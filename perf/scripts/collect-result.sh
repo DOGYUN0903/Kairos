@@ -23,6 +23,7 @@ on_fail() {
       metrics:{dealSold:($sold|tonumber? // null)}}' > "$RESULT" || true
   exit "$rc"
 }
+set -E
 trap 'on_fail $LINENO' ERR
 log "drain 대기 (cap ${DRAIN_CAP}s, tomcat baseline ${BASE})"
 DRAIN="$(wait_drain "$DEAL" "$DRAIN_CAP" "$BASE")"
