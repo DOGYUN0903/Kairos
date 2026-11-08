@@ -27,6 +27,7 @@ class DealQueryService(
             dealPrice = deal.dealPrice.amount,
             perMemberLimit = deal.perMemberLimit,
             ongoing = deal.statusAt(LocalDateTime.now(clock)) == DealStatus.ONGOING,
+            totalQuantity = deal.totalQuantity,
         )
     }
 

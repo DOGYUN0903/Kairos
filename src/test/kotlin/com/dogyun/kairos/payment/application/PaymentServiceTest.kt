@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PaymentServiceTest {
 
@@ -26,9 +27,17 @@ class PaymentServiceTest {
         override fun findLatestByOrderId(orderId: Long) = store.lastOrNull { it.orderId == orderId }
     }
 
+    private class FakePaymentMetrics : PaymentMetrics {
+        val recorded = mutableListOf<Pair<String, Long>>()
+        override fun recordDuration(result: String, nanos: Long) {
+            recorded += result to nanos
+        }
+    }
+
     private val pg = FakePgClient(PgResponse.APPROVED)
     private val repository = FakePaymentRepository()
-    private val service = PaymentService(pg, repository)
+    private val metrics = FakePaymentMetrics()
+    private val service = PaymentService(pg, repository, metrics)
 
     @Test
     fun 승인되면_APPROVED로_저장() {
@@ -70,5 +79,17 @@ class PaymentServiceTest {
         service.pay(10L, 5000L)
         assertFailsWith<IllegalStateException> { service.refund(10L) }
         assertFailsWith<IllegalStateException> { service.refund(999L) }
+    }
+
+    @Test
+    fun 결제_소요시간이_결과별로_기록된다() {
+        service.pay(10L, 5000L)
+        pg.response = PgResponse.FAILED
+        service.pay(11L, 5000L)
+        pg.response = PgResponse.TIMEOUT
+        service.pay(12L, 5000L)
+
+        assertEquals(listOf("APPROVED", "FAILED", "TIMEOUT"), metrics.recorded.map { it.first })
+        assertTrue(metrics.recorded.all { it.second >= 0 })
     }
 }

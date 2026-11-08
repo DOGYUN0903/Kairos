@@ -10,11 +10,15 @@ import org.springframework.transaction.annotation.Transactional
 class PaymentService(
     private val pgClient: PgClient,
     private val paymentRepository: PaymentRepository,
+    private val paymentMetrics: PaymentMetrics,
 ) {
 
     @Transactional
     fun pay(orderId: Long, amount: Long): PayResult {
-        val reason = when (pgClient.approve(orderId, amount)) {
+        val started = System.nanoTime()
+        val response = pgClient.approve(orderId, amount)
+        paymentMetrics.recordDuration(response.name, System.nanoTime() - started)
+        val reason = when (response) {
             PgResponse.APPROVED -> null
             PgResponse.FAILED -> FailReason.PAYMENT_FAILED
             PgResponse.TIMEOUT -> FailReason.PAYMENT_TIMEOUT
