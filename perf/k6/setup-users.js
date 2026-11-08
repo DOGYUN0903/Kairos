@@ -13,6 +13,8 @@ export const options = {
   vus: 1,
   iterations: 1,
   setupTimeout: '30m',
+  batch: CONCURRENCY, // http.batch 동시 요청 상한(기본 20)
+  batchPerHost: CONCURRENCY,
   // 출력에 토큰이 섞이지 않도록 기본 요약 통계만 사용
   summaryTrendStats: ['avg', 'med', 'p(95)', 'max'],
 };
@@ -22,6 +24,7 @@ function post(path, body) {
 }
 
 export function setup() {
+  const issuedAtMs = Date.now(); // 토큰 만료 기준은 발급 시작 시각
   if (!PASSWORD || PASSWORD.length < 8) throw new Error('PASSWORD env (8자 이상) 필요');
   const users = [];
   let signupOk = 0;
@@ -43,7 +46,7 @@ export function setup() {
       users.push({ email: userEmail(idx[k]), accessToken: r.json('data.accessToken') });
     });
   }
-  return { issuedAtMs: Date.now(), count: users.length, signupOk, signupDup, users };
+  return { issuedAtMs, count: users.length, signupOk, signupDup, users };
 }
 
 export default function () {}

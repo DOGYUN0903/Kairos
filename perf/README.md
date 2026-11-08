@@ -1,6 +1,6 @@
 # perf (Phase 2 기준선 측정)
 
-k6 시나리오. 모든 명령은 저장소 루트에서 실행한다. 전제: perf 스택이 떠 있어야 한다
+k6 시나리오. 모든 명령은 저장소 루트에서 실행하고, `.env` 값은 먼저 셸로 내보낸다(`set -a; . ./.env; set +a`). 전제: perf 스택이 떠 있어야 한다
 (`docker compose -f compose.yaml -f compose.perf.yaml up -d --build`).
 
 ## 1. 회원 준비 (측정 구간 밖)
@@ -16,6 +16,7 @@ PASSWORD="$PERF_USER_PASSWORD" USER_COUNT=1000 CONCURRENCY=30 k6 run perf/k6/set
 mkdir -p perf/results/<run>
 DEAL_ID=<id> OPEN_AT_EPOCH_MS=<ms> VIEW_SECONDS=60 USER_COUNT=1000 RUN_NAME=<run> k6 run perf/k6/timedeal-open.js
 ```
+- `OPEN_AT_EPOCH_MS`는 k6 시작 + VU 초기화(1,000 VU는 수 초~수십 초) + 원하는 조회 시간만큼 뒤여야 한다. `VIEW_SECONDS`는 기록용 설정값이고 실제 조회 구간은 OPEN_AT가 정하며 `viewActual`에 기록된다. 조회는 OPEN_AT 3초 전에 멈추고 대기한다.
 - 각 VU(=사용자 1명)가 오픈 전까지 1~2초 간격으로 `GET /deals/{id}`, `OPEN_AT_EPOCH_MS`에 `POST /orders`(quantity 1) 1건. 요청 타임아웃 90초.
 - 결과: `perf/results/<RUN_NAME>/k6-summary.json` (디렉터리는 미리 만들어 둔다. 토큰/비밀번호는 포함하지 않음).
 - 환경변수: `BASE_URL`(기본 http://localhost:8080), `TOKENS_FILE`(기본 perf/.tokens.json, 스크립트 기준 상대경로), `RESULT_DIR`.

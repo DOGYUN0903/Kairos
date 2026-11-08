@@ -1,4 +1,5 @@
 // 타임딜 오픈 시나리오: 오픈 전까지 딜 상세를 반복 조회하다가 OPEN_AT_EPOCH_MS에 사용자별 주문 1건.
+// VIEW_SECONDS는 설정값 기록용이며 OPEN_AT가 실제 조회 길이를 정한다(실제 값은 summary의 viewActual).
 // 사용(저장소 루트에서): DEAL_ID=.. OPEN_AT_EPOCH_MS=.. k6 run perf/k6/timedeal-open.js
 import http from 'k6/http';
 import exec from 'k6/execution';
@@ -16,8 +17,12 @@ const TOKENS_FILE = __ENV.TOKENS_FILE || '../../perf/.tokens.json'; // open()은
 const USER_COUNT = envInt('USER_COUNT', 1000); // 사용 인원(토큰 파일 앞에서부터)
 const TOKEN_MAX_AGE_MS = 25 * 60 * 1000; // JWT 액세스 TTL 30분보다 짧게
 
-const tokenFile = JSON.parse(open(TOKENS_FILE));
-const users = new SharedArray('users', () => tokenFile.users.slice(0, USER_COUNT));
+// 파일은 SharedArray 콜백 안에서만 파싱한다(VU별 복사 방지). 0번 원소는 메타데이터, 1번부터 사용자.
+const shared = new SharedArray('tokens', () => {
+  const f = JSON.parse(open(TOKENS_FILE));
+  return [{ issuedAtMs: f.issuedAtMs, total: f.users.length }].concat(f.users.slice(0, USER_COUNT));
+});
+const meta = shared[0];
 
 export const options = {
   scenarios: {
@@ -34,8 +39,10 @@ export const options = {
 
 const HTTP_CODES = [201, 400, 401, 403, 404, 409, 500, 502, 503, 504, 0];
 const STATUSES = ['PAID', 'CANCELLED', 'NONE'];
-const ERROR_CODES = ['INVALID_REQUEST', 'UNAUTHORIZED', 'FORBIDDEN', 'DEAL_NOT_FOUND', 'DEAL_NOT_ONGOING',
-  'ORDER_LIMIT_EXCEEDED', 'STOCK_SOLD_OUT', 'INTERNAL_ERROR', 'NONE'];
+const ERROR_CODES = ['INVALID_REQUEST', 'UNAUTHORIZED', 'FORBIDDEN', 'METHOD_NOT_ALLOWED', 'RESOURCE_NOT_FOUND',
+  'INTERNAL_ERROR', 'MEMBER_EMAIL_DUPLICATED', 'AUTH_INVALID_CREDENTIALS', 'AUTH_INVALID_TOKEN', 'DEAL_INVALID',
+  'DEAL_NOT_FOUND', 'DEAL_ALREADY_OPENED', 'DEAL_NOT_ONGOING', 'ORDER_LIMIT_EXCEEDED', 'STOCK_SOLD_OUT',
+  'ORDER_NOT_FOUND', 'ORDER_ALREADY_CANCELLED', 'NONE'];
 const CANCEL_REASONS = ['PAYMENT_FAILED', 'PAYMENT_TIMEOUT', 'NONE'];
 
 function counters(prefix, keys) {
@@ -55,30 +62,40 @@ const orderLatency = new Trend('order_latency', true);
 const orderSendOffset = new Trend('order_send_offset_ms'); // 실제 전송 시각 - OPEN_AT (ms)
 const viewLatency = new Trend('view_latency', true);
 const viewCount = new Counter('view_requests');
+const viewConnFail = new Counter('view_conn_failures'); // status 0: 타임아웃/연결 오류
+const orderConnFail = new Counter('order_conn_failures');
+const lateOrders = new Counter('late_orders'); // OPEN_AT보다 50ms 넘게 늦게 전송된 주문
+const viewFirstAt = new Trend('view_first_at_ms'); // 첫 조회 시각(epoch ms)
+const viewLastAt = new Trend('view_last_at_ms'); // 마지막 조회 응답 시각(epoch ms)
+const VIEW_STOP_MS = 3000; // OPEN_AT 이 시간 전부터 조회를 멈추고 대기
 
 export function setup() {
   const now = Date.now();
   if (!DEAL_ID || !OPEN_AT) throw new Error('DEAL_ID, OPEN_AT_EPOCH_MS env 필요');
   if (OPEN_AT - now < 3000) throw new Error(`OPEN_AT까지 ${OPEN_AT - now}ms: 너무 가깝거나 이미 지남`);
-  if (now - tokenFile.issuedAtMs > TOKEN_MAX_AGE_MS) throw new Error('토큰이 25분 넘게 지남: setup-users를 다시 실행');
-  if (tokenFile.users.length < USER_COUNT) throw new Error(`토큰 ${tokenFile.users.length}개 < USER_COUNT ${USER_COUNT}`);
+  if (now - meta.issuedAtMs > TOKEN_MAX_AGE_MS) throw new Error('토큰이 25분 넘게 지남: setup-users를 다시 실행');
+  if (meta.total < USER_COUNT) throw new Error(`토큰 ${meta.total}개 < USER_COUNT ${USER_COUNT}`);
   return { startedAtMs: now };
 }
 
 export default function () {
-  const user = users[exec.vu.idInTest - 1];
+  const user = shared[exec.vu.idInTest]; // 0번은 메타데이터
   const headers = { Authorization: `Bearer ${user.accessToken}` };
-  const getParams = { headers, timeout: '30s', tags: { name: 'deal_detail' } };
 
   // 시작 시 몰림 방지: 최대 1초 지터 후 첫 조회(연결도 이때 맺는다)
   sleep(Math.random());
   while (true) {
     const remaining = OPEN_AT - Date.now();
-    if (remaining <= 1200) break;
-    const r = http.get(`${API}/deals/${DEAL_ID}`, getParams);
+    if (remaining <= VIEW_STOP_MS) break;
+    // 진행 중인 GET이 OPEN_AT을 넘기지 않도록 타임아웃을 남은 시간 - 300ms로 제한
+    const tmo = Math.min(30000, remaining - 300);
+    const t0 = Date.now();
+    const r = http.get(`${API}/deals/${DEAL_ID}`, { headers, timeout: `${tmo}ms`, tags: { name: 'deal_detail' } });
     viewCount.add(1);
-    viewLatency.add(r.timings.duration);
-    const pause = Math.min(1000 + Math.random() * 1000, Math.max(0, OPEN_AT - Date.now() - 1100));
+    viewFirstAt.add(t0);
+    viewLastAt.add(Date.now());
+    if (r.status === 0) viewConnFail.add(1); else viewLatency.add(r.timings.duration);
+    const pause = Math.min(1000 + Math.random() * 1000, Math.max(0, OPEN_AT - Date.now() - VIEW_STOP_MS));
     sleep(pause / 1000);
   }
 
@@ -89,12 +106,14 @@ export default function () {
 
   const sentAt = Date.now();
   orderSendOffset.add(sentAt - OPEN_AT);
+  if (sentAt - OPEN_AT > 50) lateOrders.add(1);
   const res = http.post(`${API}/orders`, JSON.stringify({ dealId: DEAL_ID, quantity: 1 }), {
     headers: Object.assign({}, JSON_HEADERS, headers),
     timeout: '90s',
     tags: { name: 'order' },
   });
   orderLatency.add(res.timings.duration);
+  if (res.status === 0) orderConnFail.add(1);
 
   inc(cHttp, HTTP_CODES, res.status);
   let status = 'NONE';
@@ -134,7 +153,18 @@ export function handleSummary(data) {
     dealId: DEAL_ID,
     openAtEpochMs: OPEN_AT,
     userCount: USER_COUNT,
-    viewSeconds: VIEW_SECONDS,
+    viewSecondsConfigured: VIEW_SECONDS,
+    // 실제 조회 구간: 가장 이른 첫 조회 ~ 가장 늦은 마지막 조회 응답, 그리고 OPEN_AT까지 남은 시간
+    viewActual: m.view_first_at_ms && m.view_last_at_ms ? {
+      firstViewAtEpochMs: m.view_first_at_ms.values.min,
+      lastViewEndAtEpochMs: m.view_last_at_ms.values.max,
+      seconds: (m.view_last_at_ms.values.max - m.view_first_at_ms.values.min) / 1000,
+      secondsFirstViewToOpen: (OPEN_AT - m.view_first_at_ms.values.min) / 1000,
+      lastViewBeforeOpenMs: OPEN_AT - m.view_last_at_ms.values.max,
+    } : null,
+    lateOrders: cnt(m, 'late_orders'),
+    orderConnFailures: cnt(m, 'order_conn_failures'),
+    viewConnFailures: cnt(m, 'view_conn_failures'),
     finishedAtEpochMs: Date.now(),
     testDurationMs: data.state.testRunDurationMs,
     orderRequests: Object.values(group(m, 'order_http', HTTP_CODES)).reduce((a, b) => a + b, 0),
