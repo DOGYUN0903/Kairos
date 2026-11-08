@@ -12,7 +12,8 @@ class Stock(
         private set
 
     init {
-        check(total >= 0 && remaining in 0..total) { "재고 값이 올바르지 않습니다: total=$total, remaining=$remaining" }
+        // Phase 1은 oversell을 허용하므로 복구 후 remaining이 total을 넘을 수 있다(상한 검사 없음).
+        check(total >= 0 && remaining >= 0) { "재고 값이 올바르지 않습니다: total=$total, remaining=$remaining" }
     }
 
     fun decrease(qty: Int) {
@@ -21,10 +22,9 @@ class Stock(
         remaining -= qty
     }
 
-    /** 총수량을 넘는 복구는 불변식 위반(프로그래밍 오류)이므로 IllegalStateException. */
+    /** Phase 1: 락이 없어 oversell이 가능하므로 복구는 total로 cap하지 않는다(Phase 3에서 재검토). */
     fun restore(qty: Int) {
         require(qty >= 1) { "복구 수량은 1 이상이어야 합니다: $qty" }
-        check(remaining + qty <= total) { "복구 후 재고가 총수량을 초과합니다: remaining=$remaining, qty=$qty, total=$total" }
         remaining += qty
     }
 }

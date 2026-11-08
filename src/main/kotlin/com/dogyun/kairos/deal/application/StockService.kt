@@ -4,6 +4,7 @@ import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.deal.domain.DealId
 import com.dogyun.kairos.deal.domain.StockRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -26,6 +27,13 @@ class StockService(private val stockRepository: StockRepository) {
         val stock = find(dealId)
         stock.restore(quantity)
         stockRepository.save(stock)
+        if (stock.remaining > stock.total) {
+            log.warn("oversell detected: dealId={}, remaining={}, total={}", dealId, stock.remaining, stock.total)
+        }
+    }
+
+    private companion object {
+        val log = LoggerFactory.getLogger(StockService::class.java)
     }
 
     private fun find(dealId: Long) =

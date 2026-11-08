@@ -31,10 +31,10 @@ class StockTest {
     }
 
     @Test
-    fun 복구는_총수량을_넘을_수_없다() {
+    fun 복구가_총수량을_넘어도_Phase1에서는_허용된다() {
         val stock = Stock(DealId(1), 10, 9)
-        assertFailsWith<IllegalStateException> { stock.restore(2) }
-        assertEquals(9, stock.remaining)
+        stock.restore(2)
+        assertEquals(11, stock.remaining)
     }
 
     @Test
