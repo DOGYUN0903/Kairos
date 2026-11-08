@@ -1,0 +1,75 @@
+{
+  "run": "20261108-233452-A",
+  "dealId": 9,
+  "openAtEpochMs": 1794148677000,
+  "userCount": 1000,
+  "viewSecondsConfigured": 60,
+  "viewActual": {
+    "firstViewAtEpochMs": 1794148602641,
+    "lastViewEndAtEpochMs": 1794148674007,
+    "seconds": 71.366,
+    "secondsFirstViewToOpen": 74.359,
+    "lastViewBeforeOpenMs": 2993
+  },
+  "lateOrders": 0,
+  "orderConnFailures": 192,
+  "viewConnFailures": 0,
+  "finishedAtEpochMs": 1794148767052,
+  "testDurationMs": 164398.772,
+  "orderRequests": 1000,
+  "orderHttpStatusCounts": {
+    "0": 192,
+    "201": 807,
+    "500": 1
+  },
+  "orderResponseStatusCounts": {
+    "PAID": 807,
+    "NONE": 193
+  },
+  "orderErrorCodeCounts": {
+    "INTERNAL_ERROR": 1,
+    "NONE": 999
+  },
+  "orderCancelReasonCounts": {
+    "NONE": 1000
+  },
+  "orderLatencyMs": {
+    "min": 126.718,
+    "p50": 55861.7135,
+    "p95": 90010.5428,
+    "p99": 90012.14502000001,
+    "max": 90013.596,
+    "avg": 53743.79310300002
+  },
+  "orderLatencyAnsweredMs": {
+    "min": 126.718,
+    "p50": 45186.8655,
+    "p95": 85442.9807,
+    "p99": 89022.01838,
+    "max": 89915.866,
+    "avg": 45126.622056930675
+  },
+  "orderSendOffsetMs": {
+    "first": 0,
+    "last": 19,
+    "spread": 19,
+    "p50": 16,
+    "p95": 18
+  },
+  "viewRequests": 47398,
+  "viewLatencyMs": {
+    "min": 1.083,
+    "p50": 1.648,
+    "p95": 8.343149999999998,
+    "p99": 345.38714999999996,
+    "max": 1115.375,
+    "avg": 11.202979682687008
+  },
+  "droppedIterations": 0,
+  "iterationsCompleted": 1000,
+  "httpReqFailed": {
+    "rate": 0.003987768089590479,
+    "failed": 193
+  },
+  "interruptedIterations": 0
+}

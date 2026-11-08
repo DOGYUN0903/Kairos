@@ -1,0 +1,30 @@
+{
+  "runLabel": "",
+  "condition": "B",
+  "mockPgDelay": "1s",
+  "mockPgFailureRate": "0.0",
+  "mockPgTimeout": "3s",
+  "tomcatBusyBaseline": 0,
+  "viewSeconds": 60,
+  "userCount": 1000,
+  "stock": 100,
+  "perMemberLimit": 1,
+  "warmupDealId": 16,
+  "warmupDrain": {
+    "seconds": 1,
+    "timedOut": false,
+    "cap": 60,
+    "finalOrderRows": 50
+  },
+  "phasesEpochMs": {
+    "appRestartEpochMs": 1794149831253,
+    "appHealthyEpochMs": 1794149840713,
+    "usersSetupStartEpochMs": 1794149840745,
+    "usersSetupEndEpochMs": 1794149913643,
+    "warmupStartEpochMs": 1794149913677,
+    "warmupEndEpochMs": 1794149981536,
+    "dealCreatedEpochMs": 1794149981744,
+    "k6StartEpochMs": 1794149981782,
+    "k6EndEpochMs": 1794150146502
+  }
+}

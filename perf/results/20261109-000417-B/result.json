@@ -1,0 +1,184 @@
+{
+  "runLabel": "",
+  "condition": "B",
+  "dealId": 19,
+  "generatedAtEpochSec": 1794150687,
+  "environment": {
+    "mockPgDelay": "1s",
+    "mockPgFailureRate": "0.0",
+    "mockPgTimeout": "3s",
+    "resources": {
+      "app": {
+        "cpus": 2,
+        "memMB": 1536
+      },
+      "mysql": {
+        "cpus": 2,
+        "memMB": 2048
+      },
+      "redis": {
+        "cpus": 0.5,
+        "memMB": 256
+      }
+    },
+    "hikariMaxPoolSize": 10,
+    "tomcatMaxThreads": 200,
+    "host": {
+      "cpus": 10,
+      "memBytes": 34359738368,
+      "macOS": "26.6.2"
+    },
+    "k6Version": "k6 v2.2.0 (commit/devel, go1.26.5, darwin/arm64)",
+    "gitCommit": "2634b17",
+    "gitDirtyInAppSources": false,
+    "viewSecondsConfigured": 60,
+    "userCount": 1000,
+    "stock": 100,
+    "perMemberLimit": 1
+  },
+  "phases": {
+    "appRestartEpochMs": 1794150257047,
+    "appHealthyEpochMs": 1794150268610,
+    "usersSetupStartEpochMs": 1794150268643,
+    "usersSetupEndEpochMs": 1794150341360,
+    "warmupStartEpochMs": 1794150341392,
+    "warmupEndEpochMs": 1794150410780,
+    "dealCreatedEpochMs": 1794150410994,
+    "k6StartEpochMs": 1794150411032,
+    "k6EndEpochMs": 1794150575431,
+    "k6FirstViewAtEpochMs": 1794150411300,
+    "k6OpenAtEpochMs": 1794150485000,
+    "setupFinishedBeforeFirstView": true,
+    "warmupFinishedBeforeFirstView": true,
+    "setupToFirstViewSeconds": 69.94
+  },
+  "window": {
+    "startEpochSec": 1794150411,
+    "k6EndEpochSec": 1794150581,
+    "queryEndEpochSec": 1794150686,
+    "windowSeconds": 276
+  },
+  "drain": {
+    "seconds": 103,
+    "timedOut": false,
+    "cap": 600,
+    "finalOrderRows": 187
+  },
+  "warmupDrain": {
+    "seconds": 2,
+    "timedOut": false,
+    "cap": 60,
+    "finalOrderRows": 50
+  },
+  "db": {
+    "paidQuantity": 187,
+    "paidOrders": 187,
+    "cancelledOrders": 0,
+    "orderRows": 187,
+    "byStatusAndReason": [
+      {
+        "status": "PAID",
+        "cancelReason": "-",
+        "count": 187
+      }
+    ],
+    "stockRemaining": 81,
+    "stockTotal": 100
+  },
+  "metrics": {
+    "dealSold": 187,
+    "dealCapacity": 100,
+    "dealOversold": 87,
+    "orderPlacedByResult": {
+      "PAID": 187
+    },
+    "hikariPendingMax": 190,
+    "hikariActiveMax": 10,
+    "tomcatBusyThreadsMax": 200,
+    "appProcessCpuUsageMax": 1,
+    "paymentP95Seconds": 1.0706538435717392,
+    "paymentP95SecondsByResult": {
+      "APPROVED": 1.0706538435717392
+    }
+  },
+  "derived": {
+    "oversoldUnits": 87,
+    "soldMatches": true,
+    "lostUpdateGap": 168
+  },
+  "k6": {
+    "run": "20261109-000417-B",
+    "dealId": 19,
+    "openAtEpochMs": 1794150485000,
+    "userCount": 1000,
+    "viewSecondsConfigured": 60,
+    "viewActual": {
+      "firstViewAtEpochMs": 1794150411300,
+      "lastViewEndAtEpochMs": 1794150481998,
+      "seconds": 70.698,
+      "secondsFirstViewToOpen": 73.7,
+      "lastViewBeforeOpenMs": 3002
+    },
+    "lateOrders": 0,
+    "orderConnFailures": 586,
+    "viewConnFailures": 0,
+    "finishedAtEpochMs": 1794150575086,
+    "testDurationMs": 163766.769,
+    "orderRequests": 1000,
+    "orderHttpStatusCounts": {
+      "0": 586,
+      "201": 87,
+      "500": 327
+    },
+    "orderResponseStatusCounts": {
+      "PAID": 87,
+      "NONE": 913
+    },
+    "orderErrorCodeCounts": {
+      "INTERNAL_ERROR": 327,
+      "NONE": 673
+    },
+    "orderCancelReasonCounts": {
+      "NONE": 1000
+    },
+    "orderLatencyMs": {
+      "min": 1035.236,
+      "p50": 90020.8085,
+      "p95": 90025.48585,
+      "p99": 90026.70191,
+      "max": 90027.975,
+      "avg": 72814.1272159999
+    },
+    "orderLatencyAnsweredMs": {
+      "min": 1035.236,
+      "p50": 43365.556,
+      "p95": 68659.69969999998,
+      "p99": 85484.05434999999,
+      "max": 89662.589,
+      "avg": 48455.91844202898
+    },
+    "orderSendOffsetMs": {
+      "first": 1,
+      "last": 30,
+      "spread": 29,
+      "p50": 26,
+      "p95": 29
+    },
+    "viewRequests": 46264,
+    "viewLatencyMs": {
+      "min": 1.073,
+      "p50": 1.644,
+      "p95": 7.789,
+      "p99": 1431.7427299999993,
+      "max": 2399.761,
+      "avg": 32.92963911464674
+    },
+    "droppedIterations": 0,
+    "iterationsCompleted": 1000,
+    "httpReqFailed": {
+      "rate": 0.019317027758970887,
+      "failed": 913
+    },
+    "interruptedIterations": 0
+  }
+}
