@@ -1,0 +1,34 @@
+# 측정(perf) 전용 오버라이드. 기본 개발 흐름(compose.yaml 단독)에는 영향이 없다.
+# 시작: docker compose -f compose.yaml -f compose.perf.yaml up -d --build
+# 종료: docker compose -f compose.yaml -f compose.perf.yaml down
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      # 컨테이너 네트워크 기준 접속 정보(.env의 호스트용 값보다 environment가 우선한다)
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g"
+      KAIROS_MOCK_PG_DELAY: ${PERF_MOCK_PG_DELAY:-100ms}
+      KAIROS_MOCK_PG_FAILURE_RATE: ${PERF_MOCK_PG_FAILURE_RATE:-0.0}
+      KAIROS_MOCK_PG_TIMEOUT: ${PERF_MOCK_PG_TIMEOUT:-3s}
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    cpus: 2
+    mem_limit: 1536m
+    depends_on:
+      - mysql
+      - redis
+  mysql:
+    cpus: 2
+    mem_limit: 2g
+  redis:
+    cpus: 1
+    mem_limit: 512m
+  prometheus:
+    volumes:
+      - ./monitoring/prometheus/prometheus-perf.yml:/etc/prometheus/prometheus.yml:ro

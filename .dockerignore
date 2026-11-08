@@ -1,0 +1,12 @@
+.git
+.gradle
+.idea
+.kotlin
+.superpowers
+.env
+.env.*
+build
+logs
+docs
+monitoring
+HELP.md

@@ -1,0 +1,15 @@
+# perf 실행(compose.perf.yaml)에서만 사용한다. 기존 host job은 유지하고 컨테이너 앱 job을 1초 간격으로 추가한다.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: kairos
+    metrics_path: /actuator/prometheus
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["host.docker.internal:8081"]
+  - job_name: kairos-perf
+    metrics_path: /actuator/prometheus
+    scrape_interval: 1s
+    static_configs:
+      - targets: ["app:8081"]
