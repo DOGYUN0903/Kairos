@@ -63,7 +63,7 @@ Phase 2(기준선 측정)는 최적화 전의 상태를 수치로 남기는 단�
 |---|---|---|---|
 | `kairos.order.placed` | Counter | `result` = PAID / PAYMENT_FAILED / PAYMENT_TIMEOUT / SOLD_OUT / LIMIT_EXCEEDED / DEAL_NOT_ONGOING / OTHER | 주문 생성 요청 하나가 끝날 때마다 1회(성공·거절·예외 모두) |
 | `kairos.deal.sold` | Gauge | `dealId` | 딜별 **순판매량**: 커밋된 PAID 주문 수량의 누적 − 커밋된 취소 수량 |
-| `kairos.deal.total` | Gauge | `dealId` | 딜별 총수량(딜 생성·수정 커밋 시 또는 첫 주문 시 등록) |
+| `kairos.deal.capacity` | Gauge | `dealId` | 딜별 총수량(딜 생성·수정 커밋 시 또는 첫 주문 시 등록) |
 | `kairos.deal.oversold` | Gauge | `dealId` | `max(0, sold − total)` — 초과 판매된 수량 |
 | `kairos.payment.duration` | Timer | `result` = APPROVED / FAILED / TIMEOUT | Mock PG 호출마다 |
 

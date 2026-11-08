@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - 4계층 DDD 규칙 유지: `domain`은 Micrometer·Spring을 import하지 않는다. ArchitectureTest는 항상 통과해야 한다.
-- 메트릭 이름은 스펙 5.3 표 그대로: `kairos.order.placed`(tag `result`), `kairos.deal.sold`, `kairos.deal.total`, `kairos.deal.oversold`(tag `dealId`), `kairos.payment.duration`(tag `result` = APPROVED/FAILED/TIMEOUT).
+- 메트릭 이름은 스펙 5.3 표 그대로: `kairos.order.placed`(tag `result`), `kairos.deal.sold`, `kairos.deal.capacity`, `kairos.deal.oversold`(tag `dealId`), `kairos.payment.duration`(tag `result` = APPROVED/FAILED/TIMEOUT).
 - `kairos.order.placed` result 값: PAID, PAYMENT_FAILED, PAYMENT_TIMEOUT, SOLD_OUT, LIMIT_EXCEEDED, DEAL_NOT_ONGOING, OTHER.
 - 순판매량은 DB에서 계산하지 않는다. 커밋 후(`afterCommit`)에만 반영한다.
 - 관리 포트 `management.server.port=8081`, 노출 엔드포인트 `health,info,metrics,prometheus`. 서비스 포트 8080에는 Actuator가 없다.
@@ -78,7 +78,7 @@
   - `interface OrderMetrics { fun recordPlaced(result: PlaceOutcome); fun registerDeal(dealId: Long, totalQuantity: Int); fun addSold(dealId: Long, quantity: Int); fun subtractSold(dealId: Long, quantity: Int) }`
   - `enum class PlaceOutcome { PAID, PAYMENT_FAILED, PAYMENT_TIMEOUT, SOLD_OUT, LIMIT_EXCEEDED, DEAL_NOT_ONGOING, OTHER }` (order.application)
   - `interface PaymentMetrics { fun recordDuration(result: String /* APPROVED|FAILED|TIMEOUT */, nanos: Long) }`
-  - Micrometer 구현: 딜별 `AtomicLong` sold/total을 `ConcurrentHashMap`에 두고 Gauge `kairos.deal.sold`·`kairos.deal.total`·`kairos.deal.oversold`(=max(0, sold−total))를 딜당 1회 등록.
+  - Micrometer 구현: 딜별 `AtomicLong` sold/total을 `ConcurrentHashMap`에 두고 Gauge `kairos.deal.sold`·`kairos.deal.capacity`·`kairos.deal.oversold`(=max(0, sold−total))를 딜당 1회 등록.
 - 규칙:
   - `place`: 결과마다 `recordPlaced` 정확히 1회(성공·거절·예외 모두; 예외는 기록 후 다시 던진다). PAID면 `registerDeal`(DealReader 스냅샷에 총수량이 없으면 DealSnapshot에 `totalQuantity: Int`를 추가하고 deal 쪽 매핑도 고친다) + `addSold`를 **커밋 후** 실행(`TransactionSynchronizationManager.registerSynchronization` afterCommit, 활성 트랜잭션이 없으면 즉시).
   - `cancel`: 커밋 후 `subtractSold`.
@@ -100,7 +100,7 @@
 - [ ] **Step 1:** 대시보드 JSON(데이터 소스 uid `prometheus`, 변수 `dealId`). 패널 7개(스펙 1장 순서):
   1. 주문 TPS: `sum(rate(http_server_requests_seconds_count{uri="/api/v1/orders",method="POST"}[30s]))` + p95/p99: `histogram_quantile(0.95|0.99, sum by (le)(rate(http_server_requests_seconds_bucket{uri="/api/v1/orders",method="POST"}[30s])))`
   2. 주문 결과별: `sum by (result)(rate(kairos_order_placed_total[30s]))`(누적 막대 또는 시계열)
-  3. 순판매량 vs 총수량: `kairos_deal_sold{dealId="$dealId"}`, `kairos_deal_total{dealId="$dealId"}`
+  3. 순판매량 vs 총수량: `kairos_deal_sold{dealId="$dealId"}`, `kairos_deal_capacity{dealId="$dealId"}`
   4. 초과 판매 수량: `kairos_deal_oversold{dealId="$dealId"}` (stat, 0 초과 시 빨강)
   5. HikariCP: `hikaricp_connections_active`, `hikaricp_connections_pending`, `hikaricp_connections_max`
   6. Tomcat: `tomcat_threads_busy_threads`, `tomcat_threads_config_max_threads`
