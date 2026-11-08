@@ -230,6 +230,11 @@ com.dogyun.kairos.{module}
   - 양방향 매핑은 되도록 쓰지 않고, 정말 필요한 경우에만 쓴다. 쓸 때는 이유를 코드 주석에 남긴다.
   - **`@ManyToMany`, `@OneToOne`은 사용하지 않는다.** 다대다는 중간 엔티티로 풀고, 일대일은 ID 참조로 대체한다.
 - JPA 엔티티에는 비즈니스 로직을 두지 않는다. 비즈니스 로직은 도메인 모델에 둔다.
+- **모든 JPA 엔티티는 `BaseEntity`를 상속한다**(사용자 결정). `BaseEntity`는 `created_at`, `created_by`, `modified_at`, `modified_by`, `status`를 관리한다.
+  - `created_*`, `modified_*`는 Spring Data JPA Auditing으로 채운다. `*_by`는 인증된 회원 ID이며, 인증 전 요청(회원가입 등)과 시스템 작업은 `0`(SYSTEM)으로 기록한다(작성자 판단).
+  - `status`는 **레코드 상태**(`ACTIVE`, `DELETED`)다(작성자 판단). 주문 상태 같은 도메인 상태와 섞이지 않도록 도메인 상태 컬럼은 `order_status`, `deal_status`, `payment_status`처럼 이름을 따로 짓는다.
+- **소프트 딜리트를 사용한다**(사용자 결정). 삭제는 `status = DELETED`로 바꾸는 것이며 물리 삭제(`DELETE`)를 하지 않는다. 조회는 기본적으로 `ACTIVE`만 대상으로 하며, 엔티티에 `@SQLRestriction("status = 'ACTIVE'")`를 붙여 강제한다.
+- 감사 필드와 레코드 상태는 영속성 관심사이므로 도메인 모델에는 두지 않는다. 도메인에서 삭제가 필요하면 리포지토리 포트의 `delete` 메서드로 표현하고, 어댑터가 소프트 딜리트로 구현한다.
 - 조회 성능 문제(N+1 등)는 Phase 2 측정 후 Phase 3에서 해결한다. Phase 1에서 미리 최적화하지 않는다.
 
 ## 10. 산출물 구조
