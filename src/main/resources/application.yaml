@@ -43,7 +43,7 @@ server:
     mbeanregistry:
       enabled: true
 
-# 콘솔은 사람이 읽는 형식, 파일은 JSON(ECS). ECS에는 trace.id/span.id가 MDC에서 자동 포함된다.
+# 콘솔은 사람이 읽는 형식, 파일은 JSON(ECS). ECS 파일 로그에는 MDC 키가 최상위 traceId/spanId 필드로 포함된다.
 logging:
   file:
     name: logs/kairos.log
