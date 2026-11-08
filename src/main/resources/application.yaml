@@ -1,3 +1,42 @@
 spring:
   application:
     name: kairos-api
+  config:
+    # 프로젝트 루트의 .env를 프로퍼티로 읽는다. 없으면 OS 환경변수만 사용한다.
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jackson:
+    time-zone: Asia/Seoul
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+kairos:
+  jwt:
+    # 기본값을 두지 않는다. .env 또는 환경변수로 반드시 주입한다(256bit 이상).
+    secret: ${KAIROS_JWT_SECRET}
+    access-ttl: 30m
+    refresh-ttl: 14d
+  admin:
+    email: ${KAIROS_ADMIN_EMAIL}
+    password: ${KAIROS_ADMIN_PASSWORD}
+  mock-pg:
+    delay: 100ms
+    failure-rate: 0.0
+    timeout: 3s

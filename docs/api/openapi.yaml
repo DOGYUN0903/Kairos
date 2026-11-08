@@ -1,0 +1,770 @@
+openapi: 3.1.0
+info:
+  title: Kairos Time-Deal API
+  version: 0.1.0
+  description: |
+    Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
+
+    - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
+    - 모든 에러 응답은 `ErrorResponse`.
+    - 금액은 원 단위 정수(int64), 일시는 오프셋 없는 로컬 date-time(KST 기준, 예: 2026-11-08T12:00:00).
+    - 결제 실패는 에러가 아니다: 주문 생성은 201 + `status: CANCELLED` + `cancelReason`.
+    - 딜 `status`는 저장값이 아니라 조회 시각 기준 계산값이다.
+servers:
+  - url: http://localhost:8080
+    description: Local
+tags:
+  - name: Auth
+    description: 회원가입, 로그인, 토큰 재발급, 로그아웃
+  - name: Admin Deal
+    description: 관리자 딜 등록/수정/삭제
+  - name: Deal
+    description: 딜 목록/상세 조회
+  - name: Order
+    description: 주문 생성/취소/내 주문 조회
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/auth/signup:
+    post:
+      tags: [Auth]
+      operationId: signup
+      summary: 회원가입
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 가입 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SignupResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '409':
+          description: "`MEMBER_EMAIL_DUPLICATED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: MEMBER_EMAIL_DUPLICATED
+                message: 이미 사용 중인 이메일입니다.
+                timestamp: '2026-11-08T12:00:00'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: 로그인
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 토큰 발급
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: "`AUTH_INVALID_CREDENTIALS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: AUTH_INVALID_CREDENTIALS
+                message: 이메일 또는 비밀번호가 올바르지 않습니다.
+                timestamp: '2026-11-08T12:00:00'
+  /api/v1/auth/reissue:
+    post:
+      tags: [Auth]
+      operationId: reissue
+      summary: 토큰 재발급
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReissueRequest'
+      responses:
+        '200':
+          description: 토큰 재발급
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: "`AUTH_INVALID_TOKEN`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: AUTH_INVALID_TOKEN
+                message: 유효하지 않은 토큰입니다.
+                timestamp: '2026-11-08T12:00:00'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: 로그아웃 (USER)
+      responses:
+        '204':
+          description: 로그아웃 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/admin/deals:
+    post:
+      tags: [Admin Deal]
+      operationId: createDeal
+      summary: 딜 등록 (ADMIN)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DealRequest'
+      responses:
+        '201':
+          description: 딜 등록 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateDealResponse'
+        '400':
+          description: "`DEAL_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: DEAL_INVALID
+                message: 할인가는 정가보다 클 수 없습니다.
+                timestamp: '2026-11-08T12:00:00'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/deals/{dealId}:
+    parameters:
+      - $ref: '#/components/parameters/DealId'
+    put:
+      tags: [Admin Deal]
+      operationId: updateDeal
+      summary: 딜 수정 (ADMIN, 오픈 전에만)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DealRequest'
+      responses:
+        '200':
+          description: 수정 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`DEAL_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/DealNotFound'
+        '409':
+          $ref: '#/components/responses/DealAlreadyOpened'
+    delete:
+      tags: [Admin Deal]
+      operationId: deleteDeal
+      summary: 딜 삭제 (ADMIN, 소프트 딜리트, 오픈 전에만)
+      responses:
+        '204':
+          description: 삭제 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/DealNotFound'
+        '409':
+          $ref: '#/components/responses/DealAlreadyOpened'
+  /api/v1/deals:
+    get:
+      tags: [Deal]
+      operationId: listDeals
+      summary: 딜 목록 (공개, 페이징)
+      security: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: 조회 시각 기준 상태 필터
+          schema:
+            $ref: '#/components/schemas/DealStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 딜 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/DealSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+  /api/v1/deals/{dealId}:
+    get:
+      tags: [Deal]
+      operationId: getDeal
+      summary: 딜 상세 (공개)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/DealId'
+      responses:
+        '200':
+          description: 딜 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DealDetail'
+        '404':
+          $ref: '#/components/responses/DealNotFound'
+  /api/v1/orders:
+    post:
+      tags: [Order]
+      operationId: createOrder
+      summary: 주문 생성 (USER)
+      description: |
+        결제는 주문 생성 트랜잭션 안에서 동기 호출된다. 결제 실패/시간 초과는 에러가 아니며
+        201 + `status: CANCELLED` + `cancelReason`(`PAYMENT_FAILED` | `PAYMENT_TIMEOUT`)로 응답한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: 주문 생성 (결제 성공 PAID 또는 결제 실패 CANCELLED)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateOrderResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/DealNotFound'
+        '409':
+          description: "`DEAL_NOT_ONGOING`, `ORDER_LIMIT_EXCEEDED`, `STOCK_SOLD_OUT`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                dealNotOngoing:
+                  value:
+                    code: DEAL_NOT_ONGOING
+                    message: 진행 중인 딜이 아닙니다.
+                    timestamp: '2026-11-08T12:00:00'
+                orderLimitExceeded:
+                  value:
+                    code: ORDER_LIMIT_EXCEEDED
+                    message: 1인당 구매 제한 수량을 초과했습니다.
+                    timestamp: '2026-11-08T12:00:00'
+                stockSoldOut:
+                  value:
+                    code: STOCK_SOLD_OUT
+                    message: 재고가 소진되었습니다.
+                    timestamp: '2026-11-08T12:00:00'
+  /api/v1/orders/{orderId}/cancel:
+    post:
+      tags: [Order]
+      operationId: cancelOrder
+      summary: 주문 취소 (USER, 본인 주문)
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 취소 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`ORDER_NOT_FOUND` (타인의 주문 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: ORDER_NOT_FOUND
+                message: 주문을 찾을 수 없습니다.
+                timestamp: '2026-11-08T12:00:00'
+        '409':
+          description: "`ORDER_ALREADY_CANCELLED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: ORDER_ALREADY_CANCELLED
+                message: 이미 취소된 주문입니다.
+                timestamp: '2026-11-08T12:00:00'
+  /api/v1/orders/me:
+    get:
+      tags: [Order]
+      operationId: listMyOrders
+      summary: 내 주문 목록 (USER, 페이징)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 주문 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/OrderSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    DealId:
+      name: dealId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 0부터 시작
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: 페이지 크기 (최대 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    InvalidRequest:
+      description: "`INVALID_REQUEST` 요청 검증 실패"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: INVALID_REQUEST
+            message: 요청 값이 올바르지 않습니다.
+            timestamp: '2026-11-08T12:00:00'
+    Unauthorized:
+      description: "`UNAUTHORIZED` 인증 필요 또는 토큰 오류"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: UNAUTHORIZED
+            message: 인증이 필요합니다.
+            timestamp: '2026-11-08T12:00:00'
+    Forbidden:
+      description: "`FORBIDDEN` 권한 없음"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: FORBIDDEN
+            message: 접근 권한이 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+    DealNotFound:
+      description: "`DEAL_NOT_FOUND`"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: DEAL_NOT_FOUND
+            message: 딜을 찾을 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+    DealAlreadyOpened:
+      description: "`DEAL_ALREADY_OPENED` 오픈 이후에는 수정/삭제 불가"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: DEAL_ALREADY_OPENED
+            message: 이미 오픈된 딜은 변경할 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+  schemas:
+    ApiResponse:
+      type: object
+      description: 모든 성공 응답의 공통 래퍼. 엔드포인트별로 `data`를 allOf로 구체화한다.
+      required: [message, data, timestamp]
+      properties:
+        message:
+          type: string
+          example: OK
+        data:
+          description: 엔드포인트별 응답 값. 없으면 null.
+        timestamp:
+          $ref: '#/components/schemas/LocalDateTime'
+          example: '2026-11-08T12:00:00'
+    EmptyApiResponse:
+      description: data가 null인 성공 응답
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: 'null'
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          description: ErrorCode 이름
+          enum:
+            - INVALID_REQUEST
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - MEMBER_EMAIL_DUPLICATED
+            - AUTH_INVALID_CREDENTIALS
+            - AUTH_INVALID_TOKEN
+            - DEAL_INVALID
+            - DEAL_NOT_FOUND
+            - DEAL_ALREADY_OPENED
+            - DEAL_NOT_ONGOING
+            - ORDER_LIMIT_EXCEEDED
+            - STOCK_SOLD_OUT
+            - ORDER_NOT_FOUND
+            - ORDER_ALREADY_CANCELLED
+            - METHOD_NOT_ALLOWED
+            - RESOURCE_NOT_FOUND
+            - INTERNAL_ERROR
+        message:
+          type: string
+        timestamp:
+          $ref: '#/components/schemas/LocalDateTime'
+    LocalDateTime:
+      type: string
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?$'
+      description: 오프셋 없는 로컬 date-time. 항상 KST(Asia/Seoul) 기준으로 해석한다.
+      example: '2026-12-09T10:00:00'
+    PageResponse:
+      type: object
+      description: 페이징 응답. `content` 항목 타입은 엔드포인트별로 구체화한다.
+      required: [content, page, size, totalElements, totalPages, hasNext]
+      properties:
+        content:
+          type: array
+          items: {}
+        page:
+          type: integer
+          format: int32
+          description: 0부터 시작
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        hasNext:
+          type: boolean
+    SignupRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+    SignupResponse:
+      type: object
+      required: [memberId]
+      properties:
+        memberId:
+          type: integer
+          format: int64
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    ReissueRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    DealStatus:
+      type: string
+      description: 저장값이 아니라 조회 시각 기준 계산값
+      enum: [SCHEDULED, ONGOING, CLOSED]
+    DealRequest:
+      type: object
+      description: closeAt은 openAt보다 늦어야 하고 dealPrice는 originalPrice 이하여야 한다(위반 시 DEAL_INVALID).
+      required: [productName, originalPrice, dealPrice, totalQuantity, perMemberLimit, openAt, closeAt]
+      properties:
+        productName:
+          type: string
+          minLength: 1
+        originalPrice:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 원 단위
+        dealPrice:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 원 단위
+        totalQuantity:
+          type: integer
+          format: int32
+          minimum: 1
+        perMemberLimit:
+          type: integer
+          format: int32
+          minimum: 1
+        openAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        closeAt:
+          $ref: '#/components/schemas/LocalDateTime'
+    CreateDealResponse:
+      type: object
+      required: [dealId]
+      properties:
+        dealId:
+          type: integer
+          format: int64
+    DealSummary:
+      type: object
+      required: [dealId, productName, originalPrice, dealPrice, openAt, closeAt, status]
+      properties:
+        dealId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        originalPrice:
+          type: integer
+          format: int64
+        dealPrice:
+          type: integer
+          format: int64
+        openAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        closeAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        status:
+          $ref: '#/components/schemas/DealStatus'
+    DealDetail:
+      allOf:
+        - $ref: '#/components/schemas/DealSummary'
+        - type: object
+          required: [totalQuantity, perMemberLimit, remainingQuantity]
+          properties:
+            totalQuantity:
+              type: integer
+              format: int32
+            perMemberLimit:
+              type: integer
+              format: int32
+            remainingQuantity:
+              type: integer
+              format: int32
+              minimum: 0
+    CreateOrderRequest:
+      type: object
+      required: [dealId, quantity]
+      properties:
+        dealId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+    OrderStatus:
+      type: string
+      description: 주문 생성 응답에서는 PAID 또는 CANCELLED만 나타난다.
+      enum: [CREATED, PAID, CANCELLED]
+    CancelReason:
+      type: string
+      description: >-
+        주문 취소 사유. 결제 실패(PAYMENT_FAILED)·결제 타임아웃(PAYMENT_TIMEOUT)은 시스템 취소,
+        사용자가 직접 취소하면 USER_REQUESTED. 취소되지 않은 주문에는 null.
+      enum: [PAYMENT_FAILED, PAYMENT_TIMEOUT, USER_REQUESTED]
+    CreateOrderResponse:
+      type: object
+      required: [orderId, status]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [PAID, CANCELLED]
+        cancelReason:
+          description: status가 CANCELLED일 때만 존재
+          oneOf:
+            - $ref: '#/components/schemas/CancelReason'
+            - type: 'null'
+    OrderSummary:
+      type: object
+      required: [orderId, dealId, productName, quantity, totalAmount, status, createdAt]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        dealId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+        totalAmount:
+          type: integer
+          format: int64
+          description: 원 단위
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        cancelReason:
+          oneOf:
+            - $ref: '#/components/schemas/CancelReason'
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
