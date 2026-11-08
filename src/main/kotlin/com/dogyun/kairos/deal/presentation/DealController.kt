@@ -23,11 +23,7 @@ class DealController(private val dealQueryService: DealQueryService) {
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ResponseEntity<ApiResponse<PageResponse<DealSummary>>> =
-        ApiResponse.ok(
-            dealQueryService.list(status, page, size).let { r ->
-                PageResponse(r.content.map { it }, r.page, r.size, r.totalElements, r.totalPages, r.hasNext)
-            },
-        )
+        ApiResponse.ok(PageResponse.from(dealQueryService.list(status, page, size)))
 
     @GetMapping("/{dealId}")
     fun detail(@PathVariable dealId: Long): ResponseEntity<ApiResponse<DealDetail>> =
