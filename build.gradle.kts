@@ -30,6 +30,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.flywaydb:flyway-mysql")
+    // Micrometer 지표를 Prometheus 포맷으로 노출한다(/actuator/prometheus). 컴파일 의존이 없어 runtimeOnly.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.github.openfeign.querydsl:querydsl-jpa:7.7")

@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: kairos
+    metrics_path: /actuator/prometheus
+    scrape_interval: 5s
+    static_configs:
+      # 호스트에서 실행 중인 애플리케이션의 관리 포트
+      - targets: ["host.docker.internal:8081"]
