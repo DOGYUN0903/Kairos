@@ -11,6 +11,19 @@ COND="$(jq -r .condition "$PH")"
 BASE="$(jq -r .tomcatBusyBaseline "$PH")"
 DRAIN_CAP="${DRAIN_CAP:-$([ "$COND" = B ] && echo 600 || echo 180)}"
 
+RESULT="$RUN_DIR/result.json"; TMP="$RUN_DIR/result.json.tmp"
+# 늦은 단계에서 실패해도 빈/잘린 result.json 을 남기지 않는다: 임시 파일에 쓰고 성공 시에만 이동, 실패 시 error 필드가 있는 부분 결과를 쓴다.
+on_fail() {
+  local rc=$?
+  rm -f "$TMP"
+  jq -n --arg err "collect-result.sh 실패 (exit $rc, line ${1:-?})" --arg deal "$DEAL" --arg cond "${COND:-}" \
+    --argjson drain "${DRAIN:-null}" --arg paid "${PAID_QTY:-}" --arg rem "${REMAINING:-}" --arg total "${TOTAL:-}" --arg sold "${M_SOLD:-}" \
+    '{error:$err, partial:true, condition:$cond, dealId:($deal|tonumber), drain:$drain,
+      db:{paidQuantity:($paid|tonumber? // null), stockRemaining:($rem|tonumber? // null), stockTotal:($total|tonumber? // null)},
+      metrics:{dealSold:($sold|tonumber? // null)}}' > "$RESULT" || true
+  exit "$rc"
+}
+trap 'on_fail $LINENO' ERR
 log "drain 대기 (cap ${DRAIN_CAP}s, tomcat baseline ${BASE})"
 DRAIN="$(wait_drain "$DEAL" "$DRAIN_CAP" "$BASE")"
 log "drain: $DRAIN"
@@ -81,6 +94,7 @@ jq -n \
     }),
     window: {startEpochSec: $start, k6EndEpochSec: $k6End, queryEndEpochSec: $qEnd, windowSeconds: ($qEnd - $start + 1)},
     drain: $drain,
+    warmupDrain: ($p.warmupDrain // null),
     db: {
       paidQuantity: $paid, paidOrders: $paidOrders, cancelledOrders: $cancelled, orderRows: $rows,
       byStatusAndReason: $byStatus, stockRemaining: $remaining, stockTotal: $total
@@ -97,5 +111,7 @@ jq -n \
       lostUpdateGap: ($paid - ($total - $remaining))
     },
     k6: $k
-  }' > "$RUN_DIR/result.json"
-log "result: $RUN_DIR/result.json"
+  }' > "$TMP"
+jq -e . "$TMP" >/dev/null # 유효한 JSON 이 아니면 ERR 트랩
+mv "$TMP" "$RESULT"
+log "result: $RESULT"

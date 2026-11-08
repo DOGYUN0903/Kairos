@@ -43,6 +43,7 @@ WARM_DEAL="$(create_deal "perf-warmup-$TS" 1000 1 "$(kst_ldt $((NOW_S + 4)))" "$
 sleep 6 # 워밍업 딜 오픈 대기
 DEAL_ID="$WARM_DEAL" WARMUP_ORDERS=50 WARMUP_CONCURRENCY=10 k6 run --quiet perf/k6/warmup.js >&2
 WARM_BASE_DRAIN="$(wait_drain "$WARM_DEAL" 60 100000)" # 워밍업 주문이 끝날 때까지(활성 연결 0, 행 수 안정)
+if [ "$(echo "$WARM_BASE_DRAIN" | jq -r .timedOut)" = true ]; then log "워밍업 drain 시간 초과: $WARM_BASE_DRAIN"; exit 1; fi
 # 유휴 상태의 tomcat busy 스레드 기준값 (이후 drain 판정용)
 sleep 3
 TOMCAT_BASE="$(prom_scalar 'max(tomcat_threads_busy_threads)')"
@@ -66,11 +67,11 @@ K6_END_S="$(( (K6_END_MS + 999) / 1000 + 5 ))"
 
 jq -n --arg label "$LABEL" --arg cond "$COND" --arg d "$PG_DELAY" --arg f "$PG_FAIL" --arg t "$PG_TIMEOUT" \
   --argjson base "${TOMCAT_BASE/null/0}" --argjson vs "$VIEW_SECONDS" --argjson uc "$USER_COUNT" \
-  --argjson stock "$STOCK" --argjson lim "$LIMIT" --argjson warm "$WARM_DEAL" \
+  --argjson stock "$STOCK" --argjson lim "$LIMIT" --argjson warm "$WARM_DEAL" --argjson wdrain "$WARM_BASE_DRAIN" \
   --argjson a "$APP_RESTART_MS" --argjson b "$HEALTHY_MS" --argjson c "$SETUP_START_MS" --argjson e "$SETUP_END_MS" \
   --argjson g "$WARM_START_MS" --argjson h "$WARM_END_MS" --argjson i "$DEAL_CREATED_MS" --argjson j "$K6_START_MS" --argjson k "$K6_END_MS" \
   '{runLabel:$label, condition:$cond, mockPgDelay:$d, mockPgFailureRate:$f, mockPgTimeout:$t, tomcatBusyBaseline:$base,
-    viewSeconds:$vs, userCount:$uc, stock:$stock, perMemberLimit:$lim, warmupDealId:$warm,
+    viewSeconds:$vs, userCount:$uc, stock:$stock, perMemberLimit:$lim, warmupDealId:$warm, warmupDrain:$wdrain,
     phasesEpochMs:{appRestartEpochMs:$a, appHealthyEpochMs:$b, usersSetupStartEpochMs:$c, usersSetupEndEpochMs:$e,
       warmupStartEpochMs:$g, warmupEndEpochMs:$h, dealCreatedEpochMs:$i, k6StartEpochMs:$j, k6EndEpochMs:$k}}' > "$RUN_DIR/phases.json"
 

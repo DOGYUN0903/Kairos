@@ -48,7 +48,7 @@ db_query() {
 prom_scalar() {
   local args=(--data-urlencode "query=$1")
   [ -n "${2:-}" ] && args+=(--data-urlencode "time=$2")
-  curl -sS "$PROM_URL/api/v1/query" "${args[@]}" | jq -r '(.data.result[0].value[1] // "null")'
+  curl -sS "$PROM_URL/api/v1/query" "${args[@]}" | jq -r '(.data.result[0].value[1] // "null") | if test("NaN|Inf") then "null" else . end'
 }
 
 # prom_map <promql> <labelName> [evalTime] -> {label값: 숫자} JSON
@@ -56,7 +56,7 @@ prom_map() {
   local args=(--data-urlencode "query=$1")
   [ -n "${3:-}" ] && args+=(--data-urlencode "time=$3")
   curl -sS "$PROM_URL/api/v1/query" "${args[@]}" |
-    jq -c --arg l "$2" '[.data.result[] | {(.metric[$l] // "none"): (.value[1] | tonumber)}] | add // {}'
+    jq -c --arg l "$2" '[.data.result[] | select(.value[1] | test("NaN|Inf") | not) | {(.metric[$l] // "none"): (.value[1] | tonumber)}] | add // {}'
 }
 
 wait_health() {
