@@ -11,9 +11,24 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+
+kairos:
+  jwt:
+    # 개발용 기본값이다. 운영에서는 반드시 환경변수 KAIROS_JWT_SECRET 으로 256bit(32바이트) 이상의 값을 주입한다.
+    secret: ${KAIROS_JWT_SECRET:dev-only-insecure-secret-change-me-0123456789}
+    access-ttl: 30m
+    refresh-ttl: 14d
+  admin:
+    # 개발용 기본 계정이다. 운영에서는 KAIROS_ADMIN_EMAIL / KAIROS_ADMIN_PASSWORD 로 덮어쓴다.
+    email: ${KAIROS_ADMIN_EMAIL:admin@kairos.local}
+    password: ${KAIROS_ADMIN_PASSWORD:dev-admin-password}

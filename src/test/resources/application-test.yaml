@@ -1,0 +1,9 @@
+# 테스트 전용 값. 운영 값이 아니다.
+kairos:
+  jwt:
+    secret: test-only-secret-key-for-kairos-jwt-0123456789abcdef
+    access-ttl: 30m
+    refresh-ttl: 14d
+  admin:
+    email: admin@kairos.test
+    password: test-admin-password
