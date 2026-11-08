@@ -109,7 +109,10 @@ src/test/kotlin/com/dogyun/kairos/
 
 이 스펙이 이후 모든 API 작업의 기준이다. 구현이 스펙과 다르면 스펙을 먼저 고치고 커밋한다.
 
-- [ ] **Step 1:** OpenAPI 3.1로 아래 엔드포인트를 정의한다. 인증은 `bearerAuth`(JWT). 모든 에러는 `ErrorResponse { code: string, message: string }`.
+- [ ] **Step 1:** OpenAPI 3.1로 아래 엔드포인트를 정의한다. 인증은 `bearerAuth`(JWT).
+  - **모든 성공 응답 본문은 `ApiResponse { message: string, data: T | null, timestamp: date-time }`로 감싼다**(사용자 결정, 쌀롱픽 형식). 아래 표의 응답 본문은 `data`에 들어가는 값이다. 204는 본문 없음.
+  - **모든 에러 응답은 `ErrorResponse { code: string, message: string, timestamp: date-time }`**.
+  - **목록 API(딜 목록, 내 주문)는 페이징**: 요청 `?page=0&size=20`(0부터, size 최대 100), `data`는 `PageResponse<T> { content: T[], page, size, totalElements, totalPages, hasNext }`.
 
 | Method | Path | 권한 | 요청 | 응답 |
 |---|---|---|---|---|
@@ -140,6 +143,9 @@ src/test/kotlin/com/dogyun/kairos/
 
 **Interfaces:**
 - Produces:
+  - `data class ApiResponse<T>(val message: String, val data: T?, val timestamp: LocalDateTime)` (`common/adapter/in/web/ApiResponse.kt`) + companion `fun <T> ok(data: T, message: String = "success"): ResponseEntity<ApiResponse<T>>`, `fun <T> created(data: T, message: String = "success"): ResponseEntity<ApiResponse<T>>`, `fun noContent(): ResponseEntity<Void>`. 쌀롱픽 Java record를 Kotlin으로 옮긴 형태. 모든 Controller는 이것으로 응답한다.
+  - `data class PageResponse<T>(val content: List<T>, val page: Int, val size: Int, val totalElements: Long, val totalPages: Int, val hasNext: Boolean)` (`common/adapter/in/web/PageResponse.kt`). application 계층은 Spring `Page`를 쓰지 않고 `common/domain/PageResult<T>`(같은 필드)를 반환, 웹 어댑터가 `PageResponse.from(pageResult)`로 변환.
+  - `ErrorResponse(code: String, message: String, timestamp: LocalDateTime)`
   - `enum class ErrorCode(val httpStatus: Int, val message: String)` — Task 2 표의 모든 코드 + `INVALID_REQUEST(400)`, `UNAUTHORIZED(401)`, `FORBIDDEN(403)`.
   - `open class DomainException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)`
   - `@JvmInline value class Money(val amount: Long)` — 음수면 `IllegalArgumentException`, `operator fun times(qty: Int): Money`.
@@ -148,7 +154,7 @@ src/test/kotlin/com/dogyun/kairos/
   - `AuditorAware<Long>`: `SecurityContext`의 `LoginMember.id`, 없으면 `0L`.
   - 모든 테이블 공통 컬럼 DDL: `created_at DATETIME(6) NOT NULL, created_by BIGINT NOT NULL, modified_at DATETIME(6) NOT NULL, modified_by BIGINT NOT NULL, status VARCHAR(20) NOT NULL`.
 
-- [ ] **Step 1:** `MoneyTest`: `음수_금액은_생성할_수_없다`, `금액에_수량을_곱한다`(`Money(1000) * 3 == Money(3000)`).
+- [ ] **Step 1:** `MoneyTest`: `음수_금액은_생성할_수_없다`, `금액에_수량을_곱한다`(`Money(1000) * 3 == Money(3000)`). `PageResponseTest`: `PageResult를_PageResponse로_변환한다`(hasNext 계산 포함).
 - [ ] **Step 2:** 실행 → FAIL(컴파일 에러).
 - [ ] **Step 3:** 위 파일들 구현. `GlobalExceptionHandler`: `DomainException` → `errorCode.httpStatus` + `ErrorResponse(code = errorCode.name, message)`, `MethodArgumentNotValidException` → 400 `INVALID_REQUEST`.
 - [ ] **Step 4:** `./gradlew test` → PASS.
