@@ -199,4 +199,16 @@ class AuthApiTest : IntegrationTestSupport() {
 
         assertEquals(0L, createdBy)
     }
+
+    @Test
+    fun 잘못된_Content_Type으로_로그인하면_415_ErrorResponse() {
+        mockMvc.post("/api/v1/auth/login") {
+            contentType = MediaType.TEXT_PLAIN
+            content = "email=a"
+        }.andExpect {
+            status { isUnsupportedMediaType() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+            jsonPath("$.timestamp") { exists() }
+        }
+    }
 }
