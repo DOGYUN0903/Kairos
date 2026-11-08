@@ -12,7 +12,8 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 
 ## 명령어
 - 테스트: `./gradlew test` (Docker 실행 필요, Testcontainers 사용)
-- 로컬 실행: `docker compose up -d` 후 `./gradlew bootRun`
+- 로컬 실행: `.env.example`을 `.env`로 복사해 값을 채운 뒤 `docker compose up -d`, `./gradlew bootRun`
+- 설정값(DB, Redis, JWT 비밀키, 관리자 계정)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
 
 ## 아키텍처: 4계층 DDD
 모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `payment`, `common`

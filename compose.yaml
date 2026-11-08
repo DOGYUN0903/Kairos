@@ -1,14 +1,15 @@
+# 값은 같은 디렉터리의 .env에서 읽는다(docker compose가 자동으로 로드).
 services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_DATABASE: kairos
-      MYSQL_USER: kairos
-      MYSQL_PASSWORD: kairos
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:3306"
   redis:
     image: redis:7.4
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"

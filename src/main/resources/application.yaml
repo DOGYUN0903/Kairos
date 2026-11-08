@@ -1,10 +1,13 @@
 spring:
   application:
     name: kairos-api
+  config:
+    # 프로젝트 루트의 .env를 프로퍼티로 읽는다. 없으면 OS 환경변수만 사용한다.
+    import: optional:file:.env[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3306/kairos
-    username: kairos
-    password: kairos
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -13,8 +16,8 @@ spring:
     enabled: true
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
 
 management:
   endpoints:
@@ -24,11 +27,10 @@ management:
 
 kairos:
   jwt:
-    # 개발용 기본값이다. 운영에서는 반드시 환경변수 KAIROS_JWT_SECRET 으로 256bit(32바이트) 이상의 값을 주입한다.
-    secret: ${KAIROS_JWT_SECRET:dev-only-insecure-secret-change-me-0123456789}
+    # 기본값을 두지 않는다. .env 또는 환경변수로 반드시 주입한다(256bit 이상).
+    secret: ${KAIROS_JWT_SECRET}
     access-ttl: 30m
     refresh-ttl: 14d
   admin:
-    # 개발용 기본 계정이다. 운영에서는 KAIROS_ADMIN_EMAIL / KAIROS_ADMIN_PASSWORD 로 덮어쓴다.
-    email: ${KAIROS_ADMIN_EMAIL:admin@kairos.local}
-    password: ${KAIROS_ADMIN_PASSWORD:dev-admin-password}
+    email: ${KAIROS_ADMIN_EMAIL}
+    password: ${KAIROS_ADMIN_PASSWORD}

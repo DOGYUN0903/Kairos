@@ -1,4 +1,13 @@
 # 테스트 전용 값. 운영 값이 아니다.
+# DB/Redis 접속 정보는 Testcontainers(@ServiceConnection)가 덮어쓰므로 placeholder 해석용 더미 값만 둔다.
+DB_HOST: localhost
+DB_PORT: 3306
+DB_NAME: kairos
+DB_USERNAME: test
+DB_PASSWORD: test
+REDIS_HOST: localhost
+REDIS_PORT: 6379
+
 kairos:
   jwt:
     secret: test-only-secret-key-for-kairos-jwt-0123456789abcdef
