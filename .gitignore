@@ -46,3 +46,7 @@ out/
 
 # 애플리케이션 로그
 logs/
+
+# perf 임시 산출물
+perf/.tokens*
+perf/results/dryrun-*
