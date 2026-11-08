@@ -59,6 +59,7 @@ function inc(group, keys, key) {
 }
 
 const orderLatency = new Trend('order_latency', true);
+const orderLatencyAnswered = new Trend('order_latency_answered', true); // status 0(타임아웃/연결 오류) 제외
 const orderSendOffset = new Trend('order_send_offset_ms'); // 실제 전송 시각 - OPEN_AT (ms)
 const viewLatency = new Trend('view_latency', true);
 const viewCount = new Counter('view_requests');
@@ -113,6 +114,7 @@ export default function () {
     tags: { name: 'order' },
   });
   orderLatency.add(res.timings.duration);
+  if (res.status !== 0) orderLatencyAnswered.add(res.timings.duration);
   if (res.status === 0) orderConnFail.add(1);
 
   inc(cHttp, HTTP_CODES, res.status);
@@ -172,7 +174,8 @@ export function handleSummary(data) {
     orderResponseStatusCounts: group(m, 'order_status', STATUSES), // PAID / CANCELLED / NONE(상태 없음=에러·타임아웃)
     orderErrorCodeCounts: group(m, 'order_errorcode', ERROR_CODES),
     orderCancelReasonCounts: group(m, 'order_cancelreason', CANCEL_REASONS),
-    orderLatencyMs: trend(m, 'order_latency'),
+    orderLatencyMs: trend(m, 'order_latency'), // status 0(클라이언트 타임아웃) 포함
+    orderLatencyAnsweredMs: trend(m, 'order_latency_answered'), // 응답을 받은 주문만
     // 주문 요청 시작 시각의 OPEN_AT 대비 오프셋(ms). 도착 폭 = 마지막 - 첫 요청 시작
     orderSendOffsetMs: offs ? { first: offs.min, last: offs.max, spread: offs.max - offs.min, p50: offs.med, p95: offs['p(95)'] } : null,
     viewRequests: cnt(m, 'view_requests'),

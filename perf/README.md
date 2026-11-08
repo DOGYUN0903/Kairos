@@ -22,3 +22,13 @@ DEAL_ID=<id> OPEN_AT_EPOCH_MS=<ms> VIEW_SECONDS=60 USER_COUNT=1000 RUN_NAME=<run
 - 환경변수: `BASE_URL`(기본 http://localhost:8080), `TOKENS_FILE`(기본 perf/.tokens.json, 스크립트 기준 상대경로), `RESULT_DIR`.
 
 드라이런: `USER_COUNT=50`, 재고 5, `VIEW_SECONDS=15`, `RUN_NAME=dryrun-N`(`perf/results/dryrun-*`는 gitignore).
+
+## 3. 한 번에 실행 (권장)
+```
+perf/scripts/run-baseline.sh <A|B> [runLabel]   # A: Mock PG 100ms, B: 1s
+```
+앱 재시작 -> 회원 준비 -> 워밍업(`perf/k6/warmup.js`) -> 새 딜 -> 오픈 시나리오 -> `collect-result.sh`(서버 drain 대기 후 집계) 순서.
+결과: `perf/results/[label-]<yyyyMMdd-HHmmss>-<A|B>/result.json`(+ `phases.json`, `k6-summary.json`). 끝에 Grafana 대시보드 URL이 출력된다.
+- k6 종료 후에도 서버는 타임아웃된 요청을 계속 처리하므로, 수집은 Hikari active 0, Tomcat busy 기준값 이하, 딜 주문 행 수 5초 불변이 될 때까지 기다린다(상한 A 180초 / B 600초, `DRAIN_CAP`로 변경). `drain.seconds`, `drain.timedOut`을 결과에 기록한다.
+- 환경변수: `VIEW_SECONDS`(60), `OPEN_MARGIN_SECONDS`(15, k6 시작·VU 초기화 여유), `USER_COUNT`(1000).
+- 필요: jq, k6, docker compose, `.env`(관리자·DB·PERF_USER_PASSWORD). 리허설 산출물 `perf/results/rehearsal-*`는 gitignore.

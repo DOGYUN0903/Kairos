@@ -50,3 +50,4 @@ logs/
 # perf 임시 산출물
 perf/.tokens*
 perf/results/dryrun-*
+perf/results/rehearsal-*
