@@ -2,12 +2,12 @@ package com.dogyun.kairos.common.presentation
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import java.time.OffsetDateTime
+import java.time.LocalDateTime
 
 data class ApiResponse<T>(
     val message: String,
     val data: T?,
-    val timestamp: OffsetDateTime = KstTime.now(),
+    val timestamp: LocalDateTime = LocalDateTime.now(),
 ) {
     companion object {
         fun <T> ok(data: T, message: String = "success"): ResponseEntity<ApiResponse<T>> =

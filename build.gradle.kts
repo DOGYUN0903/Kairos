@@ -63,4 +63,7 @@ allOpen {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 서버 기본 시간대는 Asia/Seoul로 고정한다(LocalDateTime.now() 기준).
+    systemProperty("user.timezone", "Asia/Seoul")
+    jvmArgs("-Duser.timezone=Asia/Seoul")
 }

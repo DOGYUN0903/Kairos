@@ -43,6 +43,7 @@ com.dogyun.kairos.{module}/
 ## API 규칙
 - **SDD**: API를 바꾸려면 `docs/api/openapi.yaml`을 먼저 고치고 구현한다. 스펙과 구현은 계약 테스트로 맞춘다.
 - 성공 응답은 `ApiResponse(message, data, timestamp)`, 에러는 `ErrorResponse(code, message, timestamp)`, 목록은 `?page&size` + `PageResponse`.
+- API 일시는 오프셋 없는 LocalDateTime(KST 기준, 예: 2026-12-09T10:00:00). 서버 기본 시간대는 Asia/Seoul로 고정한다.
 - application 계층은 Spring `Page`가 아니라 `PageResult`를 반환한다.
 - 에러 코드는 `ErrorCode` enum과 OpenAPI의 `ErrorResponse.code`가 일치해야 한다.
 

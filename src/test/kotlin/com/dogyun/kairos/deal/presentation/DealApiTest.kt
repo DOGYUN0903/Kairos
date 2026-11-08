@@ -16,6 +16,7 @@ import java.util.UUID
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @Import(FixedClockConfig::class)
 class DealApiTest : IntegrationTestSupport() {
@@ -59,8 +60,8 @@ class DealApiTest : IntegrationTestSupport() {
             "dealPrice" to dealPrice,
             "totalQuantity" to totalQuantity,
             "perMemberLimit" to 2,
-            "openAt" to times.first + "+09:00",
-            "closeAt" to times.second + "+09:00",
+            "openAt" to times.first,
+            "closeAt" to times.second,
         ),
     )
 
@@ -92,36 +93,20 @@ class DealApiTest : IntegrationTestSupport() {
     }
 
     @Test
-    fun 일시는_KST_오프셋_형식으로_입출력된다() {
-        val token = adminToken()
-        // 2026-12-09T01:00Z == 2026-12-09T10:00+09:00 (스케줄 딜)
-        val result = mockMvc.post("/api/v1/admin/deals") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                mapOf(
-                    "productName" to "UTC딜", "originalPrice" to 10000, "dealPrice" to 5000,
-                    "totalQuantity" to 10, "perMemberLimit" to 2,
-                    "openAt" to "2026-12-09T01:00:00Z", "closeAt" to "2026-12-10T01:00:00Z",
-                ),
-            )
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.timestamp") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
-        }.andReturn()
-        val dealId = json(result).get("data").get("dealId").asLong()
+    fun 일시는_오프셋_없는_LocalDateTime으로_입출력된다() {
+        val noOffset = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$""")
+        val dealId = createDeal(scheduled)
 
-        mockMvc.get("/api/v1/deals/$dealId").andExpect {
-            jsonPath("$.data.openAt") { value("2026-12-09T10:00:00+09:00") }
-            jsonPath("$.data.closeAt") { value("2026-12-10T10:00:00+09:00") }
-            jsonPath("$.data.status") { value("SCHEDULED") }
-        }
-        mockMvc.get("/api/v1/deals").andExpect {
-            jsonPath("$.data.content[0].openAt") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
-        }
-        mockMvc.get("/api/v1/deals/999999").andExpect {
-            jsonPath("$.timestamp") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
-        }
+        val detail = json(mockMvc.get("/api/v1/deals/$dealId").andExpect { status { isOk() } }.andReturn())
+        assertEquals("2026-12-09T10:00:00", detail.get("data").get("openAt").asString())
+        assertEquals("2026-12-10T10:00:00", detail.get("data").get("closeAt").asString())
+        assertTrue(noOffset.matches(detail.get("timestamp").asString()), detail.get("timestamp").asString())
+
+        val list = json(mockMvc.get("/api/v1/deals").andReturn())
+        assertEquals("2026-12-09T10:00:00", list.get("data").get("content").get(0).get("openAt").asString())
+
+        val error = json(mockMvc.get("/api/v1/deals/999999").andReturn())
+        assertTrue(noOffset.matches(error.get("timestamp").asString()), error.get("timestamp").asString())
     }
 
     @Test
