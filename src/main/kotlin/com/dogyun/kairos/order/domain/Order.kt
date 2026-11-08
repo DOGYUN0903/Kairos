@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.domain
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.Money
+import java.time.LocalDateTime
 
 /** member/deal 은 ID 로만 참조한다. amount 는 주문 시점 단가 x 수량. */
 class Order private constructor(
@@ -13,6 +14,8 @@ class Order private constructor(
     val amount: Money,
     status: OrderStatus,
     cancelReason: CancelReason?,
+    /** 저장된 주문만 가진다(신규 생성 시 null). */
+    val createdAt: LocalDateTime? = null,
 ) {
     var status: OrderStatus = status
         private set
@@ -44,6 +47,7 @@ class Order private constructor(
             amount: Money,
             status: OrderStatus,
             cancelReason: CancelReason?,
-        ) = Order(id, memberId, dealId, quantity, amount, status, cancelReason)
+            createdAt: LocalDateTime? = null,
+        ) = Order(id, memberId, dealId, quantity, amount, status, cancelReason, createdAt)
     }
 }

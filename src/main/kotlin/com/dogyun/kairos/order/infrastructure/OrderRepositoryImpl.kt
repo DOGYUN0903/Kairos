@@ -1,6 +1,7 @@
 package com.dogyun.kairos.order.infrastructure
 
 import com.dogyun.kairos.common.domain.Money
+import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
@@ -39,9 +40,18 @@ class OrderRepositoryImpl(
             .fetchOne() ?: 0
     }
 
-    override fun findByMemberId(memberId: Long): List<Order> =
-        jpaRepository.findAllByMemberIdOrderByIdDesc(memberId).map(::toDomain)
+    override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> {
+        val order = QOrderEntity.orderEntity
+        val content = queryFactory.selectFrom(order)
+            .where(order.memberId.eq(memberId))
+            .orderBy(order.id.desc())
+            .offset(page.toLong() * size)
+            .limit(size.toLong())
+            .fetch()
+        val total = queryFactory.select(order.count()).from(order).where(order.memberId.eq(memberId)).fetchOne() ?: 0L
+        return PageResult.of(content.map(::toDomain), page, size, total)
+    }
 
     private fun toDomain(e: OrderEntity) =
-        Order.restore(e.id, e.memberId, e.dealId, e.quantity, Money(e.amount), e.orderStatus, e.cancelReason)
+        Order.restore(e.id, e.memberId, e.dealId, e.quantity, Money(e.amount), e.orderStatus, e.cancelReason, e.createdAt)
 }

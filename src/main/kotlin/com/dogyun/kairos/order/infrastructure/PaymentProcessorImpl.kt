@@ -18,6 +18,8 @@ class PaymentProcessorImpl(private val paymentService: PaymentService) : Payment
             is PayResult.Failed -> PaymentResult.Failed(toCancelReason(result.reason))
         }
 
+    override fun refund(orderId: Long) = paymentService.refund(orderId)
+
     private fun toCancelReason(reason: FailReason) = when (reason) {
         FailReason.PAYMENT_FAILED -> CancelReason.PAYMENT_FAILED
         FailReason.PAYMENT_TIMEOUT -> CancelReason.PAYMENT_TIMEOUT

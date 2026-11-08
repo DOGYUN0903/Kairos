@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.Money
+import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.order.domain.CancelReason
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderRepository
@@ -18,6 +19,8 @@ class OrderServiceTest {
     private class FakeDealReader(var snapshot: DealSnapshot?) : DealReader {
         override fun getSnapshot(dealId: Long): DealSnapshot =
             snapshot?.takeIf { it.dealId == dealId } ?: throw DomainException(ErrorCode.DEAL_NOT_FOUND)
+
+        override fun getProductNames(dealIds: Collection<Long>): Map<Long, String> = dealIds.associateWith { "상품$it" }
     }
 
     private class FakeStockManager(var remaining: Int) : StockManager {
@@ -33,6 +36,11 @@ class OrderServiceTest {
 
     private class FakePaymentProcessor(var result: PaymentResult) : PaymentProcessor {
         val calls = mutableListOf<Pair<Long, Long>>()
+        val refunds = mutableListOf<Long>()
+        override fun refund(orderId: Long) {
+            refunds += orderId
+        }
+
         override fun pay(orderId: Long, amount: Long): PaymentResult {
             calls += orderId to amount
             return result
@@ -43,7 +51,7 @@ class OrderServiceTest {
         val store = mutableMapOf<Long, Order>()
         override fun save(order: Order): Order {
             val saved = if (order.id == null) {
-                Order.restore(store.size + 1L, order.memberId, order.dealId, order.quantity, order.amount, order.status, order.cancelReason)
+                Order.restore(store.size + 1L, order.memberId, order.dealId, order.quantity, order.amount, order.status, order.cancelReason, java.time.LocalDateTime.now())
             } else {
                 order
             }
@@ -57,7 +65,10 @@ class OrderServiceTest {
             store.values.filter { it.memberId == memberId && it.dealId == dealId && it.status != OrderStatus.CANCELLED }
                 .sumOf { it.quantity }
 
-        override fun findByMemberId(memberId: Long): List<Order> = store.values.filter { it.memberId == memberId }
+        override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> {
+            val all = store.values.filter { it.memberId == memberId }.sortedByDescending { it.id }
+            return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
+        }
     }
 
     private val dealReader = FakeDealReader(DealSnapshot(dealId = 10L, dealPrice = 5000, perMemberLimit = 2, ongoing = true))
@@ -68,14 +79,16 @@ class OrderServiceTest {
 
     private fun place(quantity: Int = 1, memberId: Long = 1L) = service.place(PlaceOrderCommand(memberId, 10L, quantity))
 
-    private fun existing(memberId: Long, quantity: Int, status: OrderStatus, reason: CancelReason? = null) {
+    private val queryService = OrderQueryService(orderRepository, dealReader)
+
+    private fun existing(memberId: Long, quantity: Int, status: OrderStatus, reason: CancelReason? = null): Long {
         val order = Order.create(memberId, 10L, quantity, Money(5000))
         when (status) {
             OrderStatus.PAID -> order.markPaid()
             OrderStatus.CANCELLED -> order.cancel(checkNotNull(reason))
             OrderStatus.CREATED -> Unit
         }
-        orderRepository.save(order)
+        return checkNotNull(orderRepository.save(order).id)
     }
 
     @Test
@@ -167,5 +180,105 @@ class OrderServiceTest {
     fun 없는_딜은_DEAL_NOT_FOUND() {
         val e = assertFailsWith<DomainException> { service.place(PlaceOrderCommand(1L, 999L, 1)) }
         assertEquals(ErrorCode.DEAL_NOT_FOUND, e.errorCode)
+    }
+
+    @Test
+    fun 결제완료_주문_취소시_환불되고_재고_복구() {
+        val placed = place(quantity = 2)
+        assertEquals(3, stockManager.remaining)
+
+        service.cancel(1L, placed.orderId)
+
+        val saved = checkNotNull(orderRepository.findById(placed.orderId))
+        assertEquals(OrderStatus.CANCELLED, saved.status)
+        assertEquals(CancelReason.USER_REQUESTED, saved.cancelReason)
+        assertEquals(listOf(placed.orderId), paymentProcessor.refunds)
+        assertEquals(5, stockManager.remaining)
+    }
+
+    @Test
+    fun 이미_취소된_주문은_다시_취소할_수_없다() {
+        val placed = place(quantity = 2)
+        service.cancel(1L, placed.orderId)
+
+        val e = assertFailsWith<DomainException> { service.cancel(1L, placed.orderId) }
+
+        assertEquals(ErrorCode.ORDER_ALREADY_CANCELLED, e.errorCode)
+        assertEquals(5, stockManager.remaining)
+        assertEquals(1, paymentProcessor.refunds.size)
+    }
+
+    @Test
+    fun 결제실패로_취소된_주문의_재취소는_409이고_재고는_그대로() {
+        val id = existing(1L, 2, OrderStatus.CANCELLED, CancelReason.PAYMENT_FAILED)
+
+        val e = assertFailsWith<DomainException> { service.cancel(1L, id) }
+
+        assertEquals(ErrorCode.ORDER_ALREADY_CANCELLED, e.errorCode)
+        assertEquals(5, stockManager.remaining)
+        assertTrue(paymentProcessor.refunds.isEmpty())
+    }
+
+    @Test
+    fun 남의_주문_취소는_ORDER_NOT_FOUND() {
+        val placed = place(quantity = 2, memberId = 1L)
+
+        val e = assertFailsWith<DomainException> { service.cancel(2L, placed.orderId) }
+
+        assertEquals(ErrorCode.ORDER_NOT_FOUND, e.errorCode)
+        assertEquals(3, stockManager.remaining)
+        assertTrue(paymentProcessor.refunds.isEmpty())
+    }
+
+    @Test
+    fun 없는_주문_취소는_ORDER_NOT_FOUND() {
+        val e = assertFailsWith<DomainException> { service.cancel(1L, 999L) }
+        assertEquals(ErrorCode.ORDER_NOT_FOUND, e.errorCode)
+    }
+
+    @Test
+    fun CREATED_주문은_환불없이_취소되고_재고_복구() {
+        stockManager.remaining = 3
+        val id = existing(1L, 2, OrderStatus.CREATED)
+
+        service.cancel(1L, id)
+
+        assertEquals(OrderStatus.CANCELLED, checkNotNull(orderRepository.findById(id)).status)
+        assertTrue(paymentProcessor.refunds.isEmpty())
+        assertEquals(5, stockManager.remaining)
+    }
+
+    @Test
+    fun 내_주문만_최신순으로_조회된다() {
+        val first = existing(1L, 1, OrderStatus.PAID)
+        existing(2L, 1, OrderStatus.PAID)
+        val third = existing(1L, 2, OrderStatus.CANCELLED, CancelReason.USER_REQUESTED)
+
+        val result = queryService.findMine(1L, page = 0, size = 10)
+
+        assertEquals(listOf(third, first), result.content.map { it.orderId })
+        assertEquals(2L, result.totalElements)
+        val newest = result.content.first()
+        assertEquals("상품10", newest.productName)
+        assertEquals(10000L, newest.totalAmount)
+        assertEquals(OrderStatus.CANCELLED, newest.status)
+        assertEquals(CancelReason.USER_REQUESTED, newest.cancelReason)
+    }
+
+    @Test
+    fun 조회_페이징() {
+        repeat(3) { existing(1L, 1, OrderStatus.PAID) }
+
+        val result = queryService.findMine(1L, page = 0, size = 2)
+
+        assertEquals(2, result.content.size)
+        assertTrue(result.hasNext)
+        assertEquals(2, result.totalPages)
+    }
+
+    @Test
+    fun 조회_잘못된_페이지는_INVALID_REQUEST() {
+        assertEquals(ErrorCode.INVALID_REQUEST, assertFailsWith<DomainException> { queryService.findMine(1L, -1, 10) }.errorCode)
+        assertEquals(ErrorCode.INVALID_REQUEST, assertFailsWith<DomainException> { queryService.findMine(1L, 0, 101) }.errorCode)
     }
 }

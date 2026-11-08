@@ -37,6 +37,9 @@ class DealRepositoryImpl(private val jpaRepository: DealJpaRepository,
 
     override fun findById(id: DealId): Deal? = jpaRepository.findByIdOrNull(id.value)?.let(::toDomain)
 
+    override fun findAllByIds(ids: Collection<DealId>): List<Deal> =
+        if (ids.isEmpty()) emptyList() else jpaRepository.findAllById(ids.map { it.value }).map(::toDomain)
+
     override fun findPage(status: DealStatus?, now: LocalDateTime, page: Int, size: Int): PageResult<Deal> {
         val deal = QDealEntity.dealEntity
         val where = statusCondition(deal, status, now)

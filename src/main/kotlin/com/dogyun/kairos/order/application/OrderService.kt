@@ -3,7 +3,9 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.Money
+import com.dogyun.kairos.order.domain.CancelReason
 import com.dogyun.kairos.order.domain.Order
+import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -57,5 +59,22 @@ class OrderService(
         // 7. 저장 후 결과 반환 (결제 실패도 커밋)
         val saved = orderRepository.save(created)
         return PlaceOrderResult(orderId, saved.status, saved.cancelReason)
+    }
+
+    /**
+     * 본인 주문 취소. 남의 주문·없는 주문은 존재를 드러내지 않고 ORDER_NOT_FOUND.
+     * PAID 는 환불 후 취소, CREATED 는 환불 없이 취소하고 둘 다 재고를 복구한다(딜 종료 후에도 동일).
+     * 이미 취소된 주문은 ORDER_ALREADY_CANCELLED 이며 환불·재고에 손대지 않는다.
+     */
+    @Transactional
+    fun cancel(memberId: Long, orderId: Long) {
+        val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
+            ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
+        if (order.status == OrderStatus.CANCELLED) throw DomainException(ErrorCode.ORDER_ALREADY_CANCELLED)
+
+        if (order.status == OrderStatus.PAID) paymentProcessor.refund(orderId)
+        order.cancel(CancelReason.USER_REQUESTED)
+        stockManager.restore(order.dealId, order.quantity)
+        orderRepository.save(order)
     }
 }

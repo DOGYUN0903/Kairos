@@ -30,6 +30,9 @@ class DealQueryService(
         )
     }
 
+    fun getProductNames(dealIds: Collection<Long>): Map<Long, String> =
+        dealRepository.findAllByIds(dealIds.map(::DealId)).associate { requireNotNull(it.id).value to it.productName }
+
     fun list(status: DealStatus?, page: Int, size: Int): PageResult<DealSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val now = LocalDateTime.now(clock)

@@ -173,6 +173,118 @@ class OrderApiTest : OrderApiTestSupport() {
     }
 }
 
+class OrderCancelAndQueryApiTest : OrderApiTestSupport() {
+
+    private fun cancel(token: String?, orderId: Long) = mockMvc.post("/api/v1/orders/$orderId/cancel") {
+        token?.let { header("Authorization", "Bearer $it") }
+    }
+
+    private fun orderId(dealId: Long, token: String, quantity: Int = 2) =
+        json(order(token, dealId, quantity).andReturn()).get("data").get("orderId").asLong()
+
+    @Test
+    fun 취소하면_200_환불_재고복구() {
+        val dealId = createOngoingDeal(totalQuantity = 10)
+        val token = userToken()
+        val orderId = orderId(dealId, token)
+        assertEquals(8, remaining(dealId))
+
+        cancel(token, orderId).andExpect {
+            status { isOk() }
+            jsonPath("$.message") { isNotEmpty() }
+            jsonPath("$.data") { value(null) }
+        }
+
+        assertEquals(10, remaining(dealId))
+        assertEquals("CANCELLED", jdbcTemplate.queryForObject("select order_status from orders where id = ?", String::class.java, orderId))
+        assertEquals("USER_REQUESTED", jdbcTemplate.queryForObject("select cancel_reason from orders where id = ?", String::class.java, orderId))
+        assertEquals("REFUNDED", jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId))
+    }
+
+    @Test
+    fun 재취소는_409이고_재고는_한번만_복구() {
+        val dealId = createOngoingDeal(totalQuantity = 10)
+        val token = userToken()
+        val orderId = orderId(dealId, token)
+        cancel(token, orderId).andExpect { status { isOk() } }
+
+        cancel(token, orderId).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("ORDER_ALREADY_CANCELLED") }
+        }
+        assertEquals(10, remaining(dealId))
+    }
+
+    @Test
+    fun 남의_주문_취소는_404() {
+        val dealId = createOngoingDeal(totalQuantity = 10)
+        val orderId = orderId(dealId, userToken())
+
+        cancel(userToken(), orderId).andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("ORDER_NOT_FOUND") }
+        }
+        assertEquals(8, remaining(dealId))
+    }
+
+    @Test
+    fun 비로그인_취소는_401() {
+        cancel(null, 1L).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun 내_주문_목록은_최신순_페이징() {
+        val dealId = createOngoingDeal(totalQuantity = 10, perMemberLimit = 5)
+        val token = userToken()
+        val first = orderId(dealId, token, 1)
+        val second = orderId(dealId, token, 2)
+        orderId(dealId, userToken(), 1)
+
+        mockMvc.get("/api/v1/orders/me") {
+            header("Authorization", "Bearer $token")
+            param("page", "0")
+            param("size", "1")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.data.content.length()") { value(1) }
+            jsonPath("$.data.content[0].orderId") { value(second) }
+            jsonPath("$.data.content[0].dealId") { value(dealId) }
+            jsonPath("$.data.content[0].productName") { value("진행딜") }
+            jsonPath("$.data.content[0].quantity") { value(2) }
+            jsonPath("$.data.content[0].totalAmount") { value(10000) }
+            jsonPath("$.data.content[0].status") { value("PAID") }
+            jsonPath("$.data.content[0].cancelReason") { value(null) }
+            jsonPath("$.data.content[0].createdAt") { isNotEmpty() }
+            jsonPath("$.data.totalElements") { value(2) }
+            jsonPath("$.data.hasNext") { value(true) }
+        }
+        mockMvc.get("/api/v1/orders/me") {
+            header("Authorization", "Bearer $token")
+            param("page", "1")
+            param("size", "1")
+        }.andExpect {
+            jsonPath("$.data.content[0].orderId") { value(first) }
+            jsonPath("$.data.hasNext") { value(false) }
+        }
+    }
+
+    @Test
+    fun 내_주문_목록_잘못된_size는_400() {
+        mockMvc.get("/api/v1/orders/me") {
+            header("Authorization", "Bearer ${userToken()}")
+            param("size", "101")
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+        }
+    }
+
+    @Test
+    fun 비로그인_조회는_401() {
+        mockMvc.get("/api/v1/orders/me").andExpect { status { isUnauthorized() } }
+    }
+}
+
 @TestPropertySource(properties = ["kairos.mock-pg.failure-rate=1"])
 class OrderApiPaymentFailureTest : OrderApiTestSupport() {
 

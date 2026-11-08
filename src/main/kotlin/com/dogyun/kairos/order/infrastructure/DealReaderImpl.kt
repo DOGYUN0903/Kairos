@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component
 @Component
 class DealReaderImpl(private val dealQueryService: DealQueryService) : DealReader {
 
+    override fun getProductNames(dealIds: Collection<Long>): Map<Long, String> = dealQueryService.getProductNames(dealIds)
+
     override fun getSnapshot(dealId: Long): DealSnapshot {
         val s = dealQueryService.getSnapshot(dealId)
         return DealSnapshot(dealId = s.dealId, dealPrice = s.dealPrice, perMemberLimit = s.perMemberLimit, ongoing = s.ongoing)
