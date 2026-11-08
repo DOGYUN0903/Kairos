@@ -4,6 +4,7 @@ plugins {
     id("org.springframework.boot") version "4.1.2"
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "2.3.21"
+    id("com.google.devtools.ksp") version "2.3.13"
 }
 
 group = "com.dogyun"
@@ -31,6 +32,8 @@ dependencies {
     implementation("org.flywaydb:flyway-mysql")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    implementation("io.github.openfeign.querydsl:querydsl-jpa:7.7")
+    ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:7.7")
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
@@ -50,9 +53,16 @@ dependencies {
 }
 
 kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
     }
+}
+
+ksp {
+    arg("querydsl.includedPackages", "com.dogyun.kairos")
 }
 
 allOpen {

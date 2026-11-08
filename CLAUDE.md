@@ -8,7 +8,7 @@
 - 현재 단계: **Phase 0~1** (스펙 작성 + 모듈러 모놀리식 기본 구현)
 
 ## 스택
-Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, JUnit5, Testcontainers, ArchUnit.
+Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
 
 ## 명령어
 - 테스트: `./gradlew test` (Docker 실행 필요, Testcontainers 사용)
@@ -38,6 +38,7 @@ com.dogyun.kairos.{module}/
 - 소프트 딜리트만 쓴다(`status = DELETED`). 물리 삭제 금지. 엔티티에 `@SQLRestriction("status = 'ACTIVE'")`를 붙인다.
 - 도메인 상태 컬럼은 `status`가 아니라 `order_status`, `deal_status`, `payment_status`처럼 이름을 짓는다.
 - 연관관계는 같은 애그리거트 안에서만, `LAZY`, 기본 `@ManyToOne` 단방향. 양방향은 꼭 필요할 때만 쓰고 이유를 주석으로 남긴다. `@ManyToMany`, `@OneToOne` 금지.
+- 동적 쿼리·복잡한 조회는 QueryDSL로 작성하고, `{module}.infrastructure`의 Repository 구현에서만 사용한다. 단순 조회는 Spring Data 메서드 쿼리를 써도 된다.
 - 스키마는 Flyway로만 관리한다(`ddl-auto: validate`, `open-in-view: false`). 이미 적용된 마이그레이션 파일은 수정하지 않고 새 버전을 추가한다.
 
 ## API 규칙
