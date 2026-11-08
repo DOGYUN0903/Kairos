@@ -13,6 +13,13 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 
 테스트는 `./gradlew test` (Docker 실행 필요, Testcontainers 사용).
 
+## 모니터링
+`docker compose up -d`로 Prometheus와 Grafana도 함께 뜬다. 앱은 호스트에서 실행하므로 Prometheus가 `host.docker.internal:8081`을 5초마다 수집한다.
+- Grafana: http://localhost:3000 (사용자 `admin`, 비밀번호는 `.env`의 `GRAFANA_ADMIN_PASSWORD`). 대시보드 **Kairos 타임딜**이 자동 등록된다(`monitoring/grafana/dashboards/kairos-timedeal.json`). 상단 `dealId` 변수로 딜을 고른다.
+- Prometheus: http://localhost:9090
+- 관리 포트 8081(`/actuator/prometheus`)은 인증이 없으므로 로컬 전용이다. 운영 배포 시 외부에 열지 않는다.
+- 로그: `logs/kairos.log`(JSON, ECS). 모든 요청 로그에 `traceId`가 있고 응답 헤더 `X-Trace-Id`로도 받을 수 있다.
+
 ## 진행 단계
 - [x] Phase 0. 스펙과 기반 (OpenAPI, Docker Compose, Flyway)
 - [x] Phase 1. 모놀리식 기본 구현
