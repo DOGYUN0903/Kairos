@@ -23,12 +23,12 @@ Phase 2(기준선 측정)는 최적화 전의 상태를 수치로 남기는 단�
 - Prometheus가 애플리케이션 메트릭을 수집하고, Grafana에서 위 7개 패널이 있는 대시보드를 본다.
 - `docker compose up -d` 한 번으로 Prometheus와 Grafana가 뜨고, 데이터 소스와 대시보드가 **자동으로 등록**된다(수동 클릭 없음).
 - 대시보드 정의는 JSON 파일로 저장소에 커밋한다(재현 가능).
-- 애플리케이션 로그를 JSON 구조화 형식으로 남기고, 모든 요청 로그에 요청 ID가 붙는다.
+- 애플리케이션 로그를 JSON 구조화 형식으로 남기고, 모든 요청 로그에 `traceId`가 붙는다.
 
 ## 3. 하지 않을 것
 
 - 로그 수집 도구(Loki, ELK) — 서버가 하나라 효과가 작다. Phase 4 이후 검토.
-- 분산 트레이싱(OpenTelemetry, Zipkin) — Phase 5에서 도입.
+- 트레이스 수집·시각화(Zipkin, Tempo 등 exporter) — Phase 5에서 도입. 이번에는 traceId 생성·로그 기록·헤더 전파까지만.
 - 알림(Alertmanager) — 측정이 목적이지 운영이 아니다.
 - k6 시나리오 작성과 실제 측정 — Phase 2 본 작업에서 한다.
 - 성능 최적화, 락, 인덱스 — Phase 1 규율 유지.
@@ -77,7 +77,7 @@ Phase 2(기준선 측정)는 최적화 전의 상태를 수치로 남기는 단�
 
 ### 5.4 로깅
 - Spring Boot 기본 구조화 로깅: 콘솔은 사람이 읽는 형식 유지, **파일 로그는 JSON(ECS 형식)** 으로 `logs/kairos.log`에 남긴다. `logs/`는 gitignore.
-- 요청 ID: 서블릿 필터에서 요청마다 `X-Request-Id`(없으면 생성)를 MDC `requestId`에 넣고, 응답 헤더로도 돌려준다. 로그 패턴과 JSON 로그에 포함된다.
+- **traceId(사용자 결정)**: Micrometer Tracing(`micrometer-tracing-bridge-otel`)을 추가해 요청마다 `traceId`/`spanId`가 MDC에 들어가고 콘솔·JSON 로그에 자동으로 찍히게 한다. 응답 헤더 `X-Trace-Id`로 `traceId`를 돌려준다. 들어오는 W3C `traceparent` 헤더가 있으면 그 trace를 이어받는다(MSA 전환 시 서비스 간 전파 기반). 트레이스 수집기(Zipkin/Tempo) 연동은 Phase 5로 미룬다(exporter 없음).
 - 기존 로그(초과 판매 WARN, 예외 처리 로그)는 그대로 쓰되 dealId 등 핵심 값을 키-값으로 남긴다.
 
 ## 6. 완료 기준
@@ -85,7 +85,7 @@ Phase 2(기준선 측정)는 최적화 전의 상태를 수치로 남기는 단�
 - `docker compose up -d` + `./gradlew bootRun` 후 Grafana(`localhost:3000`)에 Kairos 대시보드가 자동으로 보이고, 7개 패널이 데이터를 그린다.
 - 간단한 수동 부하(예: curl 반복이나 짧은 k6 스모크)로 주문을 넣으면 주문 결과 카운터, 순판매량, 응답 시간 패널이 움직인다.
 - 테스트: 비즈니스 메트릭 기록(주문 결과별 카운터 증가, 순판매량 갱신)을 단위·통합 테스트로 검증한다. 관리 포트의 `/actuator/prometheus` 응답에 `kairos_order_placed_total`이 포함된다. 롤백된 주문은 순판매량에 반영되지 않는다(테스트).
-- JSON 로그 한 줄에 `requestId`가 포함되고, 응답 헤더에 `X-Request-Id`가 있다.
+- JSON 로그 한 줄에 `traceId`가 포함되고, 응답 헤더 `X-Trace-Id` 값과 일치한다.
 - ArchitectureTest 통과(domain에 Micrometer 의존 없음).
 - README에 모니터링 실행 방법과 대시보드 접속 정보 추가.
 

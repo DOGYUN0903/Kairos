@@ -30,7 +30,7 @@
 2. **롤백된 주문**(예: 재고 부족 예외): 카운터 `SOLD_OUT`은 1 증가, 순판매량은 그대로. → Task 3 `롤백된_주문은_순판매량에_반영되지_않는다`.
 3. **사용자 취소**: 커밋 후 순판매량이 취소 수량만큼 줄어든다. → Task 3 `취소하면_순판매량이_줄어든다`.
 4. **관리 포트 분리**: 8080의 `/actuator/prometheus`는 노출되지 않는다. → Task 1 `서비스_포트에는_actuator가_없다`.
-5. **요청 ID 전달**: 클라이언트가 보낸 `X-Request-Id`를 그대로 돌려준다. → Task 2 `전달된_요청ID를_그대로_돌려준다`.
+5. **trace 전파**: 들어온 `traceparent`의 traceId를 이어받아 `X-Trace-Id`로 돌려준다. → Task 2 `traceparent_헤더가_있으면_같은_traceId를_이어받는다`.
 
 ---
 
@@ -51,20 +51,20 @@
 - [ ] **Step 4:** `./gradlew test` PASS, `docker compose config` 오류 없음.
 - [ ] **Step 5: 커밋** `chore: Prometheus·Grafana 인프라와 관리 포트 분리`.
 
-### Task 2: 구조화 로그와 요청 ID
+### Task 2: 구조화 로그와 traceId
 
 **Files:**
-- Modify: `src/main/resources/application.yaml`, `.gitignore`(`logs/`)
-- Create: `common/presentation/RequestIdFilter.kt`, `src/test/kotlin/com/dogyun/kairos/common/RequestIdFilterTest.kt`
+- Modify: `build.gradle.kts` (`implementation("io.micrometer:micrometer-tracing-bridge-otel")` — Boot 관리 버전), `src/main/resources/application.yaml`, `.gitignore`(`logs/`)
+- Create: `common/presentation/TraceIdResponseFilter.kt`, `src/test/kotlin/com/dogyun/kairos/common/TraceIdTest.kt`
 
 **Interfaces:**
-- Produces: MDC 키 `requestId`, 헤더 `X-Request-Id`.
+- Produces: MDC 키 `traceId`/`spanId`(Micrometer Tracing 기본), 응답 헤더 `X-Trace-Id`.
 
-- [ ] **Step 1: 실패하는 테스트** `RequestIdFilterTest`(MockMvc): `요청ID가_없으면_생성해_응답헤더로_돌려준다`(UUID 형식), `전달된_요청ID를_그대로_돌려준다`, `요청이_끝나면_MDC를_비운다`.
+- [ ] **Step 1: 실패하는 테스트** `TraceIdTest`(통합, MockMvc 또는 RANDOM_PORT): `응답헤더에_traceId를_돌려준다`(32자리 16진수), `traceparent_헤더가_있으면_같은_traceId를_이어받는다`(예: `00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01` → `X-Trace-Id: 4bf92f3577b34da6a3ce929d0e0e4736`), `인증_실패_응답에도_traceId가_있다`(401에도 헤더).
 - [ ] **Step 2:** FAIL 확인.
-- [ ] **Step 3:** `OncePerRequestFilter`(가장 앞 순서, Security 필터보다 먼저)로 구현. 전달값은 길이 64 이하 `[A-Za-z0-9-]`만 허용, 아니면 새로 생성. 로깅: `logging.file.name: logs/kairos.log`, `logging.structured.format.file: ecs`, 콘솔 패턴에 `%X{requestId}` 포함(콘솔은 사람이 읽는 형식 유지).
-- [ ] **Step 4:** `./gradlew test` PASS. 앱을 잠깐 띄워 `logs/kairos.log` 한 줄이 JSON이고 요청 로그에 `requestId`가 있는지 확인(리포트에 한 줄 인용).
-- [ ] **Step 5: 커밋** `feat: JSON 파일 로그와 요청 ID(MDC) 추가`.
+- [ ] **Step 3:** 구현. 샘플링은 `management.tracing.sampling.probability: 1.0`, exporter 없음. `TraceIdResponseFilter`는 현재 `Tracer`의 traceId를 `X-Trace-Id`로 넣는다(관측 필터 이후, Security 필터보다 먼저 응답 헤더가 설정되도록 순서 확인). 로깅: `logging.file.name: logs/kairos.log`, `logging.structured.format.file: ecs`(ECS에 trace.id 포함 여부 확인, 없으면 MDC 키 포함 설정), 콘솔 패턴에 `[%X{traceId:-},%X{spanId:-}]` 포함(콘솔은 사람이 읽는 형식 유지).
+- [ ] **Step 4:** `./gradlew test` PASS. 앱을 잠깐 띄워 `logs/kairos.log` 한 줄이 JSON이고 traceId가 응답 헤더 값과 일치하는지 확인(리포트에 한 줄 인용).
+- [ ] **Step 5: 커밋** `feat: JSON 파일 로그와 traceId(Micrometer Tracing) 추가` (의존성 추가 이유: 로그 상관관계 + MSA 전환 시 traceparent 전파).
 
 ### Task 3: 비즈니스 메트릭
 
