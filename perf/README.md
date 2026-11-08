@@ -31,4 +31,6 @@ perf/scripts/run-baseline.sh <A|B> [runLabel]   # A: Mock PG 100ms, B: 1s
 결과: `perf/results/[label-]<yyyyMMdd-HHmmss>-<A|B>/result.json`(+ `phases.json`, `k6-summary.json`). 끝에 Grafana 대시보드 URL이 출력된다.
 - k6 종료 후에도 서버는 타임아웃된 요청을 계속 처리하므로, 수집은 Hikari active 0, Tomcat busy 기준값 이하, 딜 주문 행 수 5초 불변이 될 때까지 기다린다(상한 A 180초 / B 600초, `DRAIN_CAP`로 변경). `drain.seconds`, `drain.timedOut`을 결과에 기록한다.
 - 환경변수: `VIEW_SECONDS`(60), `OPEN_MARGIN_SECONDS`(15, k6 시작·VU 초기화 여유), `USER_COUNT`(1000).
-- 필요: jq, k6, docker compose, `.env`(관리자·DB·PERF_USER_PASSWORD). 리허설 산출물 `perf/results/rehearsal-*`는 gitignore.
+- 필요: macOS(`date -r`, `sysctl`, `sw_vers` 사용), python3, jq, k6, docker compose, `.env`(관리자·DB·PERF_USER_PASSWORD). 리허설 산출물 `perf/results/rehearsal-*`는 gitignore.
+- perf 스택을 올리면 mysql이 볼륨 없이 재생성되어 로컬 개발 데이터가 지워진다.
+- Prometheus 설정을 바꿔 전환할 때는 `docker compose -f compose.yaml -f compose.perf.yaml rm -sfv prometheus`로 컨테이너와 익명 볼륨을 지워야 중복된 옛 시계열이 남지 않는다.
