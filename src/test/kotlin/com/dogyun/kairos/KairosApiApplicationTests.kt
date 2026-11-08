@@ -1,12 +1,8 @@
 package com.dogyun.kairos
 
 import org.junit.jupiter.api.Test
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.annotation.Import
 
-@Import(TestcontainersConfiguration::class)
-@SpringBootTest
-class KairosApiApplicationTests {
+class KairosApiApplicationTests : IntegrationTestSupport() {
 
     @Test
     fun contextLoads() {
