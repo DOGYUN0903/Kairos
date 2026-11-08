@@ -30,6 +30,9 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0  # exporter는 두지 않는다(수집기 연동은 Phase 5). traceId 생성/전파만 한다.
   metrics:
     distribution:
       percentiles-histogram:
@@ -39,6 +42,14 @@ server:
   tomcat:
     mbeanregistry:
       enabled: true
+
+# 콘솔은 사람이 읽는 형식, 파일은 JSON(ECS). ECS에는 trace.id/span.id가 MDC에서 자동 포함된다.
+logging:
+  file:
+    name: logs/kairos.log
+  structured:
+    format:
+      file: ecs
 
 kairos:
   jwt:

@@ -43,3 +43,6 @@ out/
 .env
 .env.*
 !.env.example
+
+# 애플리케이션 로그
+logs/

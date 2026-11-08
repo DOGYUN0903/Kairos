@@ -32,6 +32,10 @@ dependencies {
     implementation("org.flywaydb:flyway-mysql")
     // Micrometer 지표를 Prometheus 포맷으로 노출한다(/actuator/prometheus). 컴파일 의존이 없어 runtimeOnly.
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    // 요청마다 traceId/spanId를 MDC에 넣고 W3C traceparent를 전파한다(로그 상관관계, MSA 전환 대비). exporter는 두지 않는다.
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    // Boot 4에서는 OTel 브리지 자동설정이 별도 모듈이다. 없으면 NOOP Tracer가 되어 traceId가 비어 있다.
+    implementation("org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.github.openfeign.querydsl:querydsl-jpa:7.7")
@@ -42,6 +46,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     runtimeOnly("com.mysql:mysql-connector-j")
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
+    testImplementation("org.springframework.boot:spring-boot-micrometer-tracing-test")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
