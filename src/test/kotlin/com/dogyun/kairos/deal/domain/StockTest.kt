@@ -36,4 +36,18 @@ class StockTest {
         assertFailsWith<IllegalStateException> { stock.restore(2) }
         assertEquals(9, stock.remaining)
     }
+
+    @Test
+    fun 잔여와_같은_수량을_차감하면_0이_된다() {
+        val stock = Stock(DealId(1), 10, 4)
+        stock.decrease(4)
+        assertEquals(0, stock.remaining)
+    }
+
+    @Test
+    fun 총수량까지_정확히_복구할_수_있다() {
+        val stock = Stock(DealId(1), 10, 6)
+        stock.restore(4)
+        assertEquals(10, stock.remaining)
+    }
 }
