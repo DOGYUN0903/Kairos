@@ -159,7 +159,7 @@ PAID ──사용자 취소──▶ CANCELLED(재고 복구, 환불은 Mock)
 
 ## 9. 아키텍처 규칙
 
-DDD와 클린 아키텍처를 따른다(사용자 결정). 아래 세부 규칙은 작성자 초안이다.
+DDD 4계층 아키텍처(presentation / application / domain / infrastructure)를 따른다(사용자 결정, 2026-11-08 헥사고날 포트·어댑터에서 변경). 아래 세부 규칙은 작성자 초안이다.
 
 ### 9.1 바운디드 컨텍스트 = 모듈 = 미래의 서비스
 
@@ -177,26 +177,25 @@ DDD와 클린 아키텍처를 따른다(사용자 결정). 아래 세부 규칙�
 
 ```
 com.dogyun.kairos.{module}
+  presentation/    Controller, 요청/응답 DTO
+  application/     Application Service(유스케이스 메서드), Command/Result DTO,
+                   다른 모듈을 호출하기 위해 이 모듈이 정의하는 인터페이스(예: order.application.DealReader),
+                   리포지토리가 아닌 외부 의존 인터페이스(PgClient, RefreshTokenStore)
   domain/          애그리거트, 엔티티, 값 객체, 도메인 서비스, 도메인 이벤트, 리포지토리 인터페이스
-  application/
-    port/in/       유스케이스 인터페이스 + Command/Query/Result
-    port/out/      외부 의존 인터페이스 (영속성, 외부 API, 다른 모듈)
-    service/       유스케이스 구현
-  adapter/
-    in/web/        Controller, 요청/응답 DTO
-    out/persistence/  JPA 엔티티, Spring Data 리포지토리, 매퍼, port/out 구현
-    out/external/  Mock PG 클라이언트 등
-    out/module/    다른 모듈 호출 어댑터
+  infrastructure/  JPA 엔티티, Spring Data 리포지토리, 리포지토리 구현 + 매퍼, Mock PG 클라이언트,
+                   Redis 저장소, 다른 모듈 호출 인터페이스의 구현
 ```
 
-**의존성 규칙**: `adapter → application → domain` 한 방향만 허용한다.
-- `domain`은 Spring, JPA, Jackson 등 프레임워크에 의존하지 않는 순수 Kotlin이다.
-- `application`은 트랜잭션(`@Transactional`)과 DI 어노테이션까지만 허용하고, 웹과 JPA 타입은 모른다.
+**의존성 규칙**: `presentation → application → domain ← infrastructure`.
+- `domain`은 Spring, JPA, Jackson 등 프레임워크에 의존하지 않는 순수 Kotlin이며, 다른 계층에 의존하지 않는다.
+- `application`은 트랜잭션(`@Transactional`)과 DI 어노테이션(`@Service`)까지만 허용하고, 웹과 JPA 타입은 모른다. `presentation`, `infrastructure`에 의존하지 않는다.
+- `infrastructure`는 `domain`의 리포지토리 인터페이스와 `application`의 인터페이스(PgClient, DealReader 등)를 구현하므로 두 계층에 의존할 수 있다.
+- `presentation`은 `infrastructure`에 의존하지 않는다. 별도 유스케이스 인터페이스를 두지 않고 Controller가 Application Service를 직접 호출한다.
 - 이 규칙은 ArchUnit 테스트로 강제한다. 의존성은 Phase 1에서 추가한다.
 
 ### 9.3 도메인 모델과 영속성 모델 분리
 
-- 도메인 모델과 JPA 엔티티를 **분리한다**. JPA 엔티티는 `adapter/out/persistence`에만 존재하고, 매퍼로 변환한다.
+- 도메인 모델과 JPA 엔티티를 **분리한다**. JPA 엔티티는 `infrastructure`에만 존재하고, 매퍼로 변환한다.
 - 매핑 코드가 늘어나는 비용을 감수한다. 그 대신 Phase 3에서 영속성 전략(원자적 UPDATE, Redis, CQRS 조회 모델)을 바꿔도 도메인과 유스케이스는 바뀌지 않아야 한다. 이것이 분리하는 이유이며, 최적화 단계에서 이 효과를 기록한다.
 
 ### 9.4 DDD 규칙
@@ -210,14 +209,14 @@ com.dogyun.kairos.{module}
 
 ### 9.5 모듈 간 통신
 
-- 다른 모듈은 **그 모듈의 `port/in` 유스케이스 인터페이스로만** 호출한다. 다른 모듈의 `domain`, `adapter`, JPA 엔티티를 import하지 않는다.
-- 호출하는 쪽은 자기 `port/out`에 필요한 인터페이스를 정의하고, `adapter/out/module`에서 상대 모듈의 `port/in`을 호출해 구현한다. Phase 4에서는 이 어댑터만 HTTP나 Kafka 클라이언트로 교체한다.
-- 모듈 간에 주고받는 값은 ID와 전용 DTO뿐이다.
+- 다른 모듈은 **그 모듈의 `application` 서비스 클래스로만** 호출한다. 다른 모듈의 `domain`, `presentation`, `infrastructure`, JPA 엔티티를 import하지 않는다.
+- 호출하는 쪽은 자기 `application`에 필요한 인터페이스를 정의하고(예: `order.application.DealReader`), 자기 `infrastructure`에서 상대 모듈의 `application` 서비스를 호출해 구현한다(예: `order.infrastructure.DealReaderImpl` → `deal.application.DealQueryService`). 다른 모듈의 `application`에 의존하는 코드는 `infrastructure`에만 둔다. Phase 4에서는 이 구현체만 HTTP나 Kafka 클라이언트로 교체한다.
+- 모듈 간에 주고받는 값은 ID와 전용 DTO뿐이다. 이 DTO는 제공하는 모듈의 `application`에 두며 도메인 타입을 노출하지 않는다.
 - 부가 작업(알림, 통계 등)은 도메인 이벤트로 처리한다. 모놀리식에서는 Spring `ApplicationEvent`와 `@TransactionalEventListener`를 쓴다.
 
 ### 9.6 웹, 예외, 응답
 
-- Controller는 요청 DTO를 Command/Query로 변환해서 유스케이스를 호출만 한다. 비즈니스 로직을 두지 않는다.
+- Controller는 요청 DTO를 Command/Query로 변환해서 Application Service를 호출만 한다. 비즈니스 로직을 두지 않는다.
 - 도메인 예외는 모듈별로 정의하고, 공통 `@RestControllerAdvice`에서 HTTP 상태와 에러 코드로 변환한다.
 - 에러 응답 형식은 하나로 통일하고 OpenAPI 스펙에 정의한다.
 
@@ -234,7 +233,7 @@ com.dogyun.kairos.{module}
   - `created_*`, `modified_*`는 Spring Data JPA Auditing으로 채운다. `*_by`는 인증된 회원 ID이며, 인증 전 요청(회원가입 등)과 시스템 작업은 `0`(SYSTEM)으로 기록한다(작성자 판단).
   - `status`는 **레코드 상태**(`ACTIVE`, `DELETED`)다(작성자 판단). 주문 상태 같은 도메인 상태와 섞이지 않도록 도메인 상태 컬럼은 `order_status`, `deal_status`, `payment_status`처럼 이름을 따로 짓는다.
 - **소프트 딜리트를 사용한다**(사용자 결정). 삭제는 `status = DELETED`로 바꾸는 것이며 물리 삭제(`DELETE`)를 하지 않는다. 조회는 기본적으로 `ACTIVE`만 대상으로 하며, 엔티티에 `@SQLRestriction("status = 'ACTIVE'")`를 붙여 강제한다.
-- 감사 필드와 레코드 상태는 영속성 관심사이므로 도메인 모델에는 두지 않는다. 도메인에서 삭제가 필요하면 리포지토리 포트의 `delete` 메서드로 표현하고, 어댑터가 소프트 딜리트로 구현한다.
+- 감사 필드와 레코드 상태는 영속성 관심사이므로 도메인 모델에는 두지 않는다. 도메인에서 삭제가 필요하면 리포지토리 인터페이스의 `delete` 메서드로 표현하고, `infrastructure`의 구현체가 소프트 딜리트로 구현한다.
 - 조회 성능 문제(N+1 등)는 Phase 2 측정 후 Phase 3에서 해결한다. Phase 1에서 미리 최적화하지 않는다.
 
 ## 10. 산출물 구조
