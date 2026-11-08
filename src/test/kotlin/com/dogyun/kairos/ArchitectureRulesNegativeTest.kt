@@ -2,6 +2,8 @@ package com.dogyun.kairos
 
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import com.tngtech.archunit.lang.ArchRule
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
@@ -14,20 +16,38 @@ class ArchitectureRulesNegativeTest {
         .withImportOption(ImportOption.DoNotIncludeJars())
         .importPackages(fixtureRoot)
 
-    @Test
-    fun `domain 이 Spring 에 의존하면 규칙이 실패한다`() {
-        assertThrows<AssertionError> { rules.domainHasNoFramework().check(classes) }
+    private fun assertViolation(rule: ArchRule, fixtureClass: String) {
+        val error = assertThrows<AssertionError> { rule.check(classes) }
+        assertThat(error.message).contains(fixtureClass)
     }
 
     @Test
-    fun `다른 모듈 domain 에 의존하면 규칙이 실패한다`() {
-        assertThrows<AssertionError> { rules.moduleIsolation().forEach { it.check(classes) } }
-    }
+    fun `domain 이 Spring 에 의존하면 규칙이 실패한다`() =
+        assertViolation(rules.domainHasNoFramework(), "archfixture.order.domain.BadOrder")
 
     @Test
-    fun `다른 모듈 application 을 infrastructure 밖에서 호출하면 규칙이 실패한다`() {
-        assertThrows<AssertionError> {
-            rules.crossModuleApplicationOnlyFromInfrastructure().forEach { it.check(classes) }
-        }
-    }
+    fun `domain 이 infrastructure 에 의존하면 규칙이 실패한다`() =
+        assertViolation(rules.domainHasNoOtherLayer(), "archfixture.order.domain.BadLayeredOrder")
+
+    @Test
+    fun `application 이 presentation 에 의존하면 규칙이 실패한다`() =
+        assertViolation(
+            rules.applicationNotOnPresentationInfrastructure(),
+            "archfixture.order.application.BadPresentationUser",
+        )
+
+    @Test
+    fun `presentation 이 infrastructure 에 의존하면 규칙이 실패한다`() =
+        assertViolation(rules.presentationNotOnInfrastructure(), "archfixture.order.presentation.BadOrderController")
+
+    @Test
+    fun `order 가 deal domain 에 의존하면 order-deal 쌍 규칙이 실패한다`() =
+        assertViolation(rules.moduleIsolation("order", "deal"), "archfixture.order.application.BadOrderService")
+
+    @Test
+    fun `order 가 infrastructure 밖에서 deal application 을 호출하면 order-deal 쌍 규칙이 실패한다`() =
+        assertViolation(
+            rules.crossModuleApplicationOnlyFromInfrastructure("order", "deal"),
+            "archfixture.order.application.BadOrderService",
+        )
 }

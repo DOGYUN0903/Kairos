@@ -39,7 +39,9 @@ class ArchitectureRules(private val root: String) {
             .allowEmptyShould(true)
 
     /** a -> b 쌍마다 하나의 규칙. common 은 modules 에 없으므로 예외. */
-    fun moduleIsolation(): List<ArchRule> = pairs.map { (a, b) ->
+    fun moduleIsolation(): List<ArchRule> = pairs.map { (a, b) -> moduleIsolation(a, b) }
+
+    fun moduleIsolation(a: String, b: String): ArchRule =
         noClasses().that().resideInAPackage("$root.$a..")
             .should().dependOnClassesThat().resideInAnyPackage(
                 "$root.$b.domain..",
@@ -47,12 +49,13 @@ class ArchitectureRules(private val root: String) {
                 "$root.$b.infrastructure..",
             )
             .allowEmptyShould(true)
-    }
 
-    fun crossModuleApplicationOnlyFromInfrastructure(): List<ArchRule> = pairs.map { (a, b) ->
+    fun crossModuleApplicationOnlyFromInfrastructure(): List<ArchRule> =
+        pairs.map { (a, b) -> crossModuleApplicationOnlyFromInfrastructure(a, b) }
+
+    fun crossModuleApplicationOnlyFromInfrastructure(a: String, b: String): ArchRule =
         noClasses().that().resideInAPackage("$root.$a..")
             .and().resideOutsideOfPackage("$root.$a.infrastructure..")
             .should().dependOnClassesThat().resideInAPackage("$root.$b.application..")
             .allowEmptyShould(true)
-    }
 }
