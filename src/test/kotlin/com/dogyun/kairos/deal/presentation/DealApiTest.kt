@@ -59,8 +59,8 @@ class DealApiTest : IntegrationTestSupport() {
             "dealPrice" to dealPrice,
             "totalQuantity" to totalQuantity,
             "perMemberLimit" to 2,
-            "openAt" to times.first,
-            "closeAt" to times.second,
+            "openAt" to times.first + "+09:00",
+            "closeAt" to times.second + "+09:00",
         ),
     )
 
@@ -88,6 +88,39 @@ class DealApiTest : IntegrationTestSupport() {
             jsonPath("$.data.remainingQuantity") { value(10) }
             jsonPath("$.data.perMemberLimit") { value(2) }
             jsonPath("$.data.status") { value("SCHEDULED") }
+        }
+    }
+
+    @Test
+    fun 일시는_KST_오프셋_형식으로_입출력된다() {
+        val token = adminToken()
+        // 2026-12-09T01:00Z == 2026-12-09T10:00+09:00 (스케줄 딜)
+        val result = mockMvc.post("/api/v1/admin/deals") {
+            header("Authorization", "Bearer $token")
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(
+                mapOf(
+                    "productName" to "UTC딜", "originalPrice" to 10000, "dealPrice" to 5000,
+                    "totalQuantity" to 10, "perMemberLimit" to 2,
+                    "openAt" to "2026-12-09T01:00:00Z", "closeAt" to "2026-12-10T01:00:00Z",
+                ),
+            )
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.timestamp") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
+        }.andReturn()
+        val dealId = json(result).get("data").get("dealId").asLong()
+
+        mockMvc.get("/api/v1/deals/$dealId").andExpect {
+            jsonPath("$.data.openAt") { value("2026-12-09T10:00:00+09:00") }
+            jsonPath("$.data.closeAt") { value("2026-12-10T10:00:00+09:00") }
+            jsonPath("$.data.status") { value("SCHEDULED") }
+        }
+        mockMvc.get("/api/v1/deals").andExpect {
+            jsonPath("$.data.content[0].openAt") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
+        }
+        mockMvc.get("/api/v1/deals/999999").andExpect {
+            jsonPath("$.timestamp") { value(org.hamcrest.Matchers.endsWith("+09:00")) }
         }
     }
 

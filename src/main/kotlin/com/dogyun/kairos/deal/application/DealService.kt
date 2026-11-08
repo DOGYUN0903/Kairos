@@ -19,6 +19,7 @@ class DealService(
     private val stockRepository: StockRepository,
     private val clock: Clock,
 ) {
+    // 의도적 예외(설계 9.4): Deal 과 Stock 두 애그리거트를 한 트랜잭션에서 함께 저장한다.
     @Transactional
     fun create(command: CreateDealCommand): Long {
         val deal = dealRepository.save(
@@ -39,6 +40,7 @@ class DealService(
     }
 
     /** 오픈 전(판매 이력 없음)에만 가능하므로 재고는 새 총수량으로 다시 채운다. */
+    // 의도적 예외(설계 9.4): Deal 과 Stock 두 애그리거트를 한 트랜잭션에서 함께 저장한다.
     @Transactional
     fun update(dealId: Long, command: UpdateDealCommand) {
         val deal = dealRepository.findById(DealId(dealId)) ?: throw DomainException(ErrorCode.DEAL_NOT_FOUND)

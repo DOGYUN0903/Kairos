@@ -2,9 +2,7 @@ package com.dogyun.kairos.deal.presentation
 
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.presentation.PageResponse
-import com.dogyun.kairos.deal.application.DealDetail
 import com.dogyun.kairos.deal.application.DealQueryService
-import com.dogyun.kairos.deal.application.DealSummary
 import com.dogyun.kairos.deal.domain.DealStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -22,10 +20,14 @@ class DealController(private val dealQueryService: DealQueryService) {
         @RequestParam(required = false) status: DealStatus?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
-    ): ResponseEntity<ApiResponse<PageResponse<DealSummary>>> =
-        ApiResponse.ok(PageResponse.from(dealQueryService.list(status, page, size)))
+    ): ResponseEntity<ApiResponse<PageResponse<DealSummaryResponse>>> =
+        ApiResponse.ok(
+            dealQueryService.list(status, page, size).let { r ->
+                PageResponse(r.content.map { DealSummaryResponse.from(it) }, r.page, r.size, r.totalElements, r.totalPages, r.hasNext)
+            },
+        )
 
     @GetMapping("/{dealId}")
-    fun detail(@PathVariable dealId: Long): ResponseEntity<ApiResponse<DealDetail>> =
-        ApiResponse.ok(dealQueryService.detail(dealId))
+    fun detail(@PathVariable dealId: Long): ResponseEntity<ApiResponse<DealDetailResponse>> =
+        ApiResponse.ok(DealDetailResponse.from(dealQueryService.detail(dealId)))
 }
