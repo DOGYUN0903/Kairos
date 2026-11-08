@@ -1,4 +1,4 @@
-package com.dogyun.kairos.common.adapter.out.persistence
+package com.dogyun.kairos.common.infrastructure
 
 import com.dogyun.kairos.common.security.LoginMember
 import org.springframework.context.annotation.Bean

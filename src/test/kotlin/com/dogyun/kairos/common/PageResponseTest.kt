@@ -1,6 +1,6 @@
 package com.dogyun.kairos.common
 
-import com.dogyun.kairos.common.adapter.`in`.web.PageResponse
+import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.common.domain.PageResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

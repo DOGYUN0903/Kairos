@@ -1,58 +1,44 @@
 package com.dogyun.kairos
 
+import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
-import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 
-@AnalyzeClasses(packages = ["com.dogyun.kairos"], importOptions = [ImportOption.DoNotIncludeTests::class])
+@AnalyzeClasses(
+    packages = ["com.dogyun.kairos"],
+    importOptions = [ImportOption.DoNotIncludeTests::class, ArchitectureTest.ExcludeArchFixture::class],
+)
 class ArchitectureTest {
 
-    companion object {
-        private const val ROOT = "com.dogyun.kairos"
-        private val MODULES = listOf("member", "deal", "order", "payment")
-        private val MODULE_PAIRS = MODULES.flatMap { a -> MODULES.filter { it != a }.map { b -> a to b } }
+    class ExcludeArchFixture : ImportOption {
+        override fun includes(location: com.tngtech.archunit.core.importer.Location): Boolean =
+            !location.contains("/archfixture/")
     }
 
-    @ArchTest
-    fun `domain 은 프레임워크에 의존하지 않는다`(classes: com.tngtech.archunit.core.domain.JavaClasses) {
-        noClasses().that().resideInAPackage("..domain..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "org.springframework..",
-                "jakarta.persistence..",
-                "tools.jackson..",
-                "com.fasterxml..",
-            )
-            .allowEmptyShould(true)
-            .check(classes)
-    }
+    private val rules = ArchitectureRules("com.dogyun.kairos")
 
     @ArchTest
-    fun `application 은 adapter 에 의존하지 않는다`(classes: com.tngtech.archunit.core.domain.JavaClasses) {
-        noClasses().that().resideInAPackage("..application..")
-            .should().dependOnClassesThat().resideInAPackage("..adapter..")
-            .allowEmptyShould(true)
-            .check(classes)
-    }
+    fun `domain 은 프레임워크에 의존하지 않는다`(classes: JavaClasses) =
+        rules.domainHasNoFramework().check(classes)
 
     @ArchTest
-    fun `모듈은 다른 모듈의 domain, adapter 에 의존하지 않는다`(classes: com.tngtech.archunit.core.domain.JavaClasses) {
-        MODULE_PAIRS.forEach { (a, b) ->
-            noClasses().that().resideInAPackage("$ROOT.$a..")
-                .should().dependOnClassesThat().resideInAnyPackage("$ROOT.$b.domain..", "$ROOT.$b.adapter..")
-                .allowEmptyShould(true)
-                .check(classes)
-        }
-    }
+    fun `domain 은 다른 계층에 의존하지 않는다`(classes: JavaClasses) =
+        rules.domainHasNoOtherLayer().check(classes)
 
     @ArchTest
-    fun `다른 모듈 port in 호출은 adapter out module 에서만 한다`(classes: com.tngtech.archunit.core.domain.JavaClasses) {
-        MODULE_PAIRS.forEach { (a, b) ->
-            noClasses().that().resideInAPackage("$ROOT.$a..")
-                .and().resideOutsideOfPackage("$ROOT.$a.adapter.out.module..")
-                .should().dependOnClassesThat().resideInAPackage("$ROOT.$b.application.port.in..")
-                .allowEmptyShould(true)
-                .check(classes)
-        }
-    }
+    fun `application 은 presentation 과 infrastructure 에 의존하지 않는다`(classes: JavaClasses) =
+        rules.applicationNotOnPresentationInfrastructure().check(classes)
+
+    @ArchTest
+    fun `presentation 은 infrastructure 에 의존하지 않는다`(classes: JavaClasses) =
+        rules.presentationNotOnInfrastructure().check(classes)
+
+    @ArchTest
+    fun `모듈은 다른 모듈의 domain presentation infrastructure 에 의존하지 않는다`(classes: JavaClasses) =
+        rules.moduleIsolation().forEach { it.check(classes) }
+
+    @ArchTest
+    fun `다른 모듈 application 호출은 infrastructure 에서만 한다`(classes: JavaClasses) =
+        rules.crossModuleApplicationOnlyFromInfrastructure().forEach { it.check(classes) }
 }

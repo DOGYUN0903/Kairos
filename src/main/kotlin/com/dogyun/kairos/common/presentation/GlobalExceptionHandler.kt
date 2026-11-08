@@ -1,4 +1,4 @@
-package com.dogyun.kairos.common.adapter.`in`.web
+package com.dogyun.kairos.common.presentation
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode

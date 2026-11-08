@@ -1,4 +1,4 @@
-package com.dogyun.kairos.common.adapter.`in`.web
+package com.dogyun.kairos.common.presentation
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

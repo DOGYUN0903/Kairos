@@ -1,4 +1,4 @@
-package com.dogyun.kairos.common.adapter.out.persistence
+package com.dogyun.kairos.common.infrastructure
 
 import jakarta.persistence.Column
 import jakarta.persistence.EntityListeners
