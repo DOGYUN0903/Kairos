@@ -34,3 +34,7 @@ kairos:
   admin:
     email: ${KAIROS_ADMIN_EMAIL}
     password: ${KAIROS_ADMIN_PASSWORD}
+  mock-pg:
+    delay: 100ms
+    failure-rate: 0.0
+    timeout: 3s
