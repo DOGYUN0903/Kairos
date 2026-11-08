@@ -9,6 +9,7 @@ data class DealSnapshot(
     val dealPrice: Long,
     val perMemberLimit: Int,
     val ongoing: Boolean,
+    val totalQuantity: Int,
 )
 
 data class DealSummary(

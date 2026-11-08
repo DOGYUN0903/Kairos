@@ -47,6 +47,27 @@ class OrderServiceTest {
         }
     }
 
+    private class FakeOrderMetrics : OrderMetrics {
+        val placed = mutableListOf<PlaceOutcome>()
+        val totals = mutableMapOf<Long, Int>()
+        val sold = mutableMapOf<Long, Long>()
+        override fun recordPlaced(result: PlaceOutcome) {
+            placed += result
+        }
+
+        override fun registerDeal(dealId: Long, totalQuantity: Int) {
+            totals[dealId] = totalQuantity
+        }
+
+        override fun addSold(dealId: Long, quantity: Int) {
+            sold.merge(dealId, quantity.toLong(), Long::plus)
+        }
+
+        override fun subtractSold(dealId: Long, quantity: Int) {
+            sold.merge(dealId, -quantity.toLong(), Long::plus)
+        }
+    }
+
     private class FakeOrderRepository : OrderRepository {
         val store = mutableMapOf<Long, Order>()
         override fun save(order: Order): Order {
@@ -71,11 +92,12 @@ class OrderServiceTest {
         }
     }
 
-    private val dealReader = FakeDealReader(DealSnapshot(dealId = 10L, dealPrice = 5000, perMemberLimit = 2, ongoing = true))
+    private val dealReader = FakeDealReader(DealSnapshot(dealId = 10L, dealPrice = 5000, perMemberLimit = 2, ongoing = true, totalQuantity = 5))
     private val stockManager = FakeStockManager(remaining = 5)
     private val paymentProcessor = FakePaymentProcessor(PaymentResult.Approved(paymentId = 77L))
     private val orderRepository = FakeOrderRepository()
-    private val service = OrderService(dealReader, stockManager, paymentProcessor, orderRepository)
+    private val metrics = FakeOrderMetrics()
+    private val service = OrderService(dealReader, stockManager, paymentProcessor, orderRepository, metrics)
 
     private fun place(quantity: Int = 1, memberId: Long = 1L) = service.place(PlaceOrderCommand(memberId, 10L, quantity))
 
@@ -149,7 +171,7 @@ class OrderServiceTest {
 
     @Test
     fun 진행중이_아닌_딜은_주문할_수_없다() {
-        dealReader.snapshot = DealSnapshot(10L, 5000, 2, ongoing = false)
+        dealReader.snapshot = DealSnapshot(10L, 5000, 2, ongoing = false, totalQuantity = 5)
 
         val e = assertFailsWith<DomainException> { place() }
 
@@ -280,5 +302,87 @@ class OrderServiceTest {
     fun 조회_잘못된_페이지는_INVALID_REQUEST() {
         assertEquals(ErrorCode.INVALID_REQUEST, assertFailsWith<DomainException> { queryService.findMine(1L, -1, 10) }.errorCode)
         assertEquals(ErrorCode.INVALID_REQUEST, assertFailsWith<DomainException> { queryService.findMine(1L, 0, 101) }.errorCode)
+    }
+
+    @Test
+    fun 주문_결과별로_한번씩_기록된다() {
+        place()
+        assertEquals(listOf(PlaceOutcome.PAID), metrics.placed)
+
+        paymentProcessor.result = PaymentResult.Failed(CancelReason.PAYMENT_FAILED)
+        place(memberId = 2L)
+        paymentProcessor.result = PaymentResult.Failed(CancelReason.PAYMENT_TIMEOUT)
+        place(memberId = 3L)
+        paymentProcessor.result = PaymentResult.Approved(77L)
+
+        stockManager.remaining = 0
+        assertFailsWith<DomainException> { place(memberId = 4L) }
+        stockManager.remaining = 5
+
+        assertFailsWith<DomainException> { place(quantity = 3, memberId = 5L) }
+
+        dealReader.snapshot = DealSnapshot(10L, 5000, 2, ongoing = false, totalQuantity = 5)
+        assertFailsWith<DomainException> { place(memberId = 6L) }
+
+        assertFailsWith<DomainException> { service.place(PlaceOrderCommand(7L, 999L, 1)) }
+
+        assertEquals(
+            listOf(
+                PlaceOutcome.PAID,
+                PlaceOutcome.PAYMENT_FAILED,
+                PlaceOutcome.PAYMENT_TIMEOUT,
+                PlaceOutcome.SOLD_OUT,
+                PlaceOutcome.LIMIT_EXCEEDED,
+                PlaceOutcome.DEAL_NOT_ONGOING,
+                PlaceOutcome.OTHER,
+            ),
+            metrics.placed,
+        )
+    }
+
+    @Test
+    fun 결제_승인_주문은_딜_총수량_등록과_함께_순판매량에_더해진다() {
+        place(quantity = 2)
+
+        assertEquals(5, metrics.totals[10L])
+        assertEquals(2L, metrics.sold[10L])
+    }
+
+    @Test
+    fun 결제_실패_주문은_순판매량에_반영되지_않는다() {
+        paymentProcessor.result = PaymentResult.Failed(CancelReason.PAYMENT_FAILED)
+
+        place(quantity = 2)
+
+        assertTrue(metrics.sold.isEmpty())
+        assertTrue(metrics.totals.isEmpty())
+    }
+
+    @Test
+    fun 거절된_주문은_순판매량에_반영되지_않는다() {
+        stockManager.remaining = 1
+
+        assertFailsWith<DomainException> { place(quantity = 2) }
+
+        assertTrue(metrics.sold.isEmpty())
+    }
+
+    @Test
+    fun 결제완료_주문을_취소하면_순판매량이_줄어든다() {
+        val placed = place(quantity = 2)
+
+        service.cancel(1L, placed.orderId)
+
+        assertEquals(0L, metrics.sold[10L])
+    }
+
+    @Test
+    fun CREATED_주문_취소는_순판매량을_바꾸지_않는다() {
+        stockManager.remaining = 3
+        val id = existing(1L, 2, OrderStatus.CREATED)
+
+        service.cancel(1L, id)
+
+        assertTrue(metrics.sold.isEmpty())
     }
 }

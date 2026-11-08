@@ -13,6 +13,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 ## 명령어
 - 테스트: `./gradlew test` (Docker 실행 필요, Testcontainers 사용)
 - 로컬 실행: `.env.example`을 `.env`로 복사해 값을 채운 뒤 `docker compose up -d`, `./gradlew bootRun`
+- 모니터링: `docker compose up -d` 후 Grafana(localhost:3000, 대시보드 "Kairos 타임딜"), Prometheus(localhost:9090). 메트릭은 관리 포트 8081, 로그는 `logs/kairos.log`(traceId 포함).
 - 설정값(DB, Redis, JWT 비밀키, 관리자 계정)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
 
 ## 아키텍처: 4계층 DDD

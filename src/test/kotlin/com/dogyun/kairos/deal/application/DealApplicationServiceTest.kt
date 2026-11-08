@@ -46,7 +46,7 @@ class DealApplicationServiceTest : IntegrationTestSupport() {
         val ongoing = create("2026-12-08T10:00:00", "2026-12-09T10:00:00")
         val scheduled = create("2026-12-09T10:00:00", "2026-12-10T10:00:00")
 
-        assertEquals(DealSnapshot(ongoing, 5000, 2, true), dealQueryService.getSnapshot(ongoing))
+        assertEquals(DealSnapshot(ongoing, 5000, 2, true, 5), dealQueryService.getSnapshot(ongoing))
         assertFalse(dealQueryService.getSnapshot(scheduled).ongoing)
     }
 

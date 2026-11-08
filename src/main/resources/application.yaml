@@ -21,11 +21,35 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
 
+# Actuator는 서비스 포트(8080)와 분리된 관리 포트(8081)에서만 노출한다.
+# 로컬 개발·Prometheus 수집 전용이며, 운영에서는 외부에 공개하지 않는다(내부망/방화벽으로 차단).
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0  # exporter는 두지 않는다(수집기 연동은 Phase 5). traceId 생성/전파만 한다.
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+
+# 콘솔은 사람이 읽는 형식, 파일은 JSON(ECS). ECS 파일 로그에는 MDC 키가 최상위 traceId/spanId 필드로 포함된다.
+logging:
+  file:
+    name: logs/kairos.log
+  structured:
+    format:
+      file: ecs
 
 kairos:
   jwt:

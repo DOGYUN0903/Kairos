@@ -9,6 +9,8 @@ import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 // 결정 기록: docs/adr/0001-phase1-order-single-transaction.md (Phase 4에서 Saga로 대체)
 /**
@@ -23,10 +25,37 @@ class OrderService(
     private val stockManager: StockManager,
     private val paymentProcessor: PaymentProcessor,
     private val orderRepository: OrderRepository,
+    private val orderMetrics: OrderMetrics,
 ) {
 
+    /**
+     * 요청 하나당 `recordPlaced` 를 정확히 1회 기록한다(성공·거절·예외 모두; 예외는 기록 후 다시 던진다).
+     * 카운터는 트랜잭션과 무관하므로 거절(롤백)도 세지만, 순판매량(sold)은 PAID 가 커밋된 뒤에만 반영한다.
+     */
     @Transactional
     fun place(command: PlaceOrderCommand): PlaceOrderResult {
+        val placed = try {
+            doPlace(command)
+        } catch (e: DomainException) {
+            orderMetrics.recordPlaced(outcomeOf(e.errorCode))
+            throw e
+        } catch (e: Exception) {
+            orderMetrics.recordPlaced(PlaceOutcome.OTHER)
+            throw e
+        }
+        orderMetrics.recordPlaced(outcomeOf(placed.result))
+        if (placed.result.status == OrderStatus.PAID) {
+            afterCommit {
+                orderMetrics.registerDeal(command.dealId, placed.totalQuantity)
+                orderMetrics.addSold(command.dealId, command.quantity)
+            }
+        }
+        return placed.result
+    }
+
+    private class Placed(val result: PlaceOrderResult, val totalQuantity: Int)
+
+    private fun doPlace(command: PlaceOrderCommand): Placed {
         // 1. 수량 검증
         if (command.quantity < 1) throw DomainException(ErrorCode.INVALID_REQUEST)
 
@@ -58,7 +87,34 @@ class OrderService(
 
         // 7. 저장 후 결과 반환 (결제 실패도 커밋)
         val saved = orderRepository.save(created)
-        return PlaceOrderResult(orderId, saved.status, saved.cancelReason)
+        return Placed(PlaceOrderResult(orderId, saved.status, saved.cancelReason), deal.totalQuantity)
+    }
+
+    private fun outcomeOf(result: PlaceOrderResult): PlaceOutcome = when (result.cancelReason) {
+        null -> PlaceOutcome.PAID
+        CancelReason.PAYMENT_FAILED -> PlaceOutcome.PAYMENT_FAILED
+        CancelReason.PAYMENT_TIMEOUT -> PlaceOutcome.PAYMENT_TIMEOUT
+        CancelReason.USER_REQUESTED -> PlaceOutcome.OTHER // place 에서는 발생하지 않는다
+    }
+
+    private fun outcomeOf(errorCode: ErrorCode): PlaceOutcome = when (errorCode) {
+        ErrorCode.STOCK_SOLD_OUT -> PlaceOutcome.SOLD_OUT
+        ErrorCode.ORDER_LIMIT_EXCEEDED -> PlaceOutcome.LIMIT_EXCEEDED
+        ErrorCode.DEAL_NOT_ONGOING -> PlaceOutcome.DEAL_NOT_ONGOING
+        else -> PlaceOutcome.OTHER
+    }
+
+    /** 활성 트랜잭션이 있으면 커밋 후에, 없으면(단위 테스트 등) 즉시 실행한다. 롤백되면 실행되지 않는다. */
+    private fun afterCommit(action: () -> Unit) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action()
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() = action()
+            },
+        )
     }
 
     /**
@@ -72,9 +128,12 @@ class OrderService(
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
         if (order.status == OrderStatus.CANCELLED) throw DomainException(ErrorCode.ORDER_ALREADY_CANCELLED)
 
-        if (order.status == OrderStatus.PAID) paymentProcessor.refund(orderId)
+        val wasPaid = order.status == OrderStatus.PAID
+        if (wasPaid) paymentProcessor.refund(orderId)
         order.cancel(CancelReason.USER_REQUESTED)
         stockManager.restore(order.dealId, order.quantity)
         orderRepository.save(order)
+        // 순판매량은 커밋된 PAID 수량의 누적이므로, PAID 였던 주문의 취소만 커밋 후 차감한다.
+        if (wasPaid) afterCommit { orderMetrics.subtractSold(order.dealId, order.quantity) }
     }
 }

@@ -13,6 +13,6 @@ class DealReaderImpl(private val dealQueryService: DealQueryService) : DealReade
 
     override fun getSnapshot(dealId: Long): DealSnapshot {
         val s = dealQueryService.getSnapshot(dealId)
-        return DealSnapshot(dealId = s.dealId, dealPrice = s.dealPrice, perMemberLimit = s.perMemberLimit, ongoing = s.ongoing)
+        return DealSnapshot(dealId = s.dealId, dealPrice = s.dealPrice, perMemberLimit = s.perMemberLimit, ongoing = s.ongoing, totalQuantity = s.totalQuantity)
     }
 }
