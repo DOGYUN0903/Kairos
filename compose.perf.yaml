@@ -1,6 +1,9 @@
 # 측정(perf) 전용 오버라이드. 기본 개발 흐름(compose.yaml 단독)에는 영향이 없다.
+# 사전 조건: .env 필요(.env.example을 복사해 값을 채운다).
 # 시작: docker compose -f compose.yaml -f compose.perf.yaml up -d --build
 # 종료: docker compose -f compose.yaml -f compose.perf.yaml down
+# 주의: 호스트 bootRun은 8080/8081 포트가 충돌하므로 함께 실행하지 않는다.
+# 주의: mysql에 볼륨이 없어 perf 시작 시 개발 데이터가 초기화된다(Flyway가 재적용).
 services:
   app:
     build: .
@@ -21,14 +24,26 @@ services:
     cpus: 2
     mem_limit: 1536m
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   mysql:
     cpus: 2
     mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
   redis:
-    cpus: 1
-    mem_limit: 512m
+    cpus: 0.5
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
   prometheus:
     volumes:
       - ./monitoring/prometheus/prometheus-perf.yml:/etc/prometheus/prometheus.yml:ro
