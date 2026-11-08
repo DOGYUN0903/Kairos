@@ -157,7 +157,82 @@ PAID ──사용자 취소──▶ CANCELLED(재고 복구, 환불은 Mock)
 - 분산 트레이싱(OpenTelemetry 등)과 대시보드(Grafana)로 관측한다.
 - **완료 기준**: 시나리오별로 무슨 일이 일어났고 어떻게 대응했는지 기록한 실험 리포트가 있다.
 
-## 9. 산출물 구조
+## 9. 아키텍처 규칙
+
+DDD와 클린 아키텍처를 따른다(사용자 결정). 아래 세부 규칙은 작성자 초안이다.
+
+### 9.1 바운디드 컨텍스트 = 모듈 = 미래의 서비스
+
+| 모듈 | 책임 | 애그리거트 |
+|---|---|---|
+| `member` | 회원, 인증, 권한 | Member |
+| `deal` | 타임딜과 재고 | Deal, Stock |
+| `order` | 주문과 주문 상태 흐름, 1인당 구매 제한 | Order |
+| `payment` | 결제와 Mock PG 연동 | Payment |
+| `common` | 공통 타입만(예외 기반 클래스, 공통 값 객체). 비즈니스 로직 금지 |  |
+
+모듈 경계는 Phase 4에서 그대로 서비스 경계가 된다. Stock은 Deal과 별도 애그리거트로 둔다. 딜 정보 수정과 재고 차감의 경합을 분리하고, Phase 3의 재고 최적화(Redis, 원자적 UPDATE)를 Deal과 독립적으로 바꾸기 위해서다.
+
+### 9.2 모듈 내부 레이어
+
+```
+com.dogyun.kairos.{module}
+  domain/          애그리거트, 엔티티, 값 객체, 도메인 서비스, 도메인 이벤트, 리포지토리 인터페이스
+  application/
+    port/in/       유스케이스 인터페이스 + Command/Query/Result
+    port/out/      외부 의존 인터페이스 (영속성, 외부 API, 다른 모듈)
+    service/       유스케이스 구현
+  adapter/
+    in/web/        Controller, 요청/응답 DTO
+    out/persistence/  JPA 엔티티, Spring Data 리포지토리, 매퍼, port/out 구현
+    out/external/  Mock PG 클라이언트 등
+    out/module/    다른 모듈 호출 어댑터
+```
+
+**의존성 규칙**: `adapter → application → domain` 한 방향만 허용한다.
+- `domain`은 Spring, JPA, Jackson 등 프레임워크에 의존하지 않는 순수 Kotlin이다.
+- `application`은 트랜잭션(`@Transactional`)과 DI 어노테이션까지만 허용하고, 웹과 JPA 타입은 모른다.
+- 이 규칙은 ArchUnit 테스트로 강제한다. 의존성은 Phase 1에서 추가한다.
+
+### 9.3 도메인 모델과 영속성 모델 분리
+
+- 도메인 모델과 JPA 엔티티를 **분리한다**. JPA 엔티티는 `adapter/out/persistence`에만 존재하고, 매퍼로 변환한다.
+- 매핑 코드가 늘어나는 비용을 감수한다. 그 대신 Phase 3에서 영속성 전략(원자적 UPDATE, Redis, CQRS 조회 모델)을 바꿔도 도메인과 유스케이스는 바뀌지 않아야 한다. 이것이 분리하는 이유이며, 최적화 단계에서 이 효과를 기록한다.
+
+### 9.4 DDD 규칙
+
+- 애그리거트 간에는 **ID로만 참조**한다. 객체 참조와 JPA 연관관계를 맺지 않는다.
+- 상태 변경은 애그리거트의 도메인 메서드로만 한다(예: `order.pay()`, `stock.decrease(qty)`). 외부에 public setter를 두지 않는다. Kotlin에서는 `private set`을 쓴다.
+- 불변 조건은 애그리거트 안에서 검증한다. 서비스에 `if` 검증이 흩어지지 않게 한다.
+- 값 객체를 적극 사용한다. 예: `Money`, `Quantity`, `Email`, 각 ID 타입(`DealId`, `OrderId`). Kotlin `value class`나 `data class`로 만든다.
+- 리포지토리는 애그리거트 루트 단위로만 둔다.
+- 유스케이스 하나에서 **한 애그리거트만 변경**하는 것을 원칙으로 한다. Phase 1에서 주문 생성은 재고 차감과 주문 저장을 한 트랜잭션에서 처리하는 것을 예외로 허용하고, 이 예외는 Phase 4에서 Saga로 대체한다. 예외 지점에는 주석과 ADR로 표시한다.
+
+### 9.5 모듈 간 통신
+
+- 다른 모듈은 **그 모듈의 `port/in` 유스케이스 인터페이스로만** 호출한다. 다른 모듈의 `domain`, `adapter`, JPA 엔티티를 import하지 않는다.
+- 호출하는 쪽은 자기 `port/out`에 필요한 인터페이스를 정의하고, `adapter/out/module`에서 상대 모듈의 `port/in`을 호출해 구현한다. Phase 4에서는 이 어댑터만 HTTP나 Kafka 클라이언트로 교체한다.
+- 모듈 간에 주고받는 값은 ID와 전용 DTO뿐이다.
+- 부가 작업(알림, 통계 등)은 도메인 이벤트로 처리한다. 모놀리식에서는 Spring `ApplicationEvent`와 `@TransactionalEventListener`를 쓴다.
+
+### 9.6 웹, 예외, 응답
+
+- Controller는 요청 DTO를 Command/Query로 변환해서 유스케이스를 호출만 한다. 비즈니스 로직을 두지 않는다.
+- 도메인 예외는 모듈별로 정의하고, 공통 `@RestControllerAdvice`에서 HTTP 상태와 에러 코드로 변환한다.
+- 에러 응답 형식은 하나로 통일하고 OpenAPI 스펙에 정의한다.
+
+### 9.7 JPA 규칙
+
+- 스키마는 Flyway로만 관리한다. `ddl-auto: validate`를 쓴다.
+- `open-in-view: false`
+- 연관관계는 같은 애그리거트 안에서만, 기본 `LAZY`로 맺는다(사용자 결정 포함).
+  - 기본은 **`@ManyToOne` 단방향 매핑**이다.
+  - 양방향 매핑은 되도록 쓰지 않고, 정말 필요한 경우에만 쓴다. 쓸 때는 이유를 코드 주석에 남긴다.
+  - **`@ManyToMany`, `@OneToOne`은 사용하지 않는다.** 다대다는 중간 엔티티로 풀고, 일대일은 ID 참조로 대체한다.
+- JPA 엔티티에는 비즈니스 로직을 두지 않는다. 비즈니스 로직은 도메인 모델에 둔다.
+- 조회 성능 문제(N+1 등)는 Phase 2 측정 후 Phase 3에서 해결한다. Phase 1에서 미리 최적화하지 않는다.
+
+## 10. 산출물 구조
 
 ```
 docs/
@@ -170,7 +245,7 @@ docs/
 k6/                    부하 테스트 시나리오
 ```
 
-## 10. 빌더에게 맡기는 것
+## 11. 빌더에게 맡기는 것
 
 - 엔티티와 테이블 상세 설계, API 경로와 응답 형식 세부
 - 테스트 작성 방식 세부
