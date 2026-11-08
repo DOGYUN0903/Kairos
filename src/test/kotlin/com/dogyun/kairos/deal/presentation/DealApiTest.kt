@@ -274,4 +274,30 @@ class DealApiTest : IntegrationTestSupport() {
             jsonPath("$.code") { value("FORBIDDEN") }
         }
     }
+
+    @Test
+    fun 잘못된_status_파라미터는_400_INVALID_REQUEST() {
+        mockMvc.get("/api/v1/deals?status=foo").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+            jsonPath("$.timestamp") { exists() }
+        }
+    }
+
+    @Test
+    fun 숫자가_아닌_dealId는_400_INVALID_REQUEST() {
+        mockMvc.get("/api/v1/deals/abc").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+        }
+    }
+
+    @Test
+    fun 존재하지_않는_경로는_404_RESOURCE_NOT_FOUND() {
+        mockMvc.get("/api/v1/deals/1/unknown").andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("RESOURCE_NOT_FOUND") }
+            jsonPath("$.timestamp") { exists() }
+        }
+    }
 }
