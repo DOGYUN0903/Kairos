@@ -547,6 +547,9 @@ components:
             - STOCK_SOLD_OUT
             - ORDER_NOT_FOUND
             - ORDER_ALREADY_CANCELLED
+            - METHOD_NOT_ALLOWED
+            - RESOURCE_NOT_FOUND
+            - INTERNAL_ERROR
         message:
           type: string
         timestamp:
@@ -719,8 +722,10 @@ components:
       enum: [CREATED, PAID, CANCELLED]
     CancelReason:
       type: string
-      description: 결제 실패로 인한 취소 사유. 사용자 취소 주문에는 null.
-      enum: [PAYMENT_FAILED, PAYMENT_TIMEOUT]
+      description: >-
+        주문 취소 사유. 결제 실패(PAYMENT_FAILED)·결제 타임아웃(PAYMENT_TIMEOUT)은 시스템 취소,
+        사용자가 직접 취소하면 USER_REQUESTED. 취소되지 않은 주문에는 null.
+      enum: [PAYMENT_FAILED, PAYMENT_TIMEOUT, USER_REQUESTED]
     CreateOrderResponse:
       type: object
       required: [orderId, status]
