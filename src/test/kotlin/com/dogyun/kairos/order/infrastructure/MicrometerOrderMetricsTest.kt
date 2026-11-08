@@ -28,7 +28,7 @@ class MicrometerOrderMetricsTest {
         metrics.addSold(1L, 6)
         metrics.addSold(1L, 6)
 
-        assertEquals(10.0, gauge("kairos.deal.total", 1L))
+        assertEquals(10.0, gauge("kairos.deal.capacity", 1L))
         assertEquals(12.0, gauge("kairos.deal.sold", 1L))
         assertEquals(2.0, gauge("kairos.deal.oversold", 1L))
     }
@@ -50,7 +50,7 @@ class MicrometerOrderMetricsTest {
         metrics.addSold(3L, 1)
 
         assertEquals(1, registry.find("kairos.deal.sold").tag("dealId", "3").gauges().size)
-        assertEquals(1, registry.find("kairos.deal.total").tag("dealId", "3").gauges().size)
+        assertEquals(1, registry.find("kairos.deal.capacity").tag("dealId", "3").gauges().size)
         assertEquals(1, registry.find("kairos.deal.oversold").tag("dealId", "3").gauges().size)
     }
 }

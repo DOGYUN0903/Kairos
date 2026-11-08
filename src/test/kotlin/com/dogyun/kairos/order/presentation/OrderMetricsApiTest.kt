@@ -54,15 +54,14 @@ class OrderMetricsApiTest : OrderApiTestSupport() {
         order(userToken(), dealId, 2).andExpect { status { isCreated() } }
 
         assertEquals(before + 1, placed("PAID"))
-        assertEquals(10.0, gauge("kairos.deal.total", dealId))
+        assertEquals(10.0, gauge("kairos.deal.capacity", dealId))
         assertEquals(2.0, gauge("kairos.deal.sold", dealId))
         assertEquals(0.0, gauge("kairos.deal.oversold", dealId))
 
         val body = scrape()
         assertContains(body, "kairos_order_placed_total{result=\"PAID\"}")
         assertContains(body, "kairos_deal_sold{dealId=\"$dealId\"} 2.0")
-        // Prometheus 는 게이지 이름 끝의 `_total`(카운터 예약 접미사)을 떼어 내므로 kairos_deal 로 노출된다.
-        assertContains(body, "kairos_deal{dealId=\"$dealId\"} 10.0")
+        assertContains(body, "kairos_deal_capacity{dealId=\"$dealId\"} 10.0")
         assertContains(body, "kairos_deal_oversold{dealId=\"$dealId\"} 0.0")
         assertContains(body, "kairos_payment_duration_seconds_bucket{")
     }

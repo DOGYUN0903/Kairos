@@ -15,6 +15,6 @@ data class DealSnapshot(
     val dealPrice: Long,
     val perMemberLimit: Int,
     val ongoing: Boolean,
-    /** 딜 총수량. 순판매량 게이지(kairos.deal.total)에 등록하기 위해 가져온다. */
+    /** 딜 총수량. 총수량 게이지(kairos.deal.capacity)에 등록하기 위해 가져온다. */
     val totalQuantity: Int,
 )
