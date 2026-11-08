@@ -10,7 +10,7 @@ import com.dogyun.kairos.order.domain.OrderRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-// ADR 예정: Phase 4에서 Saga로 대체
+// 결정 기록: docs/adr/0001-phase1-order-single-transaction.md (Phase 4에서 Saga로 대체)
 /**
  * 주문 생성. Phase 1 에서는 재고(deal)·주문(order)·결제(payment) 세 애그리거트를 한 트랜잭션에서 바꾼다
  * (규칙 "애그리거트당 한 트랜잭션"의 의도적 예외, 설계 문서 9.4).
