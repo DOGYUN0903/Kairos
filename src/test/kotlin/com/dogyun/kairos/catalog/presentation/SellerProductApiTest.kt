@@ -180,4 +180,44 @@ class SellerProductApiTest : CommerceTestSupport() {
             productContent(categoryId, listOf(uploadImage(token)), options = listOf(mapOf("optionId" to 999999, "name" to "색상", "values" to listOf(mapOf("name" to "검정"))))),
         ).expectCode(400, "PRODUCT_INVALID")
     }
+
+    @Test
+    fun 기존_값_ID를_다른_옵션_아래로_보내면_400_PRODUCT_INVALID() {
+        val (token, productId, categoryId) = setUpProduct()
+        val before = sellerProductDetail(token, productId)
+        val color = before.get("options").get(0)
+        val size = before.get("options").get(1)
+        val black = color.get("values").get(0).get("valueId").asLong()
+        val fileId = uploadImage(token)
+
+        // 색상 값(블랙)을 사이즈 옵션 아래로.
+        put(
+            "/api/v1/seller/products/$productId", token,
+            productContent(
+                categoryId, listOf(fileId),
+                options = listOf(
+                    mapOf("optionId" to color.get("optionId").asLong(), "name" to "색상", "values" to listOf(mapOf("name" to "레드"))),
+                    mapOf("optionId" to size.get("optionId").asLong(), "name" to "사이즈", "values" to listOf(mapOf("valueId" to black, "name" to "M"))),
+                ),
+            ),
+        ).expectCode(400, "PRODUCT_INVALID")
+        // 기존 값을 새 옵션(optionId 없음) 아래로.
+        put(
+            "/api/v1/seller/products/$productId", token,
+            productContent(categoryId, listOf(fileId), options = listOf(mapOf("name" to "소재", "values" to listOf(mapOf("valueId" to black, "name" to "면"))))),
+        ).expectCode(400, "PRODUCT_INVALID")
+        // 같은 optionId 두 번.
+        put(
+            "/api/v1/seller/products/$productId", token,
+            productContent(
+                categoryId, listOf(fileId),
+                options = listOf(
+                    mapOf("optionId" to color.get("optionId").asLong(), "name" to "색상", "values" to listOf(mapOf("name" to "레드"))),
+                    mapOf("optionId" to color.get("optionId").asLong(), "name" to "사이즈", "values" to listOf(mapOf("name" to "M"))),
+                ),
+            ),
+        ).expectCode(400, "PRODUCT_INVALID")
+        // 상품은 그대로다.
+        assertEquals(4, sellerProductDetail(token, productId).get("skus").size())
+    }
 }

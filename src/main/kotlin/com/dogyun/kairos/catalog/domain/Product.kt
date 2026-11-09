@@ -125,10 +125,20 @@ class Product(
         }
     }
 
-    /** 바뀐 콘텐츠가 유지하는 값(id 있음)은 이 상품의 기존 값이어야 한다. */
+    /**
+     * 바뀐 콘텐츠가 유지하는 옵션(id 있음)은 이 상품의 기존 옵션이어야 하고,
+     * 유지하는 값(id 있음)은 같은 옵션에 속한 기존 값이어야 한다. 새 옵션(id 없음) 아래에는 새 값만 올 수 있다.
+     */
     private fun validateValueIds(content: ProductContent) {
-        if (!this.content.existingValueIds().containsAll(content.existingValueIds())) {
-            throw DomainException(ErrorCode.PRODUCT_INVALID)
+        val existingValueIdsByOption = this.content.options.associate { it.id to it.values.mapNotNull { v -> v.id }.toSet() }
+        for (option in content.options) {
+            val keptValueIds = option.values.mapNotNull { it.id }
+            if (option.id == null) {
+                if (keptValueIds.isNotEmpty()) throw DomainException(ErrorCode.PRODUCT_INVALID)
+                continue
+            }
+            val existing = existingValueIdsByOption[option.id] ?: throw DomainException(ErrorCode.PRODUCT_INVALID)
+            if (!existing.containsAll(keptValueIds)) throw DomainException(ErrorCode.PRODUCT_INVALID)
         }
     }
 

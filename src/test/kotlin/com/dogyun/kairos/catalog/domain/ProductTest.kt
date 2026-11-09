@@ -337,4 +337,49 @@ class ProductTest {
         assertCode(ErrorCode.PRODUCT_INVALID_PRICE) { product.applyChange(content(colorSizeOptions()), 8999) }
         assertEquals(10000, product.originalPrice)
     }
+
+    @Test
+    fun 기존_값_ID를_다른_옵션_아래로_옮기면_PRODUCT_INVALID() {
+        val product = restore(ProductStatus.PENDING_REVIEW)
+
+        // 값 3(사이즈 M)을 색상 옵션(1) 아래로.
+        val moved = content(
+            listOf(
+                ProductOption(1L, "색상", listOf(OptionValue(1L, "블랙"), OptionValue(3L, "S"))),
+                ProductOption(2L, "사이즈", listOf(OptionValue(4L, "M"))),
+            ),
+        )
+        assertCode(ErrorCode.PRODUCT_INVALID) { product.editContent(moved) }
+
+        // 기존 값 ID 를 새 옵션(id null) 아래로.
+        val underNew = content(listOf(ProductOption(null, "소재", listOf(OptionValue(1L, "면")))))
+        assertCode(ErrorCode.PRODUCT_INVALID) { product.editContent(underNew) }
+
+        // 이 상품에 없는 옵션 ID.
+        val unknownOption = content(listOf(ProductOption(99L, "색상", listOf(OptionValue(null, "블랙")))))
+        assertCode(ErrorCode.PRODUCT_INVALID) { product.editContent(unknownOption) }
+
+        // applyChange 도 같은 검사를 거친다.
+        assertCode(ErrorCode.PRODUCT_INVALID) { restore(ProductStatus.ON_SALE).applyChange(moved, 10000) }
+    }
+
+    @Test
+    fun 한_요청에_같은_옵션_ID나_값_ID가_두_번_오면_PRODUCT_INVALID() {
+        assertCode(ErrorCode.PRODUCT_INVALID) {
+            content(
+                listOf(
+                    ProductOption(1L, "색상", listOf(OptionValue(null, "블랙"))),
+                    ProductOption(1L, "사이즈", listOf(OptionValue(null, "M"))),
+                ),
+            )
+        }
+        assertCode(ErrorCode.PRODUCT_INVALID) {
+            content(
+                listOf(
+                    ProductOption(1L, "색상", listOf(OptionValue(1L, "블랙"))),
+                    ProductOption(2L, "사이즈", listOf(OptionValue(1L, "M"))),
+                ),
+            )
+        }
+    }
 }

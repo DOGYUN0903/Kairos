@@ -20,6 +20,10 @@ data class ProductContent(
         if (imageFileIds.toSet().size != imageFileIds.size) throw DomainException(ErrorCode.PRODUCT_INVALID)
         if (options.size > MAX_OPTIONS) throw DomainException(ErrorCode.PRODUCT_INVALID)
         if (options.map { it.name }.toSet().size != options.size) throw DomainException(ErrorCode.PRODUCT_INVALID)
+        val optionIds = options.mapNotNull { it.id }
+        if (optionIds.toSet().size != optionIds.size) throw DomainException(ErrorCode.PRODUCT_INVALID)
+        val valueIds = options.flatMap { it.values }.mapNotNull { it.id }
+        if (valueIds.toSet().size != valueIds.size) throw DomainException(ErrorCode.PRODUCT_INVALID)
     }
 
     /** 이미 저장된(id 가 있는) 옵션 값 ID 집합. */

@@ -35,7 +35,6 @@ class ProductService(
     fun editContent(seller: SellerPrincipal, productId: Long, command: ProductContentCommand) {
         val product = findMine(seller, productId)
         val content = validatedContent(seller, command)
-        requireKnownOptionIds(product, content)
         product.editContent(content)
         productRepository.save(product)
     }
@@ -86,11 +85,5 @@ class ProductService(
         }
         if (!owned) throw DomainException(ErrorCode.FILE_NOT_OWNED)
         return content
-    }
-
-    /** 유지하겠다고 보낸 옵션 ID(값 ID 는 도메인이 검사한다)는 이 상품의 기존 옵션이어야 한다. */
-    private fun requireKnownOptionIds(product: Product, content: ProductContent) {
-        val existing = product.content.options.mapNotNull { it.id }.toSet()
-        if (!existing.containsAll(content.options.mapNotNull { it.id })) throw DomainException(ErrorCode.PRODUCT_INVALID)
     }
 }
