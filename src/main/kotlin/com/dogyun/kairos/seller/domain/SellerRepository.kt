@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.domain.PageResult
 interface SellerRepository {
     fun save(seller: Seller): Seller
     fun findById(id: SellerId): Seller?
+    fun findAllByIds(ids: Collection<SellerId>): List<Seller>
     fun findByMemberId(memberId: Long): Seller?
     fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean
 

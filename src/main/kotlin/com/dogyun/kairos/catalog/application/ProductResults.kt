@@ -140,7 +140,7 @@ internal fun toSellerProductDetail(
  * 옵션 순서대로 값 이름을 잇는다. DISCONTINUED SKU 가 참조하던 값이 콘텐츠에서 사라졌으면
  * 이름을 알 수 없으므로 "(삭제된 값)" 으로 표시한다.
  */
-private fun skuDisplayName(skuValueIds: List<Long>, orderedValueIds: List<Long>, valueNames: Map<Long, String>): String {
+internal fun skuDisplayName(skuValueIds: List<Long>, orderedValueIds: List<Long>, valueNames: Map<Long, String>): String {
     val known = orderedValueIds.filter { it in skuValueIds }.map { valueNames.getValue(it) }
     val unknown = skuValueIds.filter { it !in valueNames }.map { "(삭제된 값)" }
     return (known + unknown).joinToString(" / ")

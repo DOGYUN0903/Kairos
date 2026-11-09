@@ -40,6 +40,7 @@ class SellerAdminServiceTest {
         }
 
         override fun findById(id: SellerId): Seller? = store[id.value]
+        override fun findAllByIds(ids: Collection<SellerId>): List<Seller> = ids.mapNotNull { store[it.value] }
         override fun findByMemberId(memberId: Long): Seller? = store.values.firstOrNull { it.memberId == memberId }
         override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean =
             store.values.any { it.businessNumber == businessNumber }

@@ -9,5 +9,7 @@ interface ProductRepository {
     fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product?
     fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product>
     fun findPageByStatus(status: ProductStatus?, page: Int, size: Int): PageResult<Product>
+    /** SKU 가 속한 상품(DISCONTINUED SKU 포함). 없는 SKU ID 는 무시하고 같은 상품은 한 번만 돌려준다. */
+    fun findAllBySkuIds(skuIds: Collection<Long>): List<Product>
     fun existsByCategoryId(categoryId: Long): Boolean
 }

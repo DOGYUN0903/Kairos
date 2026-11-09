@@ -52,6 +52,9 @@ class SellerRepositoryImpl(
 
     override fun findById(id: SellerId): Seller? = jpaRepository.findByIdOrNull(id.value)?.let(::toDomain)
 
+    override fun findAllByIds(ids: Collection<SellerId>): List<Seller> =
+        if (ids.isEmpty()) emptyList() else jpaRepository.findAllById(ids.map { it.value }).map(::toDomain)
+
     override fun findByMemberId(memberId: Long): Seller? = jpaRepository.findByMemberId(memberId)?.let(::toDomain)
 
     override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean =
