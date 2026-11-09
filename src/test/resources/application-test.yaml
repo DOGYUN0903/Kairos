@@ -9,6 +9,8 @@ REDIS_HOST: localhost
 REDIS_PORT: 6379
 
 kairos:
+  file:
+    local-dir: build/test-uploads
   jwt:
     secret: test-only-secret-key-for-kairos-jwt-0123456789abcdef
     access-ttl: 30m

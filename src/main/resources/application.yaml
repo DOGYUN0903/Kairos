@@ -8,6 +8,10 @@ spring:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
     time-zone: Asia/Seoul
   jpa:
@@ -52,6 +56,9 @@ logging:
       file: ecs
 
 kairos:
+  file:
+    local-dir: ${KAIROS_FILE_DIR:uploads}
+    base-url: ${KAIROS_FILE_BASE_URL:http://localhost:8080}
   jwt:
     # 기본값을 두지 않는다. .env 또는 환경변수로 반드시 주입한다(256bit 이상).
     secret: ${KAIROS_JWT_SECRET}
