@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 상품 상세</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  .crumb { display: flex; gap: 8px; font-size: 12px; color: var(--text-2); margin: 20px 0; flex-wrap: wrap; }
+  .crumb a:hover { color: var(--navy); }
+  .detail { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 56px; }
+  .gallery .main { aspect-ratio: 1 / 1; }
+  .thumbs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px; }
+  .thumbs button { padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: none; overflow: hidden; }
+  .thumbs button[aria-current="true"] { border-color: var(--navy); border-width: 2px; }
+  .thumbs .ph { font-size: 10px; border-radius: 0; }
+
+  .buy { position: sticky; top: 96px; align-self: start; }
+  .buy .brand { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 14px; }
+  .buy h1 { font-size: 22px; font-weight: 500; line-height: 1.4; margin-top: 8px; }
+  .buy .pricing { margin-top: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .buy .pricing .strike { font-size: 14px; }
+  .buy .pricing .row { gap: 8px; margin-top: 2px; }
+  .buy .pricing .discount { font-size: 22px; }
+  .buy .pricing .price { font-size: 24px; }
+
+  .opt { padding: 20px 0; border-bottom: 1px solid var(--border); }
+  .opt h2 { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .opt h2 .sel { color: var(--text-2); font-weight: 400; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches button { min-width: 56px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; font-weight: 500; position: relative; }
+  .swatches button:hover { border-color: var(--navy); }
+  .swatches button[aria-pressed="true"] { border-color: var(--navy); background: var(--navy); color: #fff; }
+  .swatches button:disabled { color: var(--text-3); background: var(--surface); border-style: dashed; cursor: not-allowed; }
+  .swatches button:disabled::after { content: "품절"; position: absolute; right: -4px; top: -8px; font-size: 10px; font-weight: 700; background: #fff; padding: 0 3px; color: var(--text-3); }
+  .swatches .extra { display: block; font-size: 11px; font-weight: 400; opacity: .85; }
+
+  .selected { margin-top: 16px; background: var(--surface); border-radius: var(--radius); padding: 14px; }
+  .selected .row-between { align-items: flex-start; }
+  .qty { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+  .qty button { width: 36px; height: 36px; border: 0; background: none; display: grid; place-items: center; }
+  .qty input { width: 40px; border: 0; text-align: center; -moz-appearance: textfield; }
+  .qty input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .selected .remove { border: 0; background: none; color: var(--text-3); width: 32px; height: 32px; display: grid; place-items: center; }
+  .total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; }
+  .total strong { font-size: 22px; }
+  .actions { display: grid; grid-template-columns: 52px 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .like-btn { height: 52px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; color: var(--text-2); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .like-btn[aria-pressed="true"] { color: var(--hot); border-color: var(--hot); }
+  .like-btn[aria-pressed="true"] .icon { fill: currentColor; }
+  .like-btn .icon { width: 20px; height: 20px; }
+  .info-list { margin-top: 20px; font-size: 12px; color: var(--text-2); display: grid; grid-template-columns: 72px 1fr; row-gap: 6px; }
+  .info-list dt { font-weight: 500; } .info-list dd { margin: 0; }
+
+  .desc { margin-top: 72px; border-top: 1px solid var(--border); }
+  .desc .tabs { justify-content: center; }
+  .desc-body { max-width: 760px; margin: 40px auto 0; }
+  .desc-body .ph { aspect-ratio: 4 / 3; margin-top: 24px; }
+  .desc-body p { line-height: 1.8; color: var(--text-2); margin-top: 16px; }
+  .desc-body h3 { font-size: 16px; font-weight: 700; margin-top: 32px; }
+  .spec { margin-top: 16px; }
+  .spec th { width: 140px; }
+
+  @media (max-width: 960px) {
+    .detail { grid-template-columns: 1fr; gap: 28px; }
+    .buy { position: static; }
+    .site-header__row { height: auto; flex-wrap: wrap; padding: 12px 0; gap: 12px; }
+    .search { order: 3; flex-basis: 100%; max-width: none; }
+    .buy h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 2개">2</span>장바구니</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#" aria-current="page">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="crumb" aria-label="현재 위치">
+    <a href="user-product-list.html">홈</a><span aria-hidden="true">/</span>
+    <a href="#">상의</a><span aria-hidden="true">/</span>
+    <a href="user-product-list.html">티셔츠</a>
+  </nav>
+
+  <div class="detail">
+    <section class="gallery" aria-label="상품 이미지">
+      <div class="ph main">[상품 이미지 1/5]</div>
+      <div class="thumbs" role="group" aria-label="이미지 선택">
+        <button type="button" aria-current="true" aria-label="이미지 1"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 2"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 3"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 4"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 5"><div class="ph">[이미지]</div></button>
+      </div>
+    </section>
+
+    <section class="buy" aria-labelledby="pname">
+      <a class="brand" href="#">[브랜드 A]<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+      <h1 id="pname">오버핏 헤비웨이트 코튼 티셔츠</h1>
+
+      <div class="pricing">
+        <div class="strike">정가 39,000원</div>
+        <div class="row">
+          <span class="discount">30%</span>
+          <span class="price">27,300원</span>
+        </div>
+      </div>
+
+      <div class="opt">
+        <h2 id="color-h">색상 <span class="sel">선택: 블랙</span></h2>
+        <div class="swatches" role="group" aria-labelledby="color-h">
+          <button type="button" aria-pressed="true">블랙</button>
+          <button type="button" aria-pressed="false">화이트</button>
+          <button type="button" aria-pressed="false">네이비</button>
+          <button type="button" aria-pressed="false" disabled aria-label="올리브 품절">올리브</button>
+        </div>
+      </div>
+
+      <div class="opt">
+        <h2 id="size-h">사이즈 <span class="sel">선택: L</span></h2>
+        <div class="swatches" role="group" aria-labelledby="size-h">
+          <button type="button" aria-pressed="false">S</button>
+          <button type="button" aria-pressed="false">M</button>
+          <button type="button" aria-pressed="true">L</button>
+          <button type="button" aria-pressed="false">XL <span class="extra">+2,000원</span></button>
+          <button type="button" aria-pressed="false" disabled aria-label="2XL 품절">2XL <span class="extra">+2,000원</span></button>
+        </div>
+      </div>
+
+      <div class="selected" aria-live="polite">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:500">블랙 / L</div>
+            <div class="small muted">27,300원</div>
+          </div>
+          <div class="row">
+            <div class="qty" role="group" aria-label="수량">
+              <button type="button" aria-label="수량 줄이기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+              <label class="sr-only" for="qty1">수량</label>
+              <input id="qty1" type="number" value="1" min="1">
+              <button type="button" aria-label="수량 늘리기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+            <button type="button" class="remove" aria-label="선택 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="total">
+        <span class="muted">총 상품 금액 <span class="small">(1개)</span></span>
+        <strong class="price">27,300원</strong>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="like-btn" aria-pressed="false" aria-label="좋아요 1,204">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>
+          <span aria-hidden="true">1,204</span>
+        </button>
+        <button type="button" class="btn btn-lg">장바구니</button>
+        <button type="button" class="btn btn-lg btn-primary" title="구매는 C2 단계에서 연결됩니다">구매하기</button>
+      </div>
+
+      <dl class="info-list">
+        <dt>배송</dt><dd>일반 택배 · 결제 후 2~3일 내 출고</dd>
+        <dt>판매자</dt><dd>[판매자 A 주식회사]</dd>
+        <dt>상품 번호</dt><dd>1024</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="desc" aria-label="상품 정보">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true">상품 설명</button>
+      <button type="button" role="tab" aria-selected="false">사이즈 정보</button>
+      <button type="button" role="tab" aria-selected="false">배송/교환/환불</button>
+    </div>
+    <div class="desc-body">
+      <h3>상품 설명</h3>
+      <p>두께감 있는 헤비웨이트 코튼 원단으로 제작한 오버핏 티셔츠입니다. 어깨선을 자연스럽게 떨어뜨린 드롭 숄더와 넉넉한 몸통으로 편안한 착용감을 줍니다. 넥 라인은 늘어남을 줄이기 위해 2중 립으로 마감했습니다.</p>
+      <div class="ph">[상세 이미지]</div>
+      <p>세탁 시 찬물 단독 세탁을 권장하며, 건조기 사용은 피해 주세요. 모니터 환경에 따라 실제 색상과 차이가 있을 수 있습니다.</p>
+      <h3>기본 정보</h3>
+      <table class="table spec">
+        <tbody>
+          <tr><th scope="row">브랜드</th><td>[브랜드 A]</td></tr>
+          <tr><th scope="row">카테고리</th><td>상의 &gt; 티셔츠</td></tr>
+          <tr><th scope="row">소재</th><td>면 100%</td></tr>
+          <tr><th scope="row">옵션</th><td>색상(블랙, 화이트, 네이비, 올리브) × 사이즈(S, M, L, XL, 2XL)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 관리자 — 검수</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  .review { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 24px; margin-top: 20px; align-items: start; }
+  @media (max-width: 1100px) { .review { grid-template-columns: 1fr; } }
+  .queue tr.selected td { background: #E8EDF7; }
+  .queue td a.name { font-weight: 500; }
+  .queue .meta { font-size: 12px; color: var(--text-2); }
+  .queue td:last-child { text-align: right; }
+  .detail-card .card__head { align-items: flex-start; }
+  .detail-card h2 { font-size: 16px; }
+  .detail-card .sub { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .diff > div { background: #fff; padding: 12px 14px; font-size: 13px; }
+  .diff .h { background: var(--surface); font-size: 12px; font-weight: 500; color: var(--text-2); padding: 8px 14px; }
+  .diff .after.changed { background: #FFF6DD; }
+  .diff .label { font-size: 11px; color: var(--text-3); display: block; margin-bottom: 2px; }
+  .section-t { font-size: 13px; font-weight: 700; margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
+  .section-t .badge { font-weight: 500; }
+  .img-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .img-row .ph { width: 64px; height: 64px; aspect-ratio: auto; font-size: 10px; }
+  .img-row .ph.new { outline: 2px solid var(--warning); outline-offset: -2px; }
+  .sku-impact td, .sku-impact th { padding: 8px 10px; font-size: 13px; }
+  .impact-kept { color: var(--text-2); }
+  .impact-new { color: var(--warning); font-weight: 700; }
+  .impact-disc { color: var(--danger); font-weight: 700; }
+  .decision { border-top: 1px solid var(--border); padding: 20px; }
+  .decision .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .unchanged { color: var(--text-3); }
+  .side-nav a .count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--hot); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+</style>
+</head>
+<body>
+<div class="console">
+  <aside class="console__side">
+    <a class="logo" href="index.html">KAIROS</a>
+    <div class="console__role">관리자 콘솔</div>
+    <nav class="side-nav" aria-label="관리자 메뉴">
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>대시보드</a>
+      <a href="admin-review.html" aria-current="page"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>검수<span class="count" aria-label="대기 23건">23</span></a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20V10l8-6 8 6v10"/><path d="M4 10h16"/></svg>카테고리</a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>판매자</a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>핫딜</a>
+    </nav>
+  </aside>
+
+  <div class="console__main">
+    <header class="console__top">
+      <h1>검수</h1>
+      <div class="console__user"><span>admin</span><span class="avatar" aria-hidden="true">AD</span></div>
+    </header>
+
+    <main class="console__content" style="max-width:none">
+      <div class="tabs" role="tablist" aria-label="검수 대상">
+        <button type="button" role="tab" aria-selected="false">판매자 <span class="count">2</span></button>
+        <button type="button" role="tab" aria-selected="false">브랜드 <span class="count">4</span></button>
+        <button type="button" role="tab" aria-selected="false">상품 <span class="count">12</span></button>
+        <button type="button" role="tab" aria-selected="true">변경 요청 <span class="count">5</span></button>
+      </div>
+
+      <div class="review">
+        <section class="card queue" aria-labelledby="queue-h">
+          <div class="card__head">
+            <h2 id="queue-h">대기 중인 변경 요청</h2>
+            <label class="row small muted" for="sortq">정렬
+              <select id="sortq" class="select input-sm" style="width:auto">
+                <option>오래된 순</option>
+                <option>최신 순</option>
+              </select>
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">요청</th>
+                  <th scope="col">상품</th>
+                  <th scope="col">판매자</th>
+                  <th scope="col">변경 항목</th>
+                  <th scope="col">요청일</th>
+                  <th scope="col"><span class="sr-only">열기</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="selected" aria-current="true">
+                  <td>#CR-301</td>
+                  <td><a class="name" href="#">오버핏 헤비웨이트 코튼 티셔츠</a><br><span class="meta">#1024 · [브랜드 A]</span></td>
+                  <td>[판매자 A 주식회사]</td>
+                  <td><span class="badge">상품명</span> <span class="badge">옵션</span> <span class="badge">이미지</span></td>
+                  <td class="muted">2026-11-07</td>
+                  <td><button type="button" class="btn btn-ghost btn-sm" aria-pressed="true">보는 중</button></td>
+                </tr>
+                <tr>
+                  <td>#CR-302</td>
+                  <td><a class="name" href="#">베이직 크루넥 반팔 티셔츠 2팩</a><br><span class="meta">#1018 · [브랜드 B]</span></td>
+                  <td>[판매자 B]</td>
+                  <td><span class="badge">설명</span></td>
+                  <td class="muted">2026-11-07</td>
+                  <td><button type="button" class="btn btn-ghost btn-sm">열기</button></td>
+                </tr>
+                <tr>
+                  <td>#CR-303</td>
+                  <td><a class="name" href="#">수피마 코튼 슬림핏 티셔츠</a><br><span class="meta">#1040 · [브랜드 B]</span></td>
+                  <td>[판매자 B]</td>
+                  <td><span class="badge">카테고리</span></td>
+                  <td class="muted">2026-11-08</td>
+                  <td><button type="button" class="btn btn-ghost btn-sm">열기</button></td>
+                </tr>
+                <tr>
+                  <td>#CR-304</td>
+                  <td><a class="name" href="#">헨리넥 와플 티셔츠</a><br><span class="meta">#1033 · [브랜드 C]</span></td>
+                  <td>[판매자 C]</td>
+                  <td><span class="badge">옵션</span></td>
+                  <td class="muted">2026-11-08</td>
+                  <td><button type="button" class="btn btn-ghost btn-sm">열기</button></td>
+                </tr>
+                <tr>
+                  <td>#CR-305</td>
+                  <td><a class="name" href="#">그래픽 프린트 루즈핏 티셔츠</a><br><span class="meta">#1041 · [브랜드 D]</span></td>
+                  <td>[판매자 D]</td>
+                  <td><span class="badge">이미지</span></td>
+                  <td class="muted">2026-11-09</td>
+                  <td><button type="button" class="btn btn-ghost btn-sm">열기</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card detail-card" aria-labelledby="cr-h">
+          <div class="card__head">
+            <div>
+              <h2 id="cr-h">#CR-301 변경 요청</h2>
+              <div class="sub">상품 #1024 · [브랜드 A] · [판매자 A 주식회사] · 요청 2026-11-07 14:20 · 현재 상태 <span class="chip chip-onsale" style="height:20px;font-size:11px">판매 중</span></div>
+            </div>
+            <span class="chip chip-pending">검수 대기</span>
+          </div>
+          <div class="card__body">
+            <p class="small muted">검수 중에도 기존 내용으로 계속 판매됩니다. 승인하면 아래 "변경 후" 내용으로 교체되고, 반려하면 변경 요청만 버려집니다.</p>
+
+            <h3 class="section-t">상품명 <span class="badge">변경됨</span></h3>
+            <div class="diff">
+              <div class="h">변경 전</div><div class="h">변경 후</div>
+              <div>오버핏 헤비웨이트 코튼 티셔츠</div>
+              <div class="after changed">오버핏 헤비웨이트 코튼 티셔츠 (2팩)</div>
+            </div>
+
+            <h3 class="section-t">정가 · 할인율 <span class="badge">변경됨</span></h3>
+            <div class="diff">
+              <div class="h">변경 전</div><div class="h">변경 후</div>
+              <div><span class="label">정가</span>39,000원<br><span class="label mt-8">판매가 27,300원 기준 할인율</span><span class="discount">30%</span></div>
+              <div class="after changed"><span class="label">정가</span>45,000원<br><span class="label mt-8">판매가 27,300원 기준 할인율</span><span class="discount">39%</span></div>
+            </div>
+            <p class="hint mt-8">판매가는 바로 반영되는 항목이라 변경 요청에 포함되지 않습니다. 할인율은 floor((정가 − 판매가) ÷ 정가 × 100)로 다시 계산됩니다.</p>
+
+            <h3 class="section-t">설명 <span class="badge badge-outline unchanged">변경 없음</span></h3>
+            <h3 class="section-t">카테고리 <span class="badge badge-outline unchanged">변경 없음</span></h3>
+
+            <h3 class="section-t">이미지 <span class="badge">변경됨</span></h3>
+            <div class="diff">
+              <div class="h">변경 전 (3장)</div><div class="h">변경 후 (4장)</div>
+              <div class="img-row"><div class="ph">[대표]</div><div class="ph">[2]</div><div class="ph">[3]</div></div>
+              <div class="after changed img-row"><div class="ph">[대표]</div><div class="ph">[2]</div><div class="ph">[3]</div><div class="ph new">[새 이미지]</div></div>
+            </div>
+
+            <h3 class="section-t">옵션 구성 <span class="badge">변경됨</span></h3>
+            <div class="diff">
+              <div class="h">변경 전</div><div class="h">변경 후</div>
+              <div><span class="label">색상</span>블랙, 화이트<br><span class="label mt-8">사이즈</span>M, L, XL</div>
+              <div class="after changed"><span class="label">색상</span>블랙, 화이트, <strong>네이비</strong><br><span class="label mt-8">사이즈</span>M, L <span class="unchanged">(XL 삭제)</span></div>
+            </div>
+
+            <h3 class="section-t">SKU 영향 <span class="small muted" style="font-weight:400">유지 4 · 신규 2 · 단종 2</span></h3>
+            <table class="table sku-impact">
+              <thead><tr><th scope="col">조합</th><th scope="col">결과</th><th scope="col" class="num">재고</th><th scope="col" class="num">추가 금액</th></tr></thead>
+              <tbody>
+                <tr><td>블랙 / M</td><td class="impact-kept">유지 (ID, 재고, 추가 금액 유지)</td><td class="num">50</td><td class="num">0원</td></tr>
+                <tr><td>블랙 / L</td><td class="impact-kept">유지</td><td class="num">50</td><td class="num">0원</td></tr>
+                <tr><td>화이트 / M</td><td class="impact-kept">유지</td><td class="num">30</td><td class="num">0원</td></tr>
+                <tr><td>화이트 / L</td><td class="impact-kept">유지</td><td class="num">0</td><td class="num">0원</td></tr>
+                <tr><td>네이비 / M</td><td class="impact-new">신규</td><td class="num">0</td><td class="num">0원</td></tr>
+                <tr><td>네이비 / L</td><td class="impact-new">신규</td><td class="num">0</td><td class="num">0원</td></tr>
+                <tr><td>블랙 / XL</td><td class="impact-disc">DISCONTINUED</td><td class="num">20</td><td class="num">2,000원</td></tr>
+                <tr><td>화이트 / XL</td><td class="impact-disc">DISCONTINUED</td><td class="num">10</td><td class="num">2,000원</td></tr>
+              </tbody>
+            </table>
+            <p class="hint mt-8">단종 SKU는 삭제하지 않고 sku_status=DISCONTINUED로 남깁니다(주문·정산 참조 보존). 같은 조합이 다시 생기면 재고 0으로 되살아납니다.</p>
+          </div>
+
+          <form class="decision" action="#" onsubmit="return false">
+            <div class="field">
+              <label for="reason">반려 사유 <span class="small muted">(반려 시 필수, 판매자에게 그대로 전달됩니다)</span></label>
+              <textarea id="reason" class="textarea" style="min-height:88px" placeholder="예: 추가된 이미지에 타 브랜드 로고가 포함되어 있습니다."></textarea>
+            </div>
+            <div class="btns">
+              <button type="button" class="btn btn-danger">반려</button>
+              <button type="submit" class="btn btn-primary">승인</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
