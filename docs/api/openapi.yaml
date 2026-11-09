@@ -1033,6 +1033,136 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/categories:
+    get:
+      tags: [Category]
+      operationId: getCategoryTree
+      summary: 카테고리 2단계 트리 (공개, displayOrder 오름차순)
+      security: []
+      responses:
+        '200':
+          description: 대분류 목록(각 대분류가 소분류를 children으로 가진다)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CategoryNode'
+  /api/v1/admin/categories:
+    post:
+      tags: [Admin Category]
+      operationId: createCategory
+      summary: 카테고리 생성 (ADMIN, parentId 없으면 대분류, 있으면 대분류 아래 소분류)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateCategoryResponse'
+        '400':
+          description: "`INVALID_REQUEST` 또는 `CATEGORY_INVALID` 이름 길이 위반, 소분류 아래에는 만들 수 없다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`CATEGORY_NOT_FOUND` 부모 카테고리가 없다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/categories/{categoryId}:
+    put:
+      tags: [Admin Category]
+      operationId: updateCategory
+      summary: 카테고리 이름·표시 순서 수정 (ADMIN)
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryRequest'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`INVALID_REQUEST` 또는 `CATEGORY_INVALID`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`CATEGORY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin Category]
+      operationId: deleteCategory
+      summary: 카테고리 삭제 (ADMIN, 소프트 딜리트)
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 삭제 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`CATEGORY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`CATEGORY_HAS_CHILDREN` 하위 카테고리가 있다, `CATEGORY_HAS_PRODUCTS` 상품이 있다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1194,6 +1324,11 @@ components:
             - BRAND_NOT_FOUND
             - BRAND_NAME_DUPLICATED
             - BRAND_INVALID_STATE_TRANSITION
+            - CATEGORY_INVALID
+            - CATEGORY_NOT_FOUND
+            - CATEGORY_NOT_LEAF
+            - CATEGORY_HAS_CHILDREN
+            - CATEGORY_HAS_PRODUCTS
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -1421,6 +1556,44 @@ components:
           $ref: '#/components/schemas/BrandStatus'
         rejectReason:
           type: [string, 'null']
+    CategoryRequest:
+      type: object
+      required: [name, displayOrder]
+      properties:
+        parentId:
+          type: [integer, 'null']
+          format: int64
+          description: 생성 시에만 쓴다(null이면 대분류). 수정에서는 무시한다.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        displayOrder:
+          type: integer
+          format: int32
+    CreateCategoryResponse:
+      type: object
+      required: [categoryId]
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+    CategoryNode:
+      type: object
+      required: [categoryId, name, displayOrder, children]
+      properties:
+        categoryId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
     BrandPublic:
       type: object
       required: [brandId, name]

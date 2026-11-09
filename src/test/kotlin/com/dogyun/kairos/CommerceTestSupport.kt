@@ -29,6 +29,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from category")
         jdbcTemplate.update("delete from brand_image")
         jdbcTemplate.update("delete from brand")
         jdbcTemplate.update("delete from file")
@@ -115,6 +116,20 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         val brandId = json(created).get("data").get("brandId").asLong()
         post("/api/v1/admin/brands/$brandId/approve", adminToken()).andExpect { status { isOk() } }
         return brandId
+    }
+
+    /** 대분류 하나와 그 아래 소분류를 만들고 소분류 ID 를 돌려준다. */
+    protected fun leafCategory(): Long {
+        val rootId = createCategory(null, "대분류-${UUID.randomUUID().toString().take(8)}", 1)
+        return createCategory(rootId, "소분류-${UUID.randomUUID().toString().take(8)}", 1)
+    }
+
+    protected fun createCategory(parentId: Long?, name: String, displayOrder: Int): Long {
+        val created = post(
+            "/api/v1/admin/categories", adminToken(),
+            mapOf("parentId" to parentId, "name" to name, "displayOrder" to displayOrder),
+        ).andExpect { status { isCreated() } }
+        return json(created).get("data").get("categoryId").asLong()
     }
 
     protected fun suspendSeller(sellerId: Long) {
