@@ -23,7 +23,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 ## 진행 단계
 - [x] Phase 0. 스펙과 기반 (OpenAPI, Docker Compose, Flyway)
 - [x] Phase 1. 모놀리식 기본 구현
-- [ ] Phase 2. 기준선 측정 (k6)
+- [x] Phase 2. 기준선 측정 (k6) — [측정 리포트](docs/perf/2026-11-08-phase2-baseline.md)
 - [ ] Phase 3. 모놀리식 최적화
 - [ ] Phase 4. MSA 전환
 - [ ] Phase 5. 장애 대응

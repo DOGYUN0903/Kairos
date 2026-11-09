@@ -1,0 +1,12 @@
+# perf 실행(compose.perf.yaml)에서만 사용한다.
+# 컨테이너 앱(app:8081)만 1초 간격으로 수집한다. 8081이 호스트에도 게시되므로
+# host.docker.internal job을 두면 같은 앱이 이중 수집되어 시계열이 중복된다.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: kairos-perf
+    metrics_path: /actuator/prometheus
+    scrape_interval: 1s
+    static_configs:
+      - targets: ["app:8081"]
