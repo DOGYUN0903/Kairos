@@ -1,6 +1,6 @@
 # Kairos
 
-놓치면 다시 오지 않는 순간을 위한 타임딜 서비스. MSA를 직접 경험하기 위한 개인 프로젝트로, 스펙(OpenAPI)부터 작성하고(SDD) 모놀리식에서 쓸 수 있는 최적화를 단계별로 적용해 수치로 남긴 뒤, 그래도 남는 한계(장애 격리, 독립 확장)를 근거로 MSA로 전환하고 장애 실험으로 검증하는 것이 목표다. MSA는 목적이 아니라 필요해져서 선택하는 결과여야 한다.
+판매자가 상품을 올리고 구매자가 타임딜·일반 상품을 사는 마켓플레이스 커머스(놓치면 다시 오지 않는 순간을 위한 타임딜 포함). MSA를 직접 경험하기 위한 개인 프로젝트로, 스펙(OpenAPI)부터 작성하고(SDD) 모놀리식에서 쓸 수 있는 최적화를 단계별로 적용해 수치로 남긴 뒤, 그래도 남는 한계(장애 격리, 독립 확장)를 근거로 MSA로 전환하고 장애 실험으로 검증하는 것이 목표다. MSA는 목적이 아니라 필요해져서 선택하는 결과여야 한다.
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL, springdoc-openapi, JUnit5, Testcontainers, ArchUnit.
@@ -24,6 +24,12 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - [x] Phase 0. 스펙과 기반 (OpenAPI, Docker Compose, Flyway)
 - [x] Phase 1. 모놀리식 기본 구현
 - [x] Phase 2. 기준선 측정 (k6) — [측정 리포트](docs/perf/2026-11-08-phase2-baseline.md)
+- [x] C1. 판매자와 상품
+- [ ] C2. 구매
+- [ ] C3. 혜택과 후기
+- [ ] C4. 정산
+- [ ] C5. 운영 데이터
+- [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
 - [ ] Phase 4. MSA 전환
 - [ ] Phase 5. 장애 대응
@@ -31,5 +37,9 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 ## 문서
 - 설계 문서: `docs/superpowers/specs/2026-11-08-kairos-design.md`
 - 구현 계획: `docs/superpowers/plans/2026-11-08-kairos-phase0-1.md`
+- 커머스 로드맵: `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`
+- C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
+- ADR 0002(카탈로그 검색의 읽기 전용 조인): `docs/adr/0002-catalog-search-cross-module-read-join.md`
+- 업로드 파일은 로컬 `uploads/`에 저장된다(경로는 `.env`의 `KAIROS_FILE_DIR`).
 - API 계약: `docs/api/openapi.yaml` (`OpenApiContractTest`가 구현과의 일치를 검증)
 - 아키텍처 결정 기록: `docs/adr/`

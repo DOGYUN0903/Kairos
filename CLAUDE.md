@@ -1,11 +1,13 @@
 # Kairos
 
-타임딜 서비스. 모놀리식에서 최적화를 끝까지 해 본 뒤, 남는 한계를 근거로 MSA로 전환하는 학습용 개인 프로젝트다.
+마켓플레이스 커머스(판매자가 상품을 올리고 구매자가 타임딜·일반 상품을 사는 서비스). 모놀리식에서 최적화를 끝까지 해 본 뒤, 남는 한계를 근거로 MSA로 전환하는 학습용 개인 프로젝트다.
 
 - 설계 문서(근거와 상세 규칙): `docs/superpowers/specs/2026-11-08-kairos-design.md`
-- 현재 구현 계획: `docs/superpowers/plans/2026-11-08-kairos-phase0-1.md`
+- 커머스 로드맵: `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`
+- C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
+- 현재 구현 계획: `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md` (이전: `docs/superpowers/plans/2026-11-08-kairos-phase0-1.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: **Phase 0~1** (스펙 작성 + 모듈러 모놀리식 기본 구현)
+- 현재 단계: **C1 판매자와 상품**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2는 완료
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
@@ -17,7 +19,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - 설정값(DB, Redis, JWT 비밀키, 관리자 계정)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
 
 ## 아키텍처: 4계층 DDD
-모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `payment`, `common`
+모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `payment`, `seller`, `catalog`, `file`, `common`
 
 ```
 com.dogyun.kairos.{module}/
@@ -36,8 +38,10 @@ com.dogyun.kairos.{module}/
 
 ## JPA 규칙
 - 모든 엔티티는 `BaseEntity`(`created_at`, `created_by`, `modified_at`, `modified_by`, `status`)를 상속한다.
+- 예외: 읽기 전용 뷰 엔티티 `BrandView`/`SellerView`(`catalog.infrastructure`)는 `@Immutable`이며 `BaseEntity`를 상속하지 않는다(ADR 0002).
+- SKU는 소프트 딜리트 대신 `sku_status = DISCONTINUED`로 단종 처리한다(C1 스펙 13장).
 - 소프트 딜리트만 쓴다(`status = DELETED`). 물리 삭제 금지. 엔티티에 `@SQLRestriction("status = 'ACTIVE'")`를 붙인다.
-- 도메인 상태 컬럼은 `status`가 아니라 `order_status`, `deal_status`, `payment_status`처럼 이름을 짓는다.
+- 도메인 상태 컬럼은 `status`가 아니라 `order_status`, `deal_status`, `payment_status`, `seller_status`, `product_status`, `sku_status`처럼 이름을 짓는다.
 - 연관관계는 같은 애그리거트 안에서만, `LAZY`, 기본 `@ManyToOne` 단방향. 양방향은 꼭 필요할 때만 쓰고 이유를 주석으로 남긴다. `@ManyToMany`, `@OneToOne` 금지.
 - 동적 쿼리·복잡한 조회는 QueryDSL로 작성하고, `{module}.infrastructure`의 Repository 구현에서만 사용한다. 단순 조회는 Spring Data 메서드 쿼리를 써도 된다.
 - 스키마는 Flyway로만 관리한다(`ddl-auto: validate`, `open-in-view: false`). 이미 적용된 마이그레이션 파일은 수정하지 않고 새 버전을 추가한다.
@@ -75,3 +79,4 @@ com.dogyun.kairos.{module}/
 
 ## 결정 기록
 - 아키텍처 결정은 `docs/adr/`에 ADR로 남긴다. 특히 규칙의 예외(예: Phase 1에서 주문 생성 시 재고와 주문 두 애그리거트를 한 트랜잭션에서 변경)는 ADR과 코드 주석으로 표시한다.
+- ADR 0002: 상품 검색에서 `catalog`가 brand·seller 테이블을 읽기 전용 뷰 엔티티로 조인하는 예외(`docs/adr/0002-catalog-search-cross-module-read-join.md`).
