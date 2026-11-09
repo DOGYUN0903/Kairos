@@ -1473,6 +1473,122 @@ paths:
           $ref: '#/components/responses/ProductNotFound'
         '409':
           $ref: '#/components/responses/ProductInvalidStateTransition'
+  /api/v1/admin/products:
+    get:
+      tags: [Admin Product]
+      operationId: listAdminProducts
+      summary: 상품 심사 목록 (ADMIN, 최신 등록순, status 필터)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 상품 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/AdminProductSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Admin Product]
+      operationId: getAdminProduct
+      summary: 상품 심사 상세 (ADMIN, 판매자 상세와 같은 형식)
+      responses:
+        '200':
+          description: 상품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerProductDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+  /api/v1/admin/products/{productId}/approve:
+    post:
+      tags: [Admin Product]
+      operationId: approveProduct
+      summary: 상품 승인 (ADMIN, PENDING_REVIEW → ON_SALE)
+      description: "`onSaleAt` 은 처음 승인될 때만 기록한다."
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/ProductInvalidStateTransition'
+  /api/v1/admin/products/{productId}/reject:
+    post:
+      tags: [Admin Product]
+      operationId: rejectProduct
+      summary: 상품 반려 (ADMIN, PENDING_REVIEW → REJECTED)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/ProductInvalidStateTransition'
 components:
   securitySchemes:
     bearerAuth:
@@ -2217,6 +2333,30 @@ components:
           $ref: '#/components/schemas/ProductStatus'
         soldOut:
           type: boolean
+    AdminProductSummary:
+      type: object
+      required: [productId, sellerId, brandName, name, thumbnailUrl, originalPrice, salePrice, status]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        sellerId:
+          type: integer
+          format: int64
+        brandName:
+          type: string
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+        originalPrice:
+          type: integer
+          format: int64
+        salePrice:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ProductStatus'
     BrandPublic:
       type: object
       required: [brandId, name]

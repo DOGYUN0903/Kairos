@@ -220,4 +220,24 @@ class SellerProductApiTest : CommerceTestSupport() {
         // 상품은 그대로다.
         assertEquals(4, sellerProductDetail(token, productId).get("skus").size())
     }
+
+    @Test
+    fun 정지된_판매자도_ON_SALE_상품을_중지_종료할_수_있지만_판매가_변경은_SELLER_NOT_ACTIVE다() {
+        val token = newUserToken()
+        val sellerId = approvedSeller(token)
+        val brandId = approvedBrand(token)
+        val categoryId = leafCategory()
+        val fileIds = listOf(uploadImage(token))
+        val toPause = onSaleProduct(token, brandId, categoryId, fileIds)
+        val toEnd = onSaleProduct(token, brandId, categoryId, fileIds)
+        suspendSeller(sellerId)
+
+        patch("/api/v1/seller/products/$toPause/price", token, mapOf("salePrice" to 7000)).expectCode(409, "SELLER_NOT_ACTIVE")
+        post("/api/v1/seller/products/$toPause/pause", token).andExpect { status { isOk() } }
+        post("/api/v1/seller/products/$toEnd/end", token).andExpect { status { isOk() } }
+
+        assertEquals("PAUSED", sellerProductDetail(token, toPause).get("status").asString())
+        assertEquals("ENDED", sellerProductDetail(token, toEnd).get("status").asString())
+        assertEquals(8000, sellerProductDetail(token, toPause).get("salePrice").asLong())
+    }
 }

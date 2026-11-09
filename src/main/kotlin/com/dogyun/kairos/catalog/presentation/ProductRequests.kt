@@ -59,3 +59,5 @@ data class UpdateSkuRequest(
 }
 
 data class RegisterProductResponse(val productId: Long)
+
+data class RejectProductRequest(@field:NotBlank @field:Size(max = 500) val reason: String)

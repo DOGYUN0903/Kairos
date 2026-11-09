@@ -29,6 +29,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from product_review_history")
         jdbcTemplate.update("delete from sku")
         jdbcTemplate.update("delete from product_option_value")
         jdbcTemplate.update("delete from product_option")
@@ -176,6 +177,32 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         mapOf("name" to "색상", "values" to listOf(mapOf("name" to "블랙"), mapOf("name" to "화이트"))),
         mapOf("name" to "사이즈", "values" to listOf(mapOf("name" to "M"), mapOf("name" to "L"))),
     )
+
+    protected fun approveProduct(productId: Long) {
+        post("/api/v1/admin/products/$productId/approve", adminToken()).andExpect { status { isOk() } }
+    }
+
+    /** 등록 → 관리자 승인 → 모든 SKU 재고를 stock 으로 맞춘 ON_SALE 상품 ID. */
+    protected fun onSaleProduct(
+        sellerToken: String,
+        brandId: Long,
+        categoryId: Long,
+        fileIds: List<Long>,
+        originalPrice: Long = 10000,
+        salePrice: Long = 8000,
+        stock: Int = 5,
+    ): Long {
+        val productId = registerProduct(sellerToken, brandId, categoryId, fileIds, originalPrice = originalPrice, salePrice = salePrice)
+        approveProduct(productId)
+        val skus = sellerProductDetail(sellerToken, productId).get("skus")
+        for (i in 0 until skus.size()) {
+            patch(
+                "/api/v1/seller/products/$productId/skus/${skus.get(i).get("skuId").asLong()}", sellerToken,
+                mapOf("extraPrice" to 0, "stock" to stock, "onSale" to true),
+            ).andExpect { status { isOk() } }
+        }
+        return productId
+    }
 
     protected fun sellerProductDetail(token: String, productId: Long): JsonNode =
         json(get("/api/v1/seller/products/$productId", token).andExpect { status { isOk() } }).get("data")
