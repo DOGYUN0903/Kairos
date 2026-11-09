@@ -53,6 +53,14 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     CART_ITEM_NOT_FOUND(404, "장바구니 항목을 찾을 수 없습니다."),
     SKU_NOT_ORDERABLE(409, "지금 구매할 수 없는 상품입니다."),
 
+    ORDER_INVALID(400, "주문 정보가 올바르지 않습니다."),
+    ORDER_PRICE_CHANGED(409, "상품 가격이 바뀌었습니다. 다시 확인해 주세요."),
+    ORDER_INVALID_STATE_TRANSITION(409, "허용되지 않는 주문 상태 전이입니다."),
+    ORDER_ITEM_NOT_FOUND(404, "주문 항목을 찾을 수 없습니다."),
+    ORDER_ITEM_NOT_CANCELABLE(409, "배송이 시작되었거나 이미 취소된 항목입니다."),
+    SELLER_ORDER_NOT_FOUND(404, "판매자 주문을 찾을 수 없습니다."),
+    SELLER_ORDER_INVALID_STATE_TRANSITION(409, "허용되지 않는 판매자 주문 상태 전이입니다."),
+
     IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
     IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
     IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),
