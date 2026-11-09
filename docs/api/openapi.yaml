@@ -1,9 +1,11 @@
 openapi: 3.1.0
 info:
-  title: Kairos Time-Deal API
-  version: 0.1.0
+  title: Kairos Commerce API
+  version: 0.2.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
+
+    C1: 판매자·브랜드·카테고리·상품·파일
 
     - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
     - 모든 에러 응답은 `ErrorResponse`.
@@ -23,6 +25,19 @@ tags:
     description: 딜 목록/상세 조회
   - name: Order
     description: 주문 생성/취소/내 주문 조회
+  - name: Seller
+  - name: Admin Seller
+  - name: Brand
+  - name: Seller Brand
+  - name: Admin Brand
+  - name: File
+  - name: Category
+  - name: Admin Category
+  - name: Product
+  - name: Seller Product
+  - name: Admin Product
+  - name: Seller Change Request
+  - name: Admin Change Request
 security:
   - bearerAuth: []
 paths:
@@ -548,6 +563,7 @@ components:
             - STOCK_SOLD_OUT
             - ORDER_NOT_FOUND
             - ORDER_ALREADY_CANCELLED
+            - SELLER_NOT_ACTIVE
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
