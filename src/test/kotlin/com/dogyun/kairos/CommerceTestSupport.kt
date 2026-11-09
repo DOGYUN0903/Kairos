@@ -29,6 +29,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from cart_item")
         jdbcTemplate.update("delete from product_change_request")
         jdbcTemplate.update("delete from product_review_history")
         jdbcTemplate.update("delete from sku")
@@ -207,6 +208,19 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     protected fun sellerProductDetail(token: String, productId: Long): JsonNode =
         json(get("/api/v1/seller/products/$productId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 상품의 모든 SKU ID (DISCONTINUED 포함). */
+    protected fun skuIdsOf(sellerToken: String, productId: Long): List<Long> {
+        val skus = sellerProductDetail(sellerToken, productId).get("skus")
+        return (0 until skus.size()).map { skus.get(it).get("skuId").asLong() }
+    }
+
+    /** 장바구니에 담고 cartItemId 를 돌려준다. */
+    protected fun addToCart(token: String, skuId: Long, quantity: Int): Long {
+        val result = post("/api/v1/cart/items", token, mapOf("skuId" to skuId, "quantity" to quantity))
+            .andExpect { status { isOk() } }
+        return json(result).get("data").get("cartItemId").asLong()
+    }
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))

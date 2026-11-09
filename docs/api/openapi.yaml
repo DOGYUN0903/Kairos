@@ -1776,6 +1776,119 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      operationId: getCart
+      summary: 내 장바구니 (현재 판매가·가용 상태 기준 계산)
+      responses:
+        '200':
+          description: 장바구니. SKU 가 사라진 항목은 `availability=DISCONTINUED`, 가격 0 이다. `availableAmount` 는 AVAILABLE 항목의 합이다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CartResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/cart/items:
+    post:
+      tags: [Cart]
+      operationId: addCartItem
+      summary: 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '200':
+          description: 담기 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AddCartItemResponse'
+        '400':
+          description: "`CART_INVALID`(합산 수량 범위 초과) 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`SKU_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`SKU_NOT_ORDERABLE` AVAILABLE 이 아닌 SKU"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/cart/items/{cartItemId}:
+    patch:
+      tags: [Cart]
+      operationId: changeCartItemQuantity
+      summary: 장바구니 항목 수량 변경
+      parameters:
+        - $ref: '#/components/parameters/CartItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeCartItemQuantityRequest'
+      responses:
+        '200':
+          description: 변경 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`CART_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`CART_ITEM_NOT_FOUND`(다른 회원의 항목 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Cart]
+      operationId: removeCartItem
+      summary: 장바구니 항목 삭제
+      parameters:
+        - $ref: '#/components/parameters/CartItemId'
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`CART_ITEM_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1783,6 +1896,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    CartItemId:
+      name: cartItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     DealId:
       name: dealId
       in: path
@@ -2040,6 +2160,9 @@ components:
             - PRODUCT_INVALID_STATE_TRANSITION
             - SKU_INVALID
             - SKU_NOT_FOUND
+            - CART_INVALID
+            - CART_ITEM_NOT_FOUND
+            - SKU_NOT_ORDERABLE
             - CHANGE_REQUEST_NOT_FOUND
             - CHANGE_REQUEST_ALREADY_PENDING
             - CHANGE_REQUEST_INVALID_STATE_TRANSITION
@@ -2892,3 +3015,78 @@ components:
               type: integer
               format: int32
               minimum: 0
+    AddCartItemRequest:
+      type: object
+      required: [skuId, quantity]
+      properties:
+        skuId:
+          type: integer
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999
+    AddCartItemResponse:
+      type: object
+      required: [cartItemId]
+      properties:
+        cartItemId:
+          type: integer
+          format: int64
+    ChangeCartItemQuantityRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999
+    CartItemResult:
+      type: object
+      required: [cartItemId, skuId, productId, productName, brandName, thumbnailUrl, optionDisplayName, unitPrice, quantity, lineAmount, availability]
+      properties:
+        cartItemId:
+          type: integer
+          format: int64
+        skuId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        brandName:
+          type: string
+        thumbnailUrl:
+          type: string
+        optionDisplayName:
+          type: string
+        unitPrice:
+          type: integer
+          format: int64
+          description: 현재 판매가 + SKU 추가 금액
+        quantity:
+          type: integer
+          format: int32
+        lineAmount:
+          type: integer
+          format: int64
+        availability:
+          type: string
+          enum: [AVAILABLE, SOLD_OUT, PAUSED, DISCONTINUED, ENDED]
+    CartResult:
+      type: object
+      required: [items, availableAmount]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemResult'
+        availableAmount:
+          type: integer
+          format: int64
+          description: AVAILABLE 항목의 lineAmount 합
