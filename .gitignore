@@ -51,3 +51,6 @@ logs/
 perf/.tokens*
 perf/results/dryrun-*
 perf/results/rehearsal-*
+
+### Uploads ###
+uploads/

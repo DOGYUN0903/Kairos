@@ -541,6 +541,48 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/SellerNotFound'
+  /api/v1/files/images:
+    post:
+      tags: [File]
+      operationId: uploadImage
+      summary: 이미지 업로드 (jpg, png, webp, 5MB 이하)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: 업로드 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UploadImageResponse'
+        '400':
+          description: "`FILE_UNSUPPORTED_FORMAT`, `FILE_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: "파일이 너무 큼 (`INVALID_REQUEST`)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/admin/sellers:
     get:
       tags: [Admin Seller]
@@ -889,6 +931,9 @@ components:
             - SELLER_ALREADY_EXISTS
             - SELLER_BUSINESS_NUMBER_DUPLICATED
             - SELLER_INVALID_STATE_TRANSITION
+            - FILE_UNSUPPORTED_FORMAT
+            - FILE_INVALID
+            - FILE_NOT_OWNED
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -1005,6 +1050,15 @@ components:
         sellerId:
           type: integer
           format: int64
+    UploadImageResponse:
+      type: object
+      required: [fileId, url]
+      properties:
+        fileId:
+          type: integer
+          format: int64
+        url:
+          type: string
     SellerDetail:
       type: object
       required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status]

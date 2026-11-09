@@ -28,4 +28,7 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     SELLER_ALREADY_EXISTS(409, "이미 입점 신청한 회원입니다."),
     SELLER_BUSINESS_NUMBER_DUPLICATED(409, "이미 등록된 사업자등록번호입니다."),
     SELLER_INVALID_STATE_TRANSITION(409, "허용되지 않는 판매자 상태 전이입니다."),
+    FILE_UNSUPPORTED_FORMAT(400, "jpg, png, webp만 업로드할 수 있습니다."),
+    FILE_INVALID(400, "파일이 올바르지 않습니다."),
+    FILE_NOT_OWNED(400, "이 서버에 업로드한 본인 이미지 파일만 사용할 수 있습니다."),
 }

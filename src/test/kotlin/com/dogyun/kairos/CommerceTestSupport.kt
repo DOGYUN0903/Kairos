@@ -3,7 +3,9 @@ package com.dogyun.kairos
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.MockHttpServletRequestDsl
+import org.springframework.test.web.servlet.multipart
 import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.delete
@@ -27,6 +29,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from file")
         jdbcTemplate.update("delete from seller_review_history")
         jdbcTemplate.update("delete from seller")
     }
@@ -90,6 +93,15 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         return sellerId
     }
 
+    /** 1x1 PNG 를 업로드하고 fileId 를 돌려준다. */
+    protected fun uploadImage(token: String): Long {
+        val result = mockMvc.multipart("/api/v1/files/images") {
+            file(MockMultipartFile("file", "dot.png", "image/png", PNG_1X1))
+            header("Authorization", "Bearer $token")
+        }.andExpect { status { isCreated() } }
+        return json(result).get("data").get("fileId").asLong()
+    }
+
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
             .andExpect { status { isOk() } }
@@ -98,6 +110,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun unsuspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/unsuspend", adminToken())
             .andExpect { status { isOk() } }
+    }
+
+    companion object {
+        val PNG_1X1: ByteArray = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",
+        )
     }
 
     private fun randomBusinessNumber(): String {
