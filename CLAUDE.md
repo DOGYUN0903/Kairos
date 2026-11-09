@@ -5,9 +5,10 @@
 - 설계 문서(근거와 상세 규칙): `docs/superpowers/specs/2026-11-08-kairos-design.md`
 - 커머스 로드맵: `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`
 - C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
-- 현재 구현 계획: `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md` (이전: `docs/superpowers/plans/2026-11-08-kairos-phase0-1.md`)
+- C2 스펙: `docs/superpowers/specs/2026-11-09-c2-purchase-design.md`
+- 현재 구현 계획: `docs/superpowers/plans/2026-11-09-c2-purchase.md` (이전: `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: **C1 판매자와 상품**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2는 완료
+- 현재 단계: **C2 구매**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1은 완료
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
