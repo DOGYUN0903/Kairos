@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 상품 목록</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  .hot-banner { background: var(--navy); color: #fff; }
+  .hot-banner .container { display: flex; align-items: center; gap: 16px; min-height: 56px; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap; }
+  .hot-banner strong { font-weight: 700; }
+  .countdown { display: inline-flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .countdown span { background: var(--hot); color: #fff; padding: 2px 6px; border-radius: 2px; min-width: 30px; text-align: center; }
+  .hot-banner .btn { margin-left: auto; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; gap: 40px; margin-top: 32px; }
+  .filters { position: sticky; top: 96px; align-self: start; }
+  .filters h2 { font-size: 13px; font-weight: 700; margin: 0 0 8px; }
+  .filter-group { padding: 16px 0; border-top: 1px solid var(--border); }
+  .filter-group:first-child { border-top: 0; padding-top: 0; }
+  .cat-tree > li > button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; border: 0; background: none; padding: 0; font-weight: 500; text-align: left; }
+  .cat-tree ul { padding-left: 12px; }
+  .cat-tree ul a { display: block; min-height: 36px; line-height: 36px; color: var(--text-2); }
+  .cat-tree ul a[aria-current="page"] { color: var(--navy); font-weight: 700; }
+  .price-range { display: flex; align-items: center; gap: 6px; }
+  .price-range .input { padding: 0 8px; }
+
+  .list-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .list-head h1 { font-size: 20px; font-weight: 700; }
+  .list-head .total { color: var(--text-2); font-size: 13px; margin-left: 8px; font-weight: 400; }
+  .sort { display: flex; gap: 2px; }
+  .sort button { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--text-2); font-weight: 500; }
+  .sort button[aria-pressed="true"] { color: var(--navy); font-weight: 700; }
+  .sort button + button::before { content: ""; display: inline-block; width: 1px; height: 12px; background: var(--border); margin-right: 14px; vertical-align: -1px; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px 20px; margin-top: 24px; }
+  .product { position: relative; }
+  .product .thumb { position: relative; }
+  .product .like { position: absolute; right: 8px; bottom: 8px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--text-2); display: grid; place-items: center; }
+  .product .like[aria-pressed="true"] { color: var(--hot); border-color: var(--hot); }
+  .product .like[aria-pressed="true"] .icon { fill: currentColor; }
+  .product .info { padding-top: 10px; }
+  .product .brand { font-size: 12px; font-weight: 700; color: var(--text); }
+  .product .name { font-size: 14px; color: var(--text-2); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .product .pricing { margin-top: 6px; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .product .pricing .price { font-size: 15px; }
+  .product .pricing .strike { font-size: 12px; }
+  .product .likes { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: var(--text-3); }
+  .product .likes .icon { width: 12px; height: 12px; }
+  .product.sold-out .ph { position: relative; }
+  .product.sold-out .ph::after { content: "품절"; position: absolute; inset: 0; display: grid; place-items: center; background: rgba(27,42,74,.55); color: #fff; font-size: 15px; font-weight: 700; border-radius: var(--radius); }
+  .product.sold-out .brand, .product.sold-out .name, .product.sold-out .price { color: var(--text-3); }
+  .product .hot-tag { position: absolute; top: 8px; left: 8px; }
+
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 48px; }
+  .pagination a, .pagination span { display: inline-grid; place-items: center; min-width: 44px; height: 44px; border-radius: var(--radius); color: var(--text-2); font-weight: 500; }
+  .pagination a:hover { background: var(--surface); text-decoration: none; }
+  .pagination [aria-current="page"] { background: var(--navy); color: #fff; }
+
+  .mobile-filter-btn { display: none; }
+  @media (max-width: 1024px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 16px; }
+    .filters { display: none; }
+    .mobile-filter-btn { display: inline-flex; }
+    .site-header__row { height: auto; flex-wrap: wrap; padding: 12px 0; gap: 12px; }
+    .search { order: 3; flex-basis: 100%; max-width: none; }
+    .util-nav { margin-left: auto; }
+  }
+  @media (max-width: 640px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 24px 12px; } }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 2개">2</span>장바구니</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="#" aria-current="page">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<section class="hot-banner" aria-label="핫딜 안내">
+  <div class="container">
+    <span class="badge badge-hot">HOT DEAL</span>
+    <strong>[브랜드 A] 한정 수량 타임딜</strong>
+    <span class="countdown" aria-label="남은 시간 2시간 14분 09초"><span>02</span>:<span>14</span>:<span>09</span> 남음</span>
+    <a class="btn btn-hot btn-sm" href="#">핫딜 보러가기</a>
+  </div>
+</section>
+
+<main class="container">
+  <div class="layout">
+    <aside class="filters" aria-label="필터">
+      <div class="filter-group">
+        <h2>카테고리</h2>
+        <ul class="cat-tree">
+          <li>
+            <button type="button" aria-expanded="true">상의
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg>
+            </button>
+            <ul>
+              <li><a href="#" aria-current="page">티셔츠</a></li>
+              <li><a href="#">셔츠</a></li>
+              <li><a href="#">니트</a></li>
+              <li><a href="#">후드</a></li>
+            </ul>
+          </li>
+          <li><button type="button" aria-expanded="false">아우터<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></li>
+          <li><button type="button" aria-expanded="false">바지<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></li>
+          <li><button type="button" aria-expanded="false">신발<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></li>
+          <li><button type="button" aria-expanded="false">가방<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></li>
+        </ul>
+      </div>
+
+      <div class="filter-group">
+        <h2 id="brand-h">브랜드</h2>
+        <div role="group" aria-labelledby="brand-h">
+          <label class="checkbox"><input type="checkbox" name="brandId" value="1" checked> [브랜드 A]</label>
+          <label class="checkbox"><input type="checkbox" name="brandId" value="2"> [브랜드 B]</label>
+          <label class="checkbox"><input type="checkbox" name="brandId" value="3"> [브랜드 C]</label>
+          <label class="checkbox"><input type="checkbox" name="brandId" value="4"> [브랜드 D]</label>
+          <label class="checkbox"><input type="checkbox" name="brandId" value="5"> [브랜드 E]</label>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm mt-8">브랜드 더보기</button>
+      </div>
+
+      <div class="filter-group">
+        <h2 id="price-h">가격대</h2>
+        <div class="price-range" role="group" aria-labelledby="price-h">
+          <label class="sr-only" for="minPrice">최소 가격</label>
+          <input class="input" id="minPrice" type="number" inputmode="numeric" placeholder="최소" min="0">
+          <span aria-hidden="true">~</span>
+          <label class="sr-only" for="maxPrice">최대 가격</label>
+          <input class="input" id="maxPrice" type="number" inputmode="numeric" placeholder="최대" min="0">
+        </div>
+        <p class="hint mt-8">판매가 기준 (옵션 추가 금액 제외)</p>
+        <button type="button" class="btn btn-primary btn-block mt-16">적용</button>
+        <button type="button" class="btn btn-ghost btn-block mt-8">초기화</button>
+      </div>
+    </aside>
+
+    <section aria-labelledby="list-title">
+      <div class="list-head">
+        <h1 id="list-title">상의 &gt; 티셔츠 <span class="total">총 128개</span></h1>
+        <div class="row">
+          <button type="button" class="btn btn-ghost btn-sm mobile-filter-btn">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>필터
+          </button>
+          <div class="sort" role="group" aria-label="정렬">
+            <button type="button" aria-pressed="true">인기순</button>
+            <button type="button" aria-pressed="false">최신순</button>
+            <button type="button" aria-pressed="false">낮은 가격순</button>
+            <button type="button" aria-pressed="false">높은 가격순</button>
+          </div>
+        </div>
+      </div>
+
+      <ul class="grid">
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <span class="badge badge-hot hot-tag">핫딜</span>
+          <button type="button" class="like" aria-pressed="true" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 A]</a>
+            <p class="name"><a href="user-product-detail.html">오버핏 헤비웨이트 코튼 티셔츠</a></p>
+            <div class="pricing"><span class="discount">30%</span><span class="price">27,300원</span><span class="strike">39,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 1,204</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 B]</a>
+            <p class="name"><a href="user-product-detail.html">베이직 크루넥 반팔 티셔츠 2팩</a></p>
+            <div class="pricing"><span class="discount">15%</span><span class="price">25,500원</span><span class="strike">30,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 862</div>
+          </div>
+        </li>
+        <li class="product sold-out">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 C]</a>
+            <p class="name"><a href="user-product-detail.html">스트라이프 보트넥 롱슬리브</a></p>
+            <div class="pricing"><span class="price">49,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 310</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 A]</a>
+            <p class="name"><a href="user-product-detail.html">워싱 피그먼트 포켓 티셔츠</a></p>
+            <div class="pricing"><span class="discount">20%</span><span class="price">35,200원</span><span class="strike">44,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 540</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 D]</a>
+            <p class="name"><a href="user-product-detail.html">그래픽 프린트 루즈핏 티셔츠</a></p>
+            <div class="pricing"><span class="price">32,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 97</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 B]</a>
+            <p class="name"><a href="user-product-detail.html">수피마 코튼 슬림핏 티셔츠</a></p>
+            <div class="pricing"><span class="discount">10%</span><span class="price">26,100원</span><span class="strike">29,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 215</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 E]</a>
+            <p class="name"><a href="user-product-detail.html">링거 넥 레트로 티셔츠</a></p>
+            <div class="pricing"><span class="discount">41%</span><span class="price">22,900원</span><span class="strike">39,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 1,870</div>
+          </div>
+        </li>
+        <li class="product">
+          <a class="thumb" href="user-product-detail.html"><div class="ph">[상품 이미지]</div></a>
+          <button type="button" class="like" aria-pressed="false" aria-label="좋아요"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button>
+          <div class="info">
+            <a class="brand" href="#">[브랜드 C]</a>
+            <p class="name"><a href="user-product-detail.html">헨리넥 와플 티셔츠</a></p>
+            <div class="pricing"><span class="price">38,000원</span></div>
+            <div class="likes"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요 64</div>
+          </div>
+        </li>
+      </ul>
+
+      <nav class="pagination" aria-label="페이지">
+        <a href="#" aria-label="이전 페이지"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></a>
+        <a href="#" aria-current="page">1</a>
+        <a href="#">2</a>
+        <a href="#">3</a>
+        <a href="#">4</a>
+        <a href="#">5</a>
+        <span aria-hidden="true">…</span>
+        <a href="#">7</a>
+        <a href="#" aria-label="다음 페이지"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+      </nav>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+</body>
+</html>

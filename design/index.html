@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 디자인 목업</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  .hero { padding: 56px 0 32px; border-bottom: 1px solid var(--border); }
+  .hero .logo { font-size: 36px; }
+  .hero p { color: var(--text-2); margin-top: 12px; max-width: 640px; }
+  h2.sec { font-size: 18px; font-weight: 700; margin: 48px 0 16px; }
+  .screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .screens a { display: block; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; min-height: 120px; }
+  .screens a:hover { border-color: var(--navy); text-decoration: none; }
+  .screens .k { font-size: 11px; font-weight: 700; color: var(--text-2); letter-spacing: 1px; }
+  .screens .k.hot { color: var(--hot); }
+  .screens h3 { font-size: 16px; font-weight: 700; margin: 6px 0 4px; }
+  .screens p { font-size: 13px; color: var(--text-2); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .sw { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .sw .c { height: 64px; }
+  .sw .t { padding: 10px 12px; font-size: 12px; }
+  .sw .t strong { display: block; font-size: 13px; }
+  .sw code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-2); }
+  .type-row { display: grid; grid-template-columns: 180px 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+  .type-row .m { font-size: 12px; color: var(--text-2); }
+  .comp { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); margin-top: 12px; }
+  @media (max-width: 860px) { .screens { grid-template-columns: 1fr; } .type-row { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+</head>
+<body>
+<main class="container">
+  <header class="hero">
+    <div class="logo">KAIROS</div>
+    <p>멀티 브랜드 패션 마켓플레이스 Kairos의 C1(판매자·상품) 화면 목업입니다. 흰 배경과 상품 사진·타이포그래피가 이끄는 구조를 기본으로 두고, 이후 추가될 핫딜(한정 수량 타임딜)만 버밀리언으로 강조합니다. 정적 HTML이며 공유 CSS는 <code>assets/kairos.css</code>입니다.</p>
+  </header>
+
+  <h2 class="sec">화면</h2>
+  <div class="screens">
+    <a href="user-product-list.html"><span class="k">사용자</span><h3>상품 목록</h3><p>헤더·카테고리 내비·핫딜 배너, 필터(카테고리·브랜드·가격대), 정렬, 4열 그리드, 품절, 페이지네이션</p></a>
+    <a href="user-product-detail.html"><span class="k">사용자</span><h3>상품 상세</h3><p>이미지 갤러리, 정가·할인율·판매가, 색상 × 사이즈 옵션(품절 비활성, 추가 금액), 좋아요, 장바구니·구매</p></a>
+    <a href="seller-product-form.html"><span class="k">판매자</span><h3>상품 등록</h3><p>브랜드·소분류, 이미지 10장, 정가·판매가 할인율 힌트, 옵션 축 2개, SKU 표, 검수 안내</p></a>
+    <a href="seller-product-list.html"><span class="k">판매자</span><h3>상품 관리</h3><p>5개 상태 칩, 변경 요청 검수 중 배지, 일시 중지·재개·종료·판매가 수정</p></a>
+    <a href="admin-review.html"><span class="k">관리자</span><h3>검수</h3><p>판매자·브랜드·상품·변경 요청 탭, 대기 큐, 변경 전후 비교와 SKU 영향, 승인·반려</p></a>
+    <a href="user-product-list.html#hot"><span class="k hot">예정 · C6</span><h3>핫딜</h3><p>목록 상단 카운트다운 배너와 카테고리 내비 첫 항목으로 자리만 잡아 둠</p></a>
+  </div>
+
+  <h2 class="sec">색상</h2>
+  <div class="swatches">
+    <div class="sw"><div class="c" style="background:#FFFFFF;border-bottom:1px solid var(--border)"></div><div class="t"><strong>Base</strong><code>#FFFFFF</code></div></div>
+    <div class="sw"><div class="c" style="background:#1B2A4A"></div><div class="t"><strong>Navy · 텍스트/기본 UI</strong><code>#1B2A4A</code></div></div>
+    <div class="sw"><div class="c" style="background:#F3F5F8"></div><div class="t"><strong>Surface</strong><code>#F3F5F8</code></div></div>
+    <div class="sw"><div class="c" style="background:#EEF0F4"></div><div class="t"><strong>Surface 2</strong><code>#EEF0F4</code></div></div>
+    <div class="sw"><div class="c" style="background:#E3E6EC"></div><div class="t"><strong>Border</strong><code>#E3E6EC</code></div></div>
+    <div class="sw"><div class="c" style="background:#5B6577"></div><div class="t"><strong>Secondary text</strong><code>#5B6577</code></div></div>
+    <div class="sw"><div class="c" style="background:#E04A22"></div><div class="t"><strong>Vermilion · 핫딜 전용</strong><code>#E04A22</code></div></div>
+    <div class="sw"><div class="c" style="background:#D2401F"></div><div class="t"><strong>Discount text</strong><code>#D2401F</code></div></div>
+  </div>
+  <p class="hint mt-8">버밀리언은 핫딜 배지·카운트다운·핫딜 CTA에만 씁니다. 할인율 텍스트는 #D2401F, 그 외 강조는 모두 네이비입니다.</p>
+
+  <h2 class="sec">타이포그래피 · Noto Sans KR</h2>
+  <div class="type-row"><span class="m">Logo · 900 · 22px · 4px tracking</span><span class="logo">KAIROS</span></div>
+  <div class="type-row"><span class="m">H1 · 700 · 22px</span><span style="font-size:22px;font-weight:700">오버핏 헤비웨이트 코튼 티셔츠</span></div>
+  <div class="type-row"><span class="m">Price · 700 · 15~24px</span><span><span class="discount" style="font-size:18px">30%</span> <span class="price" style="font-size:18px">27,300원</span> <span class="strike">39,000원</span></span></div>
+  <div class="type-row"><span class="m">Body · 400 · 14px</span><span>상품명과 브랜드명에 대한 부분 일치 검색을 지원합니다.</span></div>
+  <div class="type-row"><span class="m">Label · 500 · 13px</span><span style="font-weight:500;font-size:13px">판매가</span></div>
+  <div class="type-row"><span class="m">Caption · 400 · 12px · secondary</span><span class="small muted">판매가 기준 (옵션 추가 금액 제외)</span></div>
+
+  <h2 class="sec">컴포넌트</h2>
+  <div class="comp">
+    <button type="button" class="btn btn-primary">기본 버튼</button>
+    <button type="button" class="btn">보조 버튼</button>
+    <button type="button" class="btn btn-ghost">고스트</button>
+    <button type="button" class="btn btn-danger">반려</button>
+    <button type="button" class="btn btn-hot">핫딜 보러가기</button>
+    <button type="button" class="btn" disabled>비활성</button>
+  </div>
+  <div class="comp">
+    <span class="chip chip-pending">검수 대기</span>
+    <span class="chip chip-onsale">판매 중</span>
+    <span class="chip chip-rejected">반려</span>
+    <span class="chip chip-paused">일시 중지</span>
+    <span class="chip chip-ended">판매 종료</span>
+    <span class="badge">상품명</span>
+    <span class="badge badge-navy">대표</span>
+    <span class="badge badge-outline">품절</span>
+    <span class="badge badge-hot">HOT DEAL</span>
+  </div>
+  <div class="comp">
+    <div class="field" style="width:220px"><label for="i1">입력</label><input id="i1" class="input" placeholder="placeholder"></div>
+    <div class="field" style="width:220px"><label for="s1">선택</label><select id="s1" class="select"><option>[브랜드 A]</option></select></div>
+    <label class="checkbox"><input type="checkbox" checked> 체크박스</label>
+    <span class="toggle-wrap"><button type="button" class="toggle" role="switch" aria-checked="true" aria-label="판매"></button>토글</span>
+    <div class="ph" style="width:80px;height:80px;aspect-ratio:auto;font-size:10px">[상품 이미지]</div>
+  </div>
+
+  <footer class="site-footer"><div class="logo">KAIROS</div><p>디자인 목업 · 2026-11-09</p></footer>
+</main>
+</body>
+</html>
