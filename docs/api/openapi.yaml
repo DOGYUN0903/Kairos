@@ -1,17 +1,17 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
     C1: 판매자·브랜드·카테고리·상품·파일
+    C2: 장바구니·주문·결제·취소·배송
 
     - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
     - 모든 에러 응답은 `ErrorResponse`.
     - 금액은 원 단위 정수(int64), 일시는 오프셋 없는 로컬 date-time(KST 기준, 예: 2026-11-08T12:00:00).
     - 모든 응답(성공/에러)에는 요청의 트레이스 ID를 담은 `X-Trace-Id` 헤더가 포함된다. 에러 문의 시 이 값을 함께 전달한다.
-    - 결제 실패는 에러가 아니다: 주문 생성은 201 + `status: CANCELLED` + `cancelReason`.
     - 딜 `status`는 저장값이 아니라 조회 시각 기준 계산값이다.
 servers:
   - url: http://localhost:8080
@@ -23,8 +23,11 @@ tags:
     description: 관리자 딜 등록/수정/삭제
   - name: Deal
     description: 딜 목록/상세 조회
+  - name: Cart
   - name: Order
-    description: 주문 생성/취소/내 주문 조회
+  - name: Payment
+  - name: Seller Order
+  - name: Admin Order
   - name: Seller
   - name: Admin Seller
   - name: Brand
@@ -303,138 +306,6 @@ paths:
                         $ref: '#/components/schemas/DealDetail'
         '404':
           $ref: '#/components/responses/DealNotFound'
-  /api/v1/orders:
-    post:
-      tags: [Order]
-      operationId: createOrder
-      summary: 주문 생성 (USER)
-      description: |
-        결제는 주문 생성 트랜잭션 안에서 동기 호출된다. 결제 실패/시간 초과는 에러가 아니며
-        201 + `status: CANCELLED` + `cancelReason`(`PAYMENT_FAILED` | `PAYMENT_TIMEOUT`)로 응답한다.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateOrderRequest'
-      responses:
-        '201':
-          description: 주문 생성 (결제 성공 PAID 또는 결제 실패 CANCELLED)
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/CreateOrderResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/DealNotFound'
-        '409':
-          description: "`DEAL_NOT_ONGOING`, `ORDER_LIMIT_EXCEEDED`, `STOCK_SOLD_OUT`"
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                dealNotOngoing:
-                  value:
-                    code: DEAL_NOT_ONGOING
-                    message: 진행 중인 딜이 아닙니다.
-                    timestamp: '2026-11-08T12:00:00'
-                orderLimitExceeded:
-                  value:
-                    code: ORDER_LIMIT_EXCEEDED
-                    message: 1인당 구매 제한 수량을 초과했습니다.
-                    timestamp: '2026-11-08T12:00:00'
-                stockSoldOut:
-                  value:
-                    code: STOCK_SOLD_OUT
-                    message: 재고가 소진되었습니다.
-                    timestamp: '2026-11-08T12:00:00'
-  /api/v1/orders/{orderId}/cancel:
-    post:
-      tags: [Order]
-      operationId: cancelOrder
-      summary: 주문 취소 (USER, 본인 주문)
-      parameters:
-        - name: orderId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: 취소 완료 (`data`는 null)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EmptyApiResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: "`ORDER_NOT_FOUND` (타인의 주문 포함)"
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                code: ORDER_NOT_FOUND
-                message: 주문을 찾을 수 없습니다.
-                timestamp: '2026-11-08T12:00:00'
-        '409':
-          description: "`ORDER_ALREADY_CANCELLED`"
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                code: ORDER_ALREADY_CANCELLED
-                message: 이미 취소된 주문입니다.
-                timestamp: '2026-11-08T12:00:00'
-  /api/v1/orders/me:
-    get:
-      tags: [Order]
-      operationId: listMyOrders
-      summary: 내 주문 목록 (USER, 페이징)
-      parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/Size'
-      responses:
-        '200':
-          description: 내 주문 목록
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/ApiResponse'
-                  - type: object
-                    properties:
-                      data:
-                        allOf:
-                          - $ref: '#/components/schemas/PageResponse'
-                          - type: object
-                            properties:
-                              content:
-                                type: array
-                                items:
-                                  $ref: '#/components/schemas/OrderSummary'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
   /api/v1/seller/application:
     post:
       tags: [Seller]
@@ -2103,10 +1974,8 @@ components:
             - DEAL_NOT_FOUND
             - DEAL_ALREADY_OPENED
             - DEAL_NOT_ONGOING
-            - ORDER_LIMIT_EXCEEDED
             - STOCK_SOLD_OUT
             - ORDER_NOT_FOUND
-            - ORDER_ALREADY_CANCELLED
             - SELLER_NOT_ACTIVE
             - SELLER_INVALID
             - SELLER_NOT_FOUND
@@ -2981,66 +2850,3 @@ components:
               type: integer
               format: int32
               minimum: 0
-    CreateOrderRequest:
-      type: object
-      required: [dealId, quantity]
-      properties:
-        dealId:
-          type: integer
-          format: int64
-        quantity:
-          type: integer
-          format: int32
-          minimum: 1
-    OrderStatus:
-      type: string
-      description: 주문 생성 응답에서는 PAID 또는 CANCELLED만 나타난다.
-      enum: [CREATED, PAID, CANCELLED]
-    CancelReason:
-      type: string
-      description: >-
-        주문 취소 사유. 결제 실패(PAYMENT_FAILED)·결제 타임아웃(PAYMENT_TIMEOUT)은 시스템 취소,
-        사용자가 직접 취소하면 USER_REQUESTED. 취소되지 않은 주문에는 null.
-      enum: [PAYMENT_FAILED, PAYMENT_TIMEOUT, USER_REQUESTED]
-    CreateOrderResponse:
-      type: object
-      required: [orderId, status]
-      properties:
-        orderId:
-          type: integer
-          format: int64
-        status:
-          type: string
-          enum: [PAID, CANCELLED]
-        cancelReason:
-          description: status가 CANCELLED일 때만 존재
-          oneOf:
-            - $ref: '#/components/schemas/CancelReason'
-            - type: 'null'
-    OrderSummary:
-      type: object
-      required: [orderId, dealId, productName, quantity, totalAmount, status, createdAt]
-      properties:
-        orderId:
-          type: integer
-          format: int64
-        dealId:
-          type: integer
-          format: int64
-        productName:
-          type: string
-        quantity:
-          type: integer
-          format: int32
-        totalAmount:
-          type: integer
-          format: int64
-          description: 원 단위
-        status:
-          $ref: '#/components/schemas/OrderStatus'
-        cancelReason:
-          oneOf:
-            - $ref: '#/components/schemas/CancelReason'
-            - type: 'null'
-        createdAt:
-          $ref: '#/components/schemas/LocalDateTime'
