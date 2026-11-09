@@ -70,3 +70,7 @@ kairos:
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s
+  pg:
+    provider: ${KAIROS_PG_PROVIDER:mock}
+    toss:
+      secret-key: ${TOSS_SECRET_KEY:}

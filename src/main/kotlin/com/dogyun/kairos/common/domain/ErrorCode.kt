@@ -61,6 +61,14 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     SELLER_ORDER_NOT_FOUND(404, "판매자 주문을 찾을 수 없습니다."),
     SELLER_ORDER_INVALID_STATE_TRANSITION(409, "허용되지 않는 판매자 주문 상태 전이입니다."),
 
+    PAYMENT_NOT_FOUND(404, "결제를 찾을 수 없습니다."),
+    PAYMENT_AMOUNT_MISMATCH(400, "결제 금액이 주문 금액과 다릅니다."),
+    PAYMENT_KEY_DUPLICATED(409, "이미 사용된 결제 키입니다."),
+    PAYMENT_IN_PROGRESS(409, "결제 승인이 진행 중입니다."),
+    PAYMENT_INVALID_STATE_TRANSITION(409, "허용되지 않는 결제 상태 전이입니다."),
+    PAYMENT_REJECTED(402, "결제가 승인되지 않았습니다."),
+    PAYMENT_CANCEL_FAILED(409, "결제 취소에 실패했습니다."),
+
     IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
     IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
     IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),
