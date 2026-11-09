@@ -435,6 +435,112 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/application:
+    post:
+      tags: [Seller]
+      operationId: applySeller
+      summary: 입점 신청 (로그인 회원)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellerApplicationRequest'
+      responses:
+        '201':
+          description: 입점 신청 완료 (PENDING)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ApplySellerResponse'
+        '400':
+          description: "`SELLER_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: "`SELLER_ALREADY_EXISTS`, `SELLER_BUSINESS_NUMBER_DUPLICATED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                sellerAlreadyExists:
+                  value:
+                    code: SELLER_ALREADY_EXISTS
+                    message: 이미 입점 신청한 회원입니다.
+                    timestamp: '2026-11-08T12:00:00'
+                businessNumberDuplicated:
+                  value:
+                    code: SELLER_BUSINESS_NUMBER_DUPLICATED
+                    message: 이미 등록된 사업자등록번호입니다.
+                    timestamp: '2026-11-08T12:00:00'
+    put:
+      tags: [Seller]
+      operationId: updateSellerApplication
+      summary: 입점 신청 수정 (PENDING 또는 REJECTED, 수정하면 PENDING으로 돌아간다)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellerApplicationRequest'
+      responses:
+        '200':
+          description: 수정 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`SELLER_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/SellerNotFound'
+        '409':
+          description: "`SELLER_INVALID_STATE_TRANSITION` 승인·정지 상태에서는 신청을 고칠 수 없다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: SELLER_INVALID_STATE_TRANSITION
+                message: 허용되지 않는 판매자 상태 전이입니다.
+                timestamp: '2026-11-08T12:00:00'
+  /api/v1/seller/me:
+    get:
+      tags: [Seller]
+      operationId: getMySeller
+      summary: 내 판매자 정보
+      responses:
+        '200':
+          description: 내 판매자 정보
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/SellerNotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -519,6 +625,16 @@ components:
             code: DEAL_ALREADY_OPENED
             message: 이미 오픈된 딜은 변경할 수 없습니다.
             timestamp: '2026-11-08T12:00:00'
+    SellerNotFound:
+      description: "`SELLER_NOT_FOUND`"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: SELLER_NOT_FOUND
+            message: 판매자를 찾을 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
   schemas:
     ApiResponse:
       type: object
@@ -564,6 +680,11 @@ components:
             - ORDER_NOT_FOUND
             - ORDER_ALREADY_CANCELLED
             - SELLER_NOT_ACTIVE
+            - SELLER_INVALID
+            - SELLER_NOT_FOUND
+            - SELLER_ALREADY_EXISTS
+            - SELLER_BUSINESS_NUMBER_DUPLICATED
+            - SELLER_INVALID_STATE_TRANSITION
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -644,6 +765,76 @@ components:
           type: string
         refreshToken:
           type: string
+    SellerStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, SUSPENDED]
+    SellerApplicationRequest:
+      type: object
+      required: [companyName, businessNumber, representativeName, phone, bank, accountNumber, holder]
+      properties:
+        companyName:
+          type: string
+          minLength: 1
+        businessNumber:
+          type: string
+          pattern: '^\d{3}-\d{2}-\d{5}$'
+          example: 123-45-67890
+        representativeName:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          minLength: 1
+        bank:
+          type: string
+          minLength: 1
+        accountNumber:
+          type: string
+          minLength: 1
+        holder:
+          type: string
+          minLength: 1
+    ApplySellerResponse:
+      type: object
+      required: [sellerId]
+      properties:
+        sellerId:
+          type: integer
+          format: int64
+    SellerDetail:
+      type: object
+      required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status]
+      properties:
+        sellerId:
+          type: integer
+          format: int64
+        memberId:
+          type: integer
+          format: int64
+        companyName:
+          type: string
+        businessNumber:
+          type: string
+        representativeName:
+          type: string
+        phone:
+          type: string
+        bank:
+          type: string
+        accountNumber:
+          type: string
+        holder:
+          type: string
+        commissionRateBp:
+          type: integer
+          format: int32
+          description: 수수료율(bp, 1bp = 0.01%). 승인 전에는 0
+        status:
+          $ref: '#/components/schemas/SellerStatus'
+        rejectReason:
+          type: [string, 'null']
+        suspendReason:
+          type: [string, 'null']
     DealStatus:
       type: string
       description: 저장값이 아니라 조회 시각 기준 계산값

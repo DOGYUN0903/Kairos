@@ -23,4 +23,9 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     ORDER_ALREADY_CANCELLED(409, "이미 취소된 주문입니다."),
 
     SELLER_NOT_ACTIVE(409, "판매자 상태 때문에 처리할 수 없습니다."),
+    SELLER_INVALID(400, "판매자 정보가 올바르지 않습니다."),
+    SELLER_NOT_FOUND(404, "판매자를 찾을 수 없습니다."),
+    SELLER_ALREADY_EXISTS(409, "이미 입점 신청한 회원입니다."),
+    SELLER_BUSINESS_NUMBER_DUPLICATED(409, "이미 등록된 사업자등록번호입니다."),
+    SELLER_INVALID_STATE_TRANSITION(409, "허용되지 않는 판매자 상태 전이입니다."),
 }
