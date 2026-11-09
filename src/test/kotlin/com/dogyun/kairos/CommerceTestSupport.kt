@@ -70,6 +70,41 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun delete(path: String, token: String? = null): ResultActionsDsl =
         mockMvc.delete(path) { prepare(token, null) }
 
+    /** 판매자 신청 → 관리자 승인(수수료율 1000bp)까지 마치고 sellerId 를 돌려준다. */
+    protected fun approvedSeller(token: String, businessNumber: String = randomBusinessNumber()): Long {
+        val created = post(
+            "/api/v1/seller/application", token,
+            mapOf(
+                "companyName" to "키로스상사",
+                "businessNumber" to businessNumber,
+                "representativeName" to "홍길동",
+                "phone" to "010-1234-5678",
+                "bank" to "국민",
+                "accountNumber" to "123456-01-123456",
+                "holder" to "홍길동",
+            ),
+        ).andExpect { status { isCreated() } }
+        val sellerId = json(created).get("data").get("sellerId").asLong()
+        post("/api/v1/admin/sellers/$sellerId/approve", adminToken(), mapOf("commissionRateBp" to 1000))
+            .andExpect { status { isOk() } }
+        return sellerId
+    }
+
+    protected fun suspendSeller(sellerId: Long) {
+        post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
+            .andExpect { status { isOk() } }
+    }
+
+    protected fun unsuspendSeller(sellerId: Long) {
+        post("/api/v1/admin/sellers/$sellerId/unsuspend", adminToken())
+            .andExpect { status { isOk() } }
+    }
+
+    private fun randomBusinessNumber(): String {
+        val n = UUID.randomUUID().mostSignificantBits.let { Math.floorMod(it, 1_000_000_000L) }
+        return "%03d-%02d-%05d".format(n / 10_000_000, (n / 100_000) % 100, n % 100_000)
+    }
+
     private fun MockHttpServletRequestDsl.prepare(token: String?, body: Any?) {
         token?.let { header("Authorization", "Bearer $it") }
         if (body != null) {

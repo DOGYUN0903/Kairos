@@ -1,8 +1,11 @@
 package com.dogyun.kairos.seller.presentation
 
 import com.dogyun.kairos.seller.application.SellerApplicationCommand
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
 
 data class SellerApplicationRequest(
     @field:NotBlank val companyName: String,
@@ -19,3 +22,11 @@ data class SellerApplicationRequest(
 }
 
 data class ApplySellerResponse(val sellerId: Long)
+
+data class ApproveSellerRequest(
+    @field:Min(0) @field:Max(10000) val commissionRateBp: Int,
+)
+
+data class ReasonRequest(
+    @field:NotBlank @field:Size(max = 500) val reason: String,
+)
