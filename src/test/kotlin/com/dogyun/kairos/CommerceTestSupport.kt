@@ -29,6 +29,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from product_change_request")
         jdbcTemplate.update("delete from product_review_history")
         jdbcTemplate.update("delete from sku")
         jdbcTemplate.update("delete from product_option_value")

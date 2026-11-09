@@ -1,6 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.Product
+import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class ProductQueryService(
     private val productRepository: ProductRepository,
+    private val changeRequestRepository: ProductChangeRequestRepository,
     private val sellerReader: SellerReader,
     private val imageFileReader: ImageFileReader,
 ) {
@@ -24,7 +26,8 @@ class ProductQueryService(
             ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
-        return toSellerProductDetail(product, brandName, urls)
+        val pending = changeRequestRepository.findPendingByProductId(productId)?.id
+        return toSellerProductDetail(product, brandName, urls, pending)
     }
 
     fun listMine(seller: SellerPrincipal, status: ProductStatus?, page: Int, size: Int): PageResult<SellerProductSummary> {

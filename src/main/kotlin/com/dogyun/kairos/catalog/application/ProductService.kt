@@ -1,10 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
-import com.dogyun.kairos.catalog.domain.OptionValue
 import com.dogyun.kairos.catalog.domain.Product
-import com.dogyun.kairos.catalog.domain.ProductContent
 import com.dogyun.kairos.catalog.domain.ProductId
-import com.dogyun.kairos.catalog.domain.ProductOption
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.SkuId
 import com.dogyun.kairos.common.domain.DomainException
@@ -27,14 +24,14 @@ class ProductService(
         val brand = sellerReader.findBrand(command.brandId)?.takeIf { it.sellerId == seller.sellerId }
             ?: throw DomainException(ErrorCode.BRAND_NOT_FOUND)
         if (!brand.approved) throw DomainException(ErrorCode.BRAND_NOT_APPROVED)
-        val content = validatedContent(seller, command.content)
+        val content = validatedContent(seller, command.content, categoryQueryService, imageFileReader)
         val product = Product.register(seller.sellerId, brand.brandId, content, command.originalPrice, command.salePrice)
         return requireNotNull(productRepository.save(product).id).value
     }
 
     fun editContent(seller: SellerPrincipal, productId: Long, command: ProductContentCommand) {
         val product = findMine(seller, productId)
-        val content = validatedContent(seller, command)
+        val content = validatedContent(seller, command, categoryQueryService, imageFileReader)
         product.editContent(content)
         productRepository.save(product)
     }
@@ -66,24 +63,4 @@ class ProductService(
     private fun findMine(seller: SellerPrincipal, productId: Long): Product =
         productRepository.findByIdAndSellerId(ProductId(productId), seller.sellerId)
             ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
-
-    /** 카테고리는 소분류, 이미지는 전부 존재하는 본인 업로드 이미지여야 한다. */
-    private fun validatedContent(seller: SellerPrincipal, command: ProductContentCommand): ProductContent {
-        val content = ProductContent(
-            name = command.name,
-            description = command.description,
-            categoryId = command.categoryId,
-            imageFileIds = command.imageFileIds,
-            options = command.options.map { option ->
-                ProductOption(option.optionId, option.name, option.values.map { OptionValue(it.valueId, it.name) })
-            },
-        )
-        categoryQueryService.requireLeaf(content.categoryId)
-        val files = imageFileReader.findImages(content.imageFileIds)
-        val owned = content.imageFileIds.all { id ->
-            files[id]?.let { it.isImage && it.uploaderMemberId == seller.memberId } ?: false
-        }
-        if (!owned) throw DomainException(ErrorCode.FILE_NOT_OWNED)
-        return content
-    }
 }

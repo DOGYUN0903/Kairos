@@ -1589,6 +1589,215 @@ paths:
           $ref: '#/components/responses/ProductNotFound'
         '409':
           $ref: '#/components/responses/ProductInvalidStateTransition'
+  /api/v1/seller/products/{productId}/change-requests:
+    post:
+      tags: [Seller Change Request]
+      operationId: submitChangeRequest
+      summary: 상품 변경 요청 (APPROVED 판매자, ON_SALE·PAUSED 상품)
+      description: |
+        판매 중인 상품의 내용(이름·설명·카테고리·이미지·옵션)과 정가는 즉시 바뀌지 않고 변경 요청으로 심사를 거친다.
+        상품은 요청 중에도 기존 내용 그대로 판매되며, 판매자 상세의 `pendingChangeRequestId` 로 대기 중인 요청을 알 수 있다.
+        카테고리·이미지·옵션 값 ID 검증은 상품 수정과 같다. 정가는 `0 < 현재 판매가 ≤ 새 정가` 여야 한다(`PRODUCT_INVALID_PRICE`).
+        상품 하나에 대기 중인 요청은 하나뿐이다(`CHANGE_REQUEST_ALREADY_PENDING`).
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitChangeRequestRequest'
+      responses:
+        '201':
+          description: 변경 요청 생성 (PENDING)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmitChangeRequestResponse'
+        '400':
+          description: "`PRODUCT_INVALID`, `PRODUCT_INVALID_PRICE`, `CATEGORY_NOT_LEAF`, `FILE_NOT_OWNED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`PRODUCT_NOT_FOUND` 또는 `CATEGORY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`CHANGE_REQUEST_ALREADY_PENDING`, `PRODUCT_INVALID_STATE_TRANSITION`(ON_SALE·PAUSED 가 아닌 상품) 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/products/{productId}/change-requests/{changeRequestId}:
+    delete:
+      tags: [Seller Change Request]
+      operationId: withdrawChangeRequest
+      summary: 변경 요청 철회 (APPROVED 판매자, PENDING 만)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ChangeRequestId'
+      responses:
+        '204':
+          description: 철회 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
+        '409':
+          description: "`CHANGE_REQUEST_INVALID_STATE_TRANSITION`(PENDING 이 아닌 요청) 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/change-requests:
+    get:
+      tags: [Admin Change Request]
+      operationId: listChangeRequests
+      summary: 변경 요청 목록 (ADMIN, 최신순, status 필터)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChangeRequestStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 변경 요청 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ChangeRequestSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/change-requests/{changeRequestId}:
+    parameters:
+      - $ref: '#/components/parameters/ChangeRequestId'
+    get:
+      tags: [Admin Change Request]
+      operationId: getChangeRequest
+      summary: 변경 요청 상세 (ADMIN, 요청된 내용과 정가)
+      responses:
+        '200':
+          description: 변경 요청 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChangeRequestDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
+  /api/v1/admin/change-requests/{changeRequestId}/approve:
+    post:
+      tags: [Admin Change Request]
+      operationId: approveChangeRequest
+      summary: 변경 요청 승인 (ADMIN, PENDING → APPROVED, 상품에 반영)
+      description: |
+        요청한 내용과 정가를 상품에 반영하고 SKU 를 재구성한다. 같은 옵션 값 ID 조합의 SKU 는 ID·재고·추가 금액이 유지되고,
+        새 조합은 재고 0 으로 생기며, 사라진 조합은 DISCONTINUED 가 된다. 상품 상태와 `onSaleAt` 은 바뀌지 않는다.
+        상품이 ENDED 면 `PRODUCT_INVALID_STATE_TRANSITION` 이고 요청은 PENDING 으로 남는다.
+        현재 판매가가 새 정가보다 크면 `PRODUCT_INVALID_PRICE`.
+      parameters:
+        - $ref: '#/components/parameters/ChangeRequestId'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`PRODUCT_INVALID_PRICE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
+        '409':
+          description: "`CHANGE_REQUEST_INVALID_STATE_TRANSITION`(PENDING 이 아닌 요청) 또는 `PRODUCT_INVALID_STATE_TRANSITION`(ENDED 상품)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/change-requests/{changeRequestId}/reject:
+    post:
+      tags: [Admin Change Request]
+      operationId: rejectChangeRequest
+      summary: 변경 요청 반려 (ADMIN, PENDING → REJECTED, 상품은 그대로)
+      parameters:
+        - $ref: '#/components/parameters/ChangeRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonRequest'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
+        '409':
+          description: "`CHANGE_REQUEST_INVALID_STATE_TRANSITION`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -1624,6 +1833,13 @@ components:
         default: 20
     ProductId:
       name: productId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ChangeRequestId:
+      name: changeRequestId
       in: path
       required: true
       schema:
@@ -1709,6 +1925,16 @@ components:
           example:
             code: PRODUCT_NOT_FOUND
             message: 상품을 찾을 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+    ChangeRequestNotFound:
+      description: "`CHANGE_REQUEST_NOT_FOUND` 없거나 다른 판매자의 변경 요청"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: CHANGE_REQUEST_NOT_FOUND
+            message: 변경 요청을 찾을 수 없습니다.
             timestamp: '2026-11-08T12:00:00'
     ProductInvalidStateTransition:
       description: "`PRODUCT_INVALID_STATE_TRANSITION` 허용되지 않는 상품 상태 전이, 또는 `SELLER_NOT_ACTIVE`"
@@ -1799,6 +2025,9 @@ components:
             - PRODUCT_INVALID_STATE_TRANSITION
             - SKU_INVALID
             - SKU_NOT_FOUND
+            - CHANGE_REQUEST_NOT_FOUND
+            - CHANGE_REQUEST_ALREADY_PENDING
+            - CHANGE_REQUEST_INVALID_STATE_TRANSITION
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -2312,6 +2541,92 @@ components:
           type: [integer, 'null']
           format: int64
           description: 대기 중인 변경 요청 ID. 없으면 null.
+    ChangeRequestStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, WITHDRAWN]
+    SubmitChangeRequestRequest:
+      type: object
+      required: [content, originalPrice]
+      properties:
+        content:
+          $ref: '#/components/schemas/ProductContentRequest'
+        originalPrice:
+          type: integer
+          format: int64
+          description: 새 정가(원). 0 < 현재 판매가 ≤ 새 정가
+    SubmitChangeRequestResponse:
+      type: object
+      required: [changeRequestId]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+    ProductContentResult:
+      type: object
+      description: 변경 요청이 담은 상품 내용. 옵션·값 ID 가 있으면 기존 것을 유지하는 변경이다.
+      required: [name, description, categoryId, images, options]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        images:
+          type: array
+          description: 요청한 순서. 첫 번째가 대표 이미지.
+          items:
+            $ref: '#/components/schemas/ProductImage'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionRequest'
+    ChangeRequestSummary:
+      type: object
+      required: [changeRequestId, productId, sellerId, name, originalPrice, status]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        sellerId:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: 요청한 상품명
+        originalPrice:
+          type: integer
+          format: int64
+          description: 요청한 정가
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+    ChangeRequestDetail:
+      type: object
+      required: [changeRequestId, productId, sellerId, status, originalPrice, content]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        sellerId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+        rejectReason:
+          type: [string, 'null']
+        originalPrice:
+          type: integer
+          format: int64
+          description: 요청한 정가
+        content:
+          $ref: '#/components/schemas/ProductContentResult'
     SellerProductSummary:
       type: object
       required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut]

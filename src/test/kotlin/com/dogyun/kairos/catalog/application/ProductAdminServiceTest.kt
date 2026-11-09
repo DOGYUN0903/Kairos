@@ -84,7 +84,8 @@ class ProductAdminServiceTest {
     private val clock = Clock.fixed(now.atZone(zone).toInstant(), zone)
     private val products = FakeProductRepository()
     private val histories = FakeHistoryRepository()
-    private val service = ProductAdminService(products, histories, FakeSellerReader(), FakeImageFileReader(), clock)
+    private val changeRequests = FakeProductChangeRequestRepository()
+    private val service = ProductAdminService(products, changeRequests, histories, FakeSellerReader(), FakeImageFileReader(), clock)
     private val reviewerId = 99L
 
     private fun content(name: String = "티셔츠") = ProductContent(name, "설명", 5L, listOf(100L), emptyList())

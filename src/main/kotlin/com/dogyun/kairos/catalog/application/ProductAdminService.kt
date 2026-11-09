@@ -1,6 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.Product
+import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductReviewHistory
@@ -31,6 +32,7 @@ data class AdminProductSummary(
 @Service
 class ProductAdminService(
     private val productRepository: ProductRepository,
+    private val changeRequestRepository: ProductChangeRequestRepository,
     private val historyRepository: ProductReviewHistoryRepository,
     private val sellerReader: SellerReader,
     private val imageFileReader: ImageFileReader,
@@ -76,7 +78,8 @@ class ProductAdminService(
         val product = productRepository.findById(ProductId(productId)) ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
-        return toSellerProductDetail(product, brandName, urls)
+        val pending = changeRequestRepository.findPendingByProductId(productId)?.id
+        return toSellerProductDetail(product, brandName, urls, pending)
     }
 
     private fun review(

@@ -87,11 +87,19 @@ class Product(
 
     /** 승인된 변경 요청을 반영한다. 상태와 onSaleAt 은 그대로 둔다. */
     fun applyChange(content: ProductContent, originalPrice: Long) {
+        validateChange(content, originalPrice)
+        this.content = content
+        this.originalPrice = originalPrice
+    }
+
+    /**
+     * 변경 요청을 낼 수 있는지(제출 시) 또는 반영할 수 있는지(승인 시) 검사한다. 바꾸지는 않는다.
+     * ON_SALE·PAUSED 상품만, 유지하는 옵션·값 ID 는 이 상품 것이어야 하고, 0 < 현재 판매가 ≤ 새 정가.
+     */
+    fun validateChange(content: ProductContent, originalPrice: Long) {
         requireStatus(ProductStatus.ON_SALE, ProductStatus.PAUSED)
         validateValueIds(content)
         validatePrice(originalPrice, salePrice)
-        this.content = content
-        this.originalPrice = originalPrice
     }
 
     /** 판매가만 바꾼다. 정가는 변경 요청으로만 바뀐다. */

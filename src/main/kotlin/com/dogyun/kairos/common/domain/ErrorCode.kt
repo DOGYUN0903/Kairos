@@ -47,4 +47,7 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     PRODUCT_INVALID_STATE_TRANSITION(409, "허용되지 않는 상품 상태 전이입니다."),
     SKU_INVALID(400, "SKU 정보가 올바르지 않습니다."),
     SKU_NOT_FOUND(404, "SKU를 찾을 수 없습니다."),
+    CHANGE_REQUEST_NOT_FOUND(404, "변경 요청을 찾을 수 없습니다."),
+    CHANGE_REQUEST_ALREADY_PENDING(409, "이미 대기 중인 변경 요청이 있습니다."),
+    CHANGE_REQUEST_INVALID_STATE_TRANSITION(409, "허용되지 않는 변경 요청 상태 전이입니다."),
 }

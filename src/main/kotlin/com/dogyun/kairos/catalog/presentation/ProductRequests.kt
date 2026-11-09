@@ -5,6 +5,7 @@ import com.dogyun.kairos.catalog.application.OptionCommand
 import com.dogyun.kairos.catalog.application.OptionValueCommand
 import com.dogyun.kairos.catalog.application.ProductContentCommand
 import com.dogyun.kairos.catalog.application.RegisterProductCommand
+import com.dogyun.kairos.catalog.application.SubmitChangeRequestCommand
 import com.dogyun.kairos.catalog.application.UpdateSkuCommand
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -61,3 +62,12 @@ data class UpdateSkuRequest(
 data class RegisterProductResponse(val productId: Long)
 
 data class RejectProductRequest(@field:NotBlank @field:Size(max = 500) val reason: String)
+
+data class SubmitChangeRequestRequest(
+    @field:NotNull @field:Valid val content: ProductContentRequest,
+    @field:NotNull val originalPrice: Long,
+) {
+    fun toCommand() = SubmitChangeRequestCommand(content.toCommand(), originalPrice)
+}
+
+data class SubmitChangeRequestResponse(val changeRequestId: Long)

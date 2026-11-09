@@ -40,8 +40,42 @@ data class SellerProductDetail(
     val options: List<OptionResult>,
     /** ACTIVE·DISCONTINUED 모두. */
     val skus: List<SellerSkuResult>,
-    /** 대기 중인 변경 요청 ID. Task 10 에서 채운다. */
+    /** 대기 중인 변경 요청 ID. 없으면 null. */
     val pendingChangeRequestId: Long?,
+)
+
+/** 변경 요청이 담은 옵션. ID 가 있으면 기존 옵션·값을 유지하는 변경이다. */
+data class ChangeOptionValueResult(val valueId: Long?, val name: String)
+
+data class ChangeOptionResult(val optionId: Long?, val name: String, val values: List<ChangeOptionValueResult>)
+
+data class ProductContentResult(
+    val name: String,
+    val description: String,
+    val categoryId: Long,
+    val images: List<ProductImageResult>,
+    val options: List<ChangeOptionResult>,
+)
+
+data class ChangeRequestDetail(
+    val changeRequestId: Long,
+    val productId: Long,
+    val sellerId: Long,
+    val status: String,
+    val rejectReason: String?,
+    /** 요청한 정가. */
+    val originalPrice: Long,
+    val content: ProductContentResult,
+)
+
+data class ChangeRequestSummary(
+    val changeRequestId: Long,
+    val productId: Long,
+    val sellerId: Long,
+    /** 요청한 상품명. */
+    val name: String,
+    val originalPrice: Long,
+    val status: String,
 )
 
 data class SellerProductSummary(
@@ -54,7 +88,12 @@ data class SellerProductSummary(
     val soldOut: Boolean,
 )
 
-internal fun toSellerProductDetail(product: Product, brandName: String, imageUrls: Map<Long, String>): SellerProductDetail {
+internal fun toSellerProductDetail(
+    product: Product,
+    brandName: String,
+    imageUrls: Map<Long, String>,
+    pendingChangeRequestId: Long?,
+): SellerProductDetail {
     val content = product.content
     val valueNames = content.options.flatMap { it.values }.associate { requireNotNull(it.id) to it.name }
     return SellerProductDetail(
@@ -93,7 +132,7 @@ internal fun toSellerProductDetail(product: Product, brandName: String, imageUrl
                 skuStatus = sku.skuStatus.name,
             )
         },
-        pendingChangeRequestId = null,
+        pendingChangeRequestId = pendingChangeRequestId,
     )
 }
 
