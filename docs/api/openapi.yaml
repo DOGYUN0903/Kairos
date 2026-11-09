@@ -1329,6 +1329,12 @@ components:
             - CATEGORY_NOT_LEAF
             - CATEGORY_HAS_CHILDREN
             - CATEGORY_HAS_PRODUCTS
+            - PRODUCT_INVALID
+            - PRODUCT_INVALID_PRICE
+            - PRODUCT_NOT_FOUND
+            - PRODUCT_INVALID_STATE_TRANSITION
+            - SKU_INVALID
+            - SKU_NOT_FOUND
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR

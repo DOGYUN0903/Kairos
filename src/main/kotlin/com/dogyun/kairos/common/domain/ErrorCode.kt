@@ -40,4 +40,10 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     CATEGORY_NOT_LEAF(400, "소분류 카테고리만 선택할 수 있습니다."),
     CATEGORY_HAS_CHILDREN(409, "하위 카테고리가 있어 삭제할 수 없습니다."),
     CATEGORY_HAS_PRODUCTS(409, "상품이 있는 카테고리는 삭제할 수 없습니다."),
+    PRODUCT_INVALID(400, "상품 정보가 올바르지 않습니다."),
+    PRODUCT_INVALID_PRICE(400, "판매가는 0보다 크고 정가 이하여야 합니다."),
+    PRODUCT_NOT_FOUND(404, "상품을 찾을 수 없습니다."),
+    PRODUCT_INVALID_STATE_TRANSITION(409, "허용되지 않는 상품 상태 전이입니다."),
+    SKU_INVALID(400, "SKU 정보가 올바르지 않습니다."),
+    SKU_NOT_FOUND(404, "SKU를 찾을 수 없습니다."),
 }
