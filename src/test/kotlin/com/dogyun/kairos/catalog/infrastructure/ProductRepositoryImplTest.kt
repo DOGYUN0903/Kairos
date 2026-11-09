@@ -58,6 +58,18 @@ class ProductRepositoryImplTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun 판매자_저장은_판매량을_덮어쓰지_않는다() {
+        val productId = assertNotNull(tx { repository.save(register()) }.id)
+        val stale = tx { repository.findById(productId)!! }
+        jdbcTemplate.update("update product set sales_count = 7 where id = ?", productId.value)
+
+        tx { repository.save(stale.also { it.changeSalePrice(8000) }) }
+
+        assertEquals(7L, jdbcTemplate.queryForObject("select sales_count from product where id = ?", Long::class.java, productId.value))
+        assertEquals(8000L, jdbcTemplate.queryForObject("select sale_price from product where id = ?", Long::class.java, productId.value))
+    }
+
+    @Test
     fun 저장_후_읽으면_이미지_순서_옵션_값_ID_SKU가_그대로다() {
         val saved = tx { repository.save(register()) }
         val productId = assertNotNull(saved.id)

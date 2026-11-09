@@ -80,7 +80,7 @@ class ProductRepositoryImpl(
             requireNotNull(productJpaRepository.findByIdOrNull(id.value)) { "존재하지 않는 상품입니다: ${id.value}" }.also {
                 it.change(
                     content.categoryId, content.name, content.description, product.originalPrice, product.salePrice,
-                    product.status, product.rejectReason, product.onSaleAt, product.salesCount,
+                    product.status, product.rejectReason, product.onSaleAt,
                 )
             }
         }

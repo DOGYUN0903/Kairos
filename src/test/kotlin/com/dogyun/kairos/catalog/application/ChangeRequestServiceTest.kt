@@ -90,7 +90,7 @@ class ChangeRequestServiceTest {
     )
     private val categoryQueryService = CategoryQueryService(categories)
     private val service = ChangeRequestService(products, changeRequests, categoryQueryService, files)
-    private val adminService = ChangeRequestAdminService(products, changeRequests, histories, files, clock)
+    private val adminService = ChangeRequestAdminService(products, changeRequests, categoryQueryService, histories, files, clock)
     private val query = ProductQueryService(products, changeRequests, FakeSellerReader(), files)
 
     private val root: Long = requireNotNull(categories.save(Category.root("패션", 1)).id).value
@@ -166,6 +166,19 @@ class ChangeRequestServiceTest {
         assertEquals("새 티셔츠", detail.content.name)
         assertEquals(listOf("http://files/a.png", "http://files/b.png"), detail.content.images.map { it.url })
         assertEquals("PENDING", detail.status)
+    }
+
+    @Test
+    fun 제출_후_카테고리가_삭제되면_승인은_CATEGORY_NOT_FOUND이고_요청은_PENDING으로_남는다() {
+        val productId = onSaleProduct()
+        val id = submitSame(productId)
+        categories.delete(CategoryId(leaf))
+
+        assertCode(ErrorCode.CATEGORY_NOT_FOUND) { adminService.approve(id, reviewerId) }
+
+        assertEquals(ChangeRequestStatus.PENDING, requireNotNull(changeRequests.findById(id)).status)
+        assertEquals("티셔츠", product(productId).content.name)
+        assertTrue(histories.store.isEmpty())
     }
 
     @Test

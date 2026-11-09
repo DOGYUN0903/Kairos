@@ -22,6 +22,7 @@ import java.time.LocalDateTime
 class ChangeRequestAdminService(
     private val productRepository: ProductRepository,
     private val changeRequestRepository: ProductChangeRequestRepository,
+    private val categoryQueryService: CategoryQueryService,
     private val historyRepository: ProductReviewHistoryRepository,
     private val imageFileReader: ImageFileReader,
     private val clock: Clock,
@@ -38,6 +39,8 @@ class ChangeRequestAdminService(
         val request = find(changeRequestId)
         if (request.status != ChangeRequestStatus.PENDING) throw DomainException(ErrorCode.CHANGE_REQUEST_INVALID_STATE_TRANSITION)
         val product = productRepository.findById(ProductId(request.productId)) ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
+        // 제출 이후 카테고리가 삭제됐을 수 있으므로 승인 시점에 다시 확인한다.
+        categoryQueryService.requireLeaf(request.content.categoryId)
         product.applyChange(request.content, request.originalPrice)
         productRepository.save(product)
         request.approve()

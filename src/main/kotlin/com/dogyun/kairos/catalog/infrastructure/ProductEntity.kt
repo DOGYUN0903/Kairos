@@ -75,6 +75,7 @@ class ProductEntity(
     var salesCount: Long = salesCount
         protected set
 
+    /** salesCount 는 주문 쪽에서만 증가하므로 변경 대상이 아니다(오래된 스냅샷으로 덮어쓰지 않는다). */
     fun change(
         categoryId: Long,
         name: String,
@@ -84,7 +85,6 @@ class ProductEntity(
         productStatus: ProductStatus,
         rejectReason: String?,
         onSaleAt: LocalDateTime?,
-        salesCount: Long,
     ) {
         this.categoryId = categoryId
         this.name = name
@@ -94,6 +94,5 @@ class ProductEntity(
         this.productStatus = productStatus
         this.rejectReason = rejectReason
         this.onSaleAt = onSaleAt
-        this.salesCount = salesCount
     }
 }
