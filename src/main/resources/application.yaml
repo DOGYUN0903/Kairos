@@ -67,3 +67,6 @@ kairos:
   admin:
     email: ${KAIROS_ADMIN_EMAIL}
     password: ${KAIROS_ADMIN_PASSWORD}
+  idempotency:
+    ttl: 24h
+    in-progress-timeout: 60s

@@ -1823,6 +1823,15 @@ components:
       schema:
         type: integer
         format: int64
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 같은 요청의 재시도를 식별하는 키(1~100자). 같은 회원·같은 키·같은 본문이면 저장된 응답을 다시 돌려준다.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
   responses:
     InvalidRequest:
       description: "`INVALID_REQUEST` 요청 검증 실패"
@@ -1934,6 +1943,36 @@ components:
             code: SELLER_NOT_ACTIVE
             message: 판매자 상태 때문에 처리할 수 없습니다.
             timestamp: '2026-11-08T12:00:00'
+    IdempotencyKeyRequired:
+      description: "`IDEMPOTENCY_KEY_REQUIRED` Idempotency-Key 헤더가 없거나 1~100자가 아니다"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: IDEMPOTENCY_KEY_REQUIRED
+            message: Idempotency-Key 헤더가 필요합니다.
+            timestamp: '2026-11-08T12:00:00'
+    IdempotencyKeyReused:
+      description: "`IDEMPOTENCY_KEY_REUSED` 같은 키로 다른 본문을 보냈다"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: IDEMPOTENCY_KEY_REUSED
+            message: 같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+    IdempotencyInProgress:
+      description: "`IDEMPOTENCY_IN_PROGRESS` 같은 키의 요청이 아직 처리 중이다"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: IDEMPOTENCY_IN_PROGRESS
+            message: 같은 요청이 처리 중입니다.
+            timestamp: '2026-11-08T12:00:00'
   schemas:
     ApiResponse:
       type: object
@@ -2004,6 +2043,9 @@ components:
             - CHANGE_REQUEST_NOT_FOUND
             - CHANGE_REQUEST_ALREADY_PENDING
             - CHANGE_REQUEST_INVALID_STATE_TRANSITION
+            - IDEMPOTENCY_KEY_REQUIRED
+            - IDEMPOTENCY_KEY_REUSED
+            - IDEMPOTENCY_IN_PROGRESS
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR

@@ -48,4 +48,8 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     CHANGE_REQUEST_NOT_FOUND(404, "변경 요청을 찾을 수 없습니다."),
     CHANGE_REQUEST_ALREADY_PENDING(409, "이미 대기 중인 변경 요청이 있습니다."),
     CHANGE_REQUEST_INVALID_STATE_TRANSITION(409, "허용되지 않는 변경 요청 상태 전이입니다."),
+
+    IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
+    IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
+    IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),
 }
