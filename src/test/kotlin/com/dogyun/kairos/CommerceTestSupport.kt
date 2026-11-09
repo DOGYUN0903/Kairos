@@ -29,6 +29,8 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from brand_image")
+        jdbcTemplate.update("delete from brand")
         jdbcTemplate.update("delete from file")
         jdbcTemplate.update("delete from seller_review_history")
         jdbcTemplate.update("delete from seller")
@@ -100,6 +102,19 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             header("Authorization", "Bearer $token")
         }.andExpect { status { isCreated() } }
         return json(result).get("data").get("fileId").asLong()
+    }
+
+    /** 브랜드 신청 → 관리자 승인까지 마치고 brandId 를 돌려준다. */
+    protected fun approvedBrand(
+        sellerToken: String,
+        name: String = "브랜드-${UUID.randomUUID().toString().take(8)}",
+        logoFileId: Long? = null,
+    ): Long {
+        val created = post("/api/v1/seller/brands", sellerToken, mapOf("name" to name, "logoFileId" to logoFileId))
+            .andExpect { status { isCreated() } }
+        val brandId = json(created).get("data").get("brandId").asLong()
+        post("/api/v1/admin/brands/$brandId/approve", adminToken()).andExpect { status { isOk() } }
+        return brandId
     }
 
     protected fun suspendSeller(sellerId: Long) {

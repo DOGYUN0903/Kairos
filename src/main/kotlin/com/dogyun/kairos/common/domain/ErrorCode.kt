@@ -31,4 +31,8 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     FILE_UNSUPPORTED_FORMAT(400, "jpg, png, webp만 업로드할 수 있습니다."),
     FILE_INVALID(400, "파일이 올바르지 않습니다."),
     FILE_NOT_OWNED(400, "이 서버에 업로드한 본인 이미지 파일만 사용할 수 있습니다."),
+    BRAND_INVALID(400, "브랜드 정보가 올바르지 않습니다."),
+    BRAND_NOT_FOUND(404, "브랜드를 찾을 수 없습니다."),
+    BRAND_NAME_DUPLICATED(409, "이미 사용 중인 브랜드명입니다."),
+    BRAND_INVALID_STATE_TRANSITION(409, "허용되지 않는 브랜드 상태 전이입니다."),
 }
