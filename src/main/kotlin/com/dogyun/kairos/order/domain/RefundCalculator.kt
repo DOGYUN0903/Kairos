@@ -50,7 +50,9 @@ object RefundCalculator {
             shippingFeeReturned = outstandingDeduction
         } else if (
             actor == CancelActor.BUYER && order.freeShippingApplied &&
-            remainingAfter < policy.freeShippingThreshold && everDeducted == 0L
+            remainingAfter < policy.freeShippingThreshold && everDeducted == 0L &&
+            // 이 취소로 처음 기준 아래로 떨어질 때만. 판매자·관리자 취소로 이미 깨졌다면 구매자 책임이 아니다.
+            order.remainingItemsAmount >= policy.freeShippingThreshold
         ) {
             shippingFeeDeducted = minOf(policy.baseShippingFee, itemAmount + shippingFeeRefund)
         }

@@ -71,6 +71,22 @@ class RefundCalculatorTest {
     }
 
     @Test
+    fun 판매자_취소로_이미_깨진_무료배송은_이후_구매자_취소에서_차감하지_않는다() {
+        val o = paidOrder(line(1, 30_000), line(2, 20_000, skuId = 21), line(2, 10_000, skuId = 22))
+
+        val sellerCancel = o.cancel(o.itemIdOf(1), CancelActor.SELLER)
+        assertEquals(30_000, sellerCancel.refundAmount)
+        assertInvariant(o)
+
+        val buyerCancel = o.cancel(o.itemIdOf(2, 1))
+
+        assertEquals(0, buyerCancel.shippingFeeDeducted)
+        assertEquals(10_000, buyerCancel.refundAmount)
+        assertEquals(0, o.shippingFeeRecovered)
+        assertInvariant(o)
+    }
+
+    @Test
     fun 판매자_취소는_차감_없이_전액_환불한다() {
         val o = paidOrder(line(2, 30_000), line(3, 30_000))
 
