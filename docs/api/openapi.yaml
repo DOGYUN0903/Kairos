@@ -1163,6 +1163,316 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/products:
+    post:
+      tags: [Seller Product]
+      operationId: registerProduct
+      summary: 상품 등록 (APPROVED 판매자, PENDING_REVIEW 로 시작)
+      description: |
+        브랜드는 내 소유(아니면 `BRAND_NOT_FOUND`)이고 APPROVED(아니면 `BRAND_NOT_APPROVED`)여야 한다.
+        카테고리는 소분류만(`CATEGORY_NOT_LEAF`), 이미지는 본인이 올린 이미지 파일만(`FILE_NOT_OWNED`).
+        옵션 값 조합마다 SKU 가 재고 0·추가 금액 0·판매 중으로 생성된다. 옵션이 없으면 SKU 하나.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterProductRequest'
+      responses:
+        '201':
+          description: 등록 완료 (PENDING_REVIEW)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RegisterProductResponse'
+        '400':
+          description: "`PRODUCT_INVALID`, `PRODUCT_INVALID_PRICE`, `CATEGORY_NOT_LEAF`, `FILE_NOT_OWNED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`BRAND_NOT_FOUND` 또는 `CATEGORY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`BRAND_NOT_APPROVED` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Seller Product]
+      operationId: listMyProducts
+      summary: 내 상품 목록 (APPROVED·SUSPENDED 판매자, 최신 등록순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProductStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 상품 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SellerProductSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Seller Product]
+      operationId: getMyProduct
+      summary: 내 상품 상세 (APPROVED·SUSPENDED 판매자, ACTIVE·DISCONTINUED SKU 모두)
+      responses:
+        '200':
+          description: 상품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerProductDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+    put:
+      tags: [Seller Product]
+      operationId: editProductContent
+      summary: 상품 내용 직접 수정 (APPROVED 판매자, PENDING_REVIEW·REJECTED 만, 다시 PENDING_REVIEW)
+      description: |
+        판매 중인 상품의 내용은 변경 요청(`/change-requests`)으로만 바꾼다.
+        `optionId`·`valueId` 를 유지한 옵션 값의 SKU 는 그대로 남고, 사라진 조합의 SKU 는 DISCONTINUED 가 된다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductContentRequest'
+      responses:
+        '200':
+          description: 수정 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`PRODUCT_INVALID`, `CATEGORY_NOT_LEAF`, `FILE_NOT_OWNED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`PRODUCT_NOT_FOUND` 또는 `CATEGORY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`PRODUCT_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/products/{productId}/price:
+    patch:
+      tags: [Seller Product]
+      operationId: changeProductSalePrice
+      summary: 판매가 변경 (APPROVED 판매자, 즉시 반영, ENDED 제외)
+      description: 판매가만 바꾼다(`0 < 판매가 ≤ 현재 정가`). 정가는 변경 요청으로만 바뀐다.
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeSalePriceRequest'
+      responses:
+        '200':
+          description: 변경 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`PRODUCT_INVALID_PRICE` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          description: "`PRODUCT_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/products/{productId}/skus/{skuId}:
+    patch:
+      tags: [Seller Product]
+      operationId: updateProductSku
+      summary: SKU 재고·추가 금액·판매 여부 변경 (APPROVED 판매자, 즉시 반영, ENDED 제외)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: skuId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSkuRequest'
+      responses:
+        '200':
+          description: 변경 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`SKU_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`PRODUCT_NOT_FOUND` 또는 `SKU_NOT_FOUND`(DISCONTINUED SKU 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`PRODUCT_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/products/{productId}/pause:
+    post:
+      tags: [Seller Product]
+      operationId: pauseProduct
+      summary: 판매 일시 중지 (APPROVED·SUSPENDED 판매자, ON_SALE → PAUSED)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/ProductInvalidStateTransition'
+  /api/v1/seller/products/{productId}/resume:
+    post:
+      tags: [Seller Product]
+      operationId: resumeProduct
+      summary: 판매 재개 (APPROVED 판매자, PAUSED → ON_SALE)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/ProductInvalidStateTransition'
+  /api/v1/seller/products/{productId}/end:
+    post:
+      tags: [Seller Product]
+      operationId: endProduct
+      summary: 판매 종료 (APPROVED·SUSPENDED 판매자, ON_SALE·PAUSED → ENDED, 되돌릴 수 없음)
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '409':
+          $ref: '#/components/responses/ProductInvalidStateTransition'
 components:
   securitySchemes:
     bearerAuth:
@@ -1196,6 +1506,13 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
   responses:
     InvalidRequest:
       description: "`INVALID_REQUEST` 요청 검증 실패"
@@ -1267,6 +1584,36 @@ components:
             code: BRAND_NOT_FOUND
             message: 브랜드를 찾을 수 없습니다.
             timestamp: '2026-11-08T12:00:00'
+    ProductNotFound:
+      description: "`PRODUCT_NOT_FOUND` 없거나 다른 판매자의 상품"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: PRODUCT_NOT_FOUND
+            message: 상품을 찾을 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
+    ProductInvalidStateTransition:
+      description: "`PRODUCT_INVALID_STATE_TRANSITION` 허용되지 않는 상품 상태 전이, 또는 `SELLER_NOT_ACTIVE`"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: PRODUCT_INVALID_STATE_TRANSITION
+            message: 허용되지 않는 상품 상태 전이입니다.
+            timestamp: '2026-11-08T12:00:00'
+    SellerNotActive:
+      description: "`SELLER_NOT_ACTIVE` 판매자 상태 때문에 처리할 수 없다"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: SELLER_NOT_ACTIVE
+            message: 판매자 상태 때문에 처리할 수 없습니다.
+            timestamp: '2026-11-08T12:00:00'
   schemas:
     ApiResponse:
       type: object
@@ -1324,6 +1671,7 @@ components:
             - BRAND_NOT_FOUND
             - BRAND_NAME_DUPLICATED
             - BRAND_INVALID_STATE_TRANSITION
+            - BRAND_NOT_APPROVED
             - CATEGORY_INVALID
             - CATEGORY_NOT_FOUND
             - CATEGORY_NOT_LEAF
@@ -1600,6 +1948,275 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryNode'
+    ProductStatus:
+      type: string
+      enum: [PENDING_REVIEW, ON_SALE, REJECTED, PAUSED, ENDED]
+    SkuStatus:
+      type: string
+      description: 사라진 옵션 조합의 SKU 는 삭제하지 않고 DISCONTINUED 로 남긴다.
+      enum: [ACTIVE, DISCONTINUED]
+    OptionValueRequest:
+      type: object
+      required: [name]
+      properties:
+        valueId:
+          type: [integer, 'null']
+          format: int64
+          description: 기존 값을 유지하면 그 ID(SKU 가 유지된다), 새 값이면 null. 등록 시에는 항상 null.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+    OptionRequest:
+      type: object
+      required: [name, values]
+      properties:
+        optionId:
+          type: [integer, 'null']
+          format: int64
+          description: 기존 옵션을 유지하면 그 ID, 새 옵션이면 null. 등록 시에는 항상 null.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        values:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OptionValueRequest'
+    ProductContentRequest:
+      type: object
+      description: 심사 대상이 되는 상품 내용. 가격은 포함하지 않는다. imageFileIds 의 첫 번째가 대표 이미지다.
+      required: [name, description, categoryId, imageFileIds, options]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+          description: 소분류 카테고리 ID
+        imageFileIds:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: integer
+            format: int64
+        options:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/OptionRequest'
+    RegisterProductRequest:
+      type: object
+      required: [brandId, content, originalPrice, salePrice]
+      properties:
+        brandId:
+          type: integer
+          format: int64
+        content:
+          $ref: '#/components/schemas/ProductContentRequest'
+        originalPrice:
+          type: integer
+          format: int64
+          description: 정가(원)
+        salePrice:
+          type: integer
+          format: int64
+          description: 판매가(원). 0 < 판매가 ≤ 정가
+    RegisterProductResponse:
+      type: object
+      required: [productId]
+      properties:
+        productId:
+          type: integer
+          format: int64
+    ChangeSalePriceRequest:
+      type: object
+      required: [salePrice]
+      properties:
+        salePrice:
+          type: integer
+          format: int64
+    UpdateSkuRequest:
+      type: object
+      required: [extraPrice, stock, onSale]
+      properties:
+        extraPrice:
+          type: integer
+          format: int64
+          minimum: 0
+        stock:
+          type: integer
+          format: int32
+          minimum: 0
+        onSale:
+          type: boolean
+    ProductImage:
+      type: object
+      required: [fileId, url, isMain]
+      properties:
+        fileId:
+          type: integer
+          format: int64
+        url:
+          type: string
+        isMain:
+          type: boolean
+    OptionValue:
+      type: object
+      required: [valueId, name]
+      properties:
+        valueId:
+          type: integer
+          format: int64
+        name:
+          type: string
+    ProductOption:
+      type: object
+      required: [optionId, name, values]
+      properties:
+        optionId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        values:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionValue'
+    SellerSku:
+      type: object
+      required: [skuId, optionValueIds, displayName, extraPrice, stock, onSale, skuStatus]
+      properties:
+        skuId:
+          type: integer
+          format: int64
+        optionValueIds:
+          type: array
+          description: 오름차순 정렬된 옵션 값 ID. 옵션이 없는 상품이면 빈 배열.
+          items:
+            type: integer
+            format: int64
+        displayName:
+          type: string
+          description: 옵션 순서대로 값 이름을 " / " 로 이은 표시명(예 "블랙 / L"). 옵션이 없으면 빈 문자열.
+        extraPrice:
+          type: integer
+          format: int64
+        stock:
+          type: integer
+          format: int32
+        onSale:
+          type: boolean
+        skuStatus:
+          $ref: '#/components/schemas/SkuStatus'
+    SellerProductDetail:
+      type: object
+      required:
+        - productId
+        - sellerId
+        - brandId
+        - brandName
+        - categoryId
+        - name
+        - description
+        - images
+        - originalPrice
+        - salePrice
+        - discountRate
+        - status
+        - salesCount
+        - soldOut
+        - options
+        - skus
+      properties:
+        productId:
+          type: integer
+          format: int64
+        sellerId:
+          type: integer
+          format: int64
+        brandId:
+          type: integer
+          format: int64
+        brandName:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        images:
+          type: array
+          description: display_order 순. 첫 번째가 대표 이미지.
+          items:
+            $ref: '#/components/schemas/ProductImage'
+        originalPrice:
+          type: integer
+          format: int64
+        salePrice:
+          type: integer
+          format: int64
+        discountRate:
+          type: integer
+          format: int32
+          description: (정가 - 판매가) * 100 / 정가, 내림
+        status:
+          $ref: '#/components/schemas/ProductStatus'
+        rejectReason:
+          type: [string, 'null']
+        onSaleAt:
+          oneOf:
+            - $ref: '#/components/schemas/LocalDateTime'
+            - type: 'null'
+          description: 처음 승인된 시각. 이후 덮어쓰지 않는다.
+        salesCount:
+          type: integer
+          format: int64
+        soldOut:
+          type: boolean
+          description: ACTIVE SKU 중 판매 중이고 재고가 있는 것이 하나도 없으면 true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductOption'
+        skus:
+          type: array
+          description: ACTIVE·DISCONTINUED 모두
+          items:
+            $ref: '#/components/schemas/SellerSku'
+        pendingChangeRequestId:
+          type: [integer, 'null']
+          format: int64
+          description: 대기 중인 변경 요청 ID. 없으면 null.
+    SellerProductSummary:
+      type: object
+      required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL
+        brandName:
+          type: string
+        salePrice:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ProductStatus'
+        soldOut:
+          type: boolean
     BrandPublic:
       type: object
       required: [brandId, name]

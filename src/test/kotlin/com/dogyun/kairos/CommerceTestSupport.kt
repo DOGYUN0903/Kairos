@@ -29,6 +29,11 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from sku")
+        jdbcTemplate.update("delete from product_option_value")
+        jdbcTemplate.update("delete from product_option")
+        jdbcTemplate.update("delete from product_image")
+        jdbcTemplate.update("delete from product")
         jdbcTemplate.update("delete from category")
         jdbcTemplate.update("delete from brand_image")
         jdbcTemplate.update("delete from brand")
@@ -131,6 +136,49 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         ).andExpect { status { isCreated() } }
         return json(created).get("data").get("categoryId").asLong()
     }
+
+    /** 기본 옵션: 색상[블랙, 화이트] × 사이즈[M, L] → SKU 4개. 정가 10000, 판매가 9000. */
+    protected fun registerProduct(
+        sellerToken: String,
+        brandId: Long,
+        categoryId: Long,
+        fileIds: List<Long>,
+        options: List<Map<String, Any?>> = colorSizeOptions(),
+        originalPrice: Long = 10000,
+        salePrice: Long = 9000,
+    ): Long {
+        val created = post(
+            "/api/v1/seller/products", sellerToken,
+            mapOf(
+                "brandId" to brandId,
+                "content" to productContent(categoryId, fileIds, options),
+                "originalPrice" to originalPrice,
+                "salePrice" to salePrice,
+            ),
+        ).andExpect { status { isCreated() } }
+        return json(created).get("data").get("productId").asLong()
+    }
+
+    protected fun productContent(
+        categoryId: Long,
+        fileIds: List<Long>,
+        options: List<Map<String, Any?>> = colorSizeOptions(),
+        name: String = "티셔츠",
+    ): Map<String, Any?> = mapOf(
+        "name" to name,
+        "description" to "설명",
+        "categoryId" to categoryId,
+        "imageFileIds" to fileIds,
+        "options" to options,
+    )
+
+    protected fun colorSizeOptions(): List<Map<String, Any?>> = listOf(
+        mapOf("name" to "색상", "values" to listOf(mapOf("name" to "블랙"), mapOf("name" to "화이트"))),
+        mapOf("name" to "사이즈", "values" to listOf(mapOf("name" to "M"), mapOf("name" to "L"))),
+    )
+
+    protected fun sellerProductDetail(token: String, productId: Long): JsonNode =
+        json(get("/api/v1/seller/products/$productId", token).andExpect { status { isOk() } }).get("data")
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))

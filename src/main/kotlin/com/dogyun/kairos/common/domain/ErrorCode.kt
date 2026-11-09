@@ -35,6 +35,7 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     BRAND_NOT_FOUND(404, "브랜드를 찾을 수 없습니다."),
     BRAND_NAME_DUPLICATED(409, "이미 사용 중인 브랜드명입니다."),
     BRAND_INVALID_STATE_TRANSITION(409, "허용되지 않는 브랜드 상태 전이입니다."),
+    BRAND_NOT_APPROVED(409, "승인되지 않은 브랜드입니다."),
     CATEGORY_INVALID(400, "카테고리 정보가 올바르지 않습니다."),
     CATEGORY_NOT_FOUND(404, "카테고리를 찾을 수 없습니다."),
     CATEGORY_NOT_LEAF(400, "소분류 카테고리만 선택할 수 있습니다."),
