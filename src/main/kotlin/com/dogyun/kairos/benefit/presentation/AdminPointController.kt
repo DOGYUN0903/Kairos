@@ -1,7 +1,6 @@
 package com.dogyun.kairos.benefit.presentation
 
 import com.dogyun.kairos.benefit.application.PointQueryService
-import com.dogyun.kairos.benefit.application.PointTransactionResult
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.presentation.PageResponse
 import org.springframework.http.ResponseEntity
@@ -27,9 +26,3 @@ class AdminPointController(private val pointQueryService: PointQueryService) {
         )
     }
 }
-
-data class AdminMemberPointsResponse(
-    val balance: Long,
-    val expiringWithin30Days: Long,
-    val transactions: PageResponse<PointTransactionResult>,
-)
