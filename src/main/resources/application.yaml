@@ -74,6 +74,13 @@ kairos:
     auto-confirm-after: 7d
     in-progress-timeout: 5m
     cancel-request-timeout: 1m
+  jobs:
+    enabled: true
+    order-expiry-delay: 60s
+    payment-reconcile-delay: 60s
+    delivery-poll-delay: 10m
+    auto-confirm-delay: 1h
+    idempotency-cleanup-delay: 1h
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s

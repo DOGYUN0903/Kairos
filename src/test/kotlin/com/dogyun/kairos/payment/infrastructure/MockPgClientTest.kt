@@ -60,6 +60,15 @@ class MockPgClientTest {
     }
 
     @Test
+    fun cancellost_키도_같은_멱등_키로_다시_부르면_취소가_기록된다() {
+        pg.confirm("cancellost-2", "ORD-2", 5_000L)
+        assertIs<PgResult.Unknown>(pg.cancel("cancellost-2", 2_000L, "사유", "idem-1"))
+        val retried = done(pg.cancel("cancellost-2", 2_000L, "사유", "idem-1"))
+        assertEquals(3_000L, retried.balanceAmount)
+        assertEquals(1, done(pg.find("cancellost-2")).cancels.size)
+    }
+
+    @Test
     fun cancelfail_키의_취소는_Failed다() {
         pg.confirm("cancelfail-1", "ORD-1", 5_000L)
         assertIs<PgResult.Failed>(pg.cancel("cancelfail-1", 2_000L, "사유", "idem-1"))

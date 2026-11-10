@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.infrastructure
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItem
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrder
@@ -103,14 +104,56 @@ class OrderRepositoryImpl(
         return orderIds.mapNotNull { byId[it] }
     }
 
-    // 아래 대사·만료 조회는 해당 기능을 만드는 Task(만료·대사 작업)에서 채운다.
-    override fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long> = notYet()
-    override fun findSellerOrderIdsByStatus(status: SellerOrderStatus, limit: Int): List<Long> = notYet()
-    override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, limit: Int): List<Long> = notYet()
-    override fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>> = notYet()
-    override fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long> = notYet()
+    override fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long> {
+        val o = QOrderEntity.orderEntity
+        return queryFactory.select(o.id).from(o)
+            .where(o.orderStatus.eq(OrderStatus.PENDING_PAYMENT), o.expiresAt.before(now))
+            .orderBy(o.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+    }
 
-    private fun notYet(): Nothing = throw UnsupportedOperationException("이후 Task 에서 구현한다")
+    override fun findSellerOrderIdsByStatus(status: SellerOrderStatus, limit: Int): List<Long> {
+        val so = QSellerOrderEntity.sellerOrderEntity
+        return queryFactory.select(so.id).from(so)
+            .where(so.sellerOrderStatus.eq(status))
+            .orderBy(so.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+    }
+
+    override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, limit: Int): List<Long> {
+        val so = QSellerOrderEntity.sellerOrderEntity
+        return queryFactory.select(so.id).from(so)
+            .where(so.sellerOrderStatus.eq(SellerOrderStatus.DELIVERED), so.deliveredAt.before(threshold))
+            .orderBy(so.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+    }
+
+    /** 항목은 `CANCEL_REQUESTED` 로 바뀔 때 갱신되므로 `modified_at` 이 요청 시각이다. */
+    override fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>> {
+        val i = QOrderItemEntity.orderItemEntity
+        return queryFactory.select(i.sellerOrder.order.id, i.id).from(i)
+            .where(i.orderItemStatus.eq(OrderItemStatus.CANCEL_REQUESTED), i.modifiedAt.before(before))
+            .orderBy(i.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+            .map { requireNotNull(it.get(0, Long::class.javaObjectType)) to requireNotNull(it.get(1, Long::class.javaObjectType)) }
+    }
+
+    /**
+     * 결제 완료된 적 없이(`paid_at IS NULL`) 닫힌 주문 중 [since] 이후 닫힌 것. 이런 주문에 PG 잔액이 남아 있으면 void 가 유실된 것이다.
+     * 결제 후 항목 취소로 닫힌 주문(`paid_at` 있음)은 배송비 공제 등으로 PG 잔액이 정상적으로 남을 수 있어 제외한다.
+     */
+    override fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long> {
+        val o = QOrderEntity.orderEntity
+        return queryFactory.select(o.id).from(o)
+            .where(o.orderStatus.eq(OrderStatus.CANCELED), o.paidAt.isNull, o.modifiedAt.goe(since))
+            .orderBy(o.id.desc())
+            .limit(limit.toLong())
+            .fetch()
+    }
 
     private fun saveOrder(order: Order): OrderEntity {
         val id = order.id

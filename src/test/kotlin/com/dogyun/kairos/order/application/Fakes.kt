@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItem
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrder
@@ -85,8 +86,12 @@ class FakeOrderRepository : OrderRepository {
             .filter { it.status == SellerOrderStatus.DELIVERED && it.deliveredAt?.isBefore(threshold) == true }
             .take(limit).mapNotNull { it.id }
 
-    override fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>> = emptyList()
-    override fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long> = emptyList()
+    override fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>> =
+        rows.values.flatMap { o -> o.allItems.filter { it.status == OrderItemStatus.CANCEL_REQUESTED }.map { requireNotNull(o.id) to requireNotNull(it.id) } }
+            .take(limit)
+
+    override fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long> =
+        rows.values.filter { it.status == OrderStatus.CANCELED && it.paidAt == null }.take(limit).mapNotNull { it.id }
 
     private fun page(list: List<Order>, page: Int, size: Int) =
         PageResult.of(list.drop(page * size).take(size), page, size, list.size.toLong())
@@ -155,7 +160,7 @@ class FakeStockManager : StockManager {
 
 data class CancelCall(val paymentKey: String, val amount: Long, val reason: String, val idempotencyKey: String)
 
-/** 결제 상태 전이는 payment 도메인과 같은 규칙으로 흉내 낸다. 이후 Task 가 쓰는 조회·대사 메서드는 아직 비어 있다. */
+/** 결제 상태 전이는 payment 도메인과 같은 규칙으로 흉내 낸다. */
 class FakePaymentGateway : PaymentGateway {
     val payments = mutableMapOf<Long, PaymentInfo>()
     private var seq = 0L
@@ -209,7 +214,9 @@ class FakePaymentGateway : PaymentGateway {
         payments[orderId] = current.copy(refundedAmount = refunded, status = if (refunded == current.amount) "CANCELED" else "PARTIAL_CANCELED")
     }
 
-    override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> = unsupported()
+    /** 시각은 따지지 않는다(IN_PROGRESS 와 UNKNOWN 전부). */
+    override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> =
+        payments.values.filter { it.status == "IN_PROGRESS" || it.status == "UNKNOWN" }.take(limit)
 
     override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome {
         confirmCalls += Triple(paymentKey, orderNo, amount)
@@ -222,15 +229,17 @@ class FakePaymentGateway : PaymentGateway {
         return nextCancel
     }
 
-    override fun findFromPg(paymentKey: String): PgOutcome = unsupported()
+    /** findFromPg 가 paymentKey 별로 돌려줄 PG 쪽 상태. 없으면 NOT_FOUND. */
+    val pgPayments = mutableMapOf<String, PgOutcome>()
+
+    override fun findFromPg(paymentKey: String): PgOutcome =
+        pgPayments[paymentKey] ?: PgOutcome.Failed("NOT_FOUND", "존재하지 않는 결제입니다.")
 
     private fun change(orderId: Long, allowed: Set<String>, action: (PaymentInfo) -> PaymentInfo): PaymentInfo {
         val current = get(orderId)
         if (current.status !in allowed) throw DomainException(ErrorCode.PAYMENT_INVALID_STATE_TRANSITION)
         return action(current).also { payments[orderId] = it }
     }
-
-    private fun unsupported(): Nothing = throw UnsupportedOperationException("이후 Task 에서 채운다")
 }
 
 class FakeCartItemRemover : CartItemRemover {
@@ -238,5 +247,16 @@ class FakeCartItemRemover : CartItemRemover {
 
     override fun removeBySkuIds(memberId: Long, skuIds: Collection<Long>) {
         removed += memberId to skuIds.toSet()
+    }
+}
+
+/** 송장 번호별 조회 결과. 지정하지 않은 번호는 배송 중이다. */
+class FakeDeliveryTracker : DeliveryTracker {
+    val results = mutableMapOf<String, TrackingResult>()
+    val calls = mutableListOf<Pair<String, String>>()
+
+    override fun track(carrierCode: String, trackingNumber: String): TrackingResult {
+        calls += carrierCode to trackingNumber
+        return results[trackingNumber] ?: TrackingResult.IN_TRANSIT
     }
 }
