@@ -15,3 +15,6 @@ data class WriteReviewRequest(
 ) {
     fun toCommand() = WriteReviewCommand(rating, content, imageFileIds)
 }
+
+/** 판매자 답글. 길이(최대 500자)는 도메인이 `REVIEW_INVALID` 로 판정한다. */
+data class ReplyReviewRequest(@field:NotBlank val content: String)
