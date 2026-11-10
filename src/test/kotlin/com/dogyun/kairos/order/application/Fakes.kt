@@ -357,3 +357,15 @@ class FakeBenefitReverter(val events: MutableList<String> = mutableListOf()) : B
         events += "revertItem"
     }
 }
+
+/** earnForPurchase 호출을 기록한다. 적립 값은 1%(버림)로 흉내 낸다. */
+class FakePointEarner : PointEarner {
+    data class Earn(val memberId: Long, val sellerOrderId: Long, val paidAmount: Long)
+
+    val calls = mutableListOf<Earn>()
+
+    override fun earnForPurchase(memberId: Long, sellerOrderId: Long, paidAmount: Long): Long {
+        calls += Earn(memberId, sellerOrderId, paidAmount)
+        return paidAmount / 100
+    }
+}

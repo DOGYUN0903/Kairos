@@ -27,15 +27,17 @@ class OrderShippingServiceTest {
     private val sellerReader = FakeSellerReader()
     private val stockManager = FakeStockManager()
     private val paymentGateway = FakePaymentGateway()
+    private val benefitApplier = FakeBenefitApplier()
+    private val pointEarner = FakePointEarner()
     private val orderService = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier,
         OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
     private val paymentService = OrderPaymentService(
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock,
     )
-    private val service = OrderShippingService(orderRepository, InlineTransactionRunner(), clock)
+    private val service = OrderShippingService(orderRepository, InlineTransactionRunner(), clock, pointEarner)
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L
@@ -156,5 +158,71 @@ class OrderShippingServiceTest {
         assertEquals(SellerOrderStatus.DELIVERED, reload(order).findSellerOrder(soId).status)
         service.autoConfirm(soId)
         assertEquals(SellerOrderStatus.CONFIRMED, reload(order).findSellerOrder(soId).status)
+    }
+
+    /** 스펙 6장 주문(B 21,438 / C 27,562)을 PAID 로 만든다. */
+    private fun spec6Order(): Order {
+        productReader.put(31L, sellerId = 1L, salePrice = 30_000)
+        productReader.put(32L, sellerId = 2L, salePrice = 20_000)
+        stockManager.stock[31L] = 10
+        stockManager.stock[32L] = 10
+        benefitApplier.product(501L, issuer = "PLATFORM", value = 2_000)
+        benefitApplier.product(502L, issuer = "SELLER", target = "SELLER", sellerId = 2L, discountType = "RATE", value = 1_000, max = 5_000)
+        benefitApplier.cart(503L, value = 1_000, max = 5_000, min = 50_000)
+        benefitApplier.balance = 20_000
+        val placed = orderService.place(
+            memberId,
+            PlaceOrderCommand(
+                listOf(OrderItemCommand(31L, 1), OrderItemCommand(32L, 2)), 49_000, address,
+                listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 502L)), 503L, 10_000,
+            ),
+        )
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, 49_000, 49_000, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(placed.orderNo, "pay-${placed.orderId}", 49_000))
+        return orderRepository.findById(placed.orderId)!!
+    }
+
+    private fun deliverAll(order: Order) {
+        for (so in order.sellerOrders) {
+            service.ship(so.sellerId, so.id!!, "04", "T${so.sellerId}")
+            service.deliver(so.sellerId, so.id!!)
+        }
+    }
+
+    @Test
+    fun 구매_확정하면_판매자_주문의_paidAmount_합으로_earnForPurchase가_불린다() {
+        val order = spec6Order()
+        deliverAll(order)
+
+        service.confirmPurchase(memberId, order.id!!, order.soId(1L))
+        service.confirmPurchase(memberId, order.id, order.soId(2L))
+
+        assertEquals(
+            listOf(FakePointEarner.Earn(memberId, order.soId(1L), 21_438), FakePointEarner.Earn(memberId, order.soId(2L), 27_562)),
+            pointEarner.calls,
+        )
+    }
+
+    @Test
+    fun 이미_CONFIRMED면_earnForPurchase를_부르지_않는다() {
+        val order = paidOrder()
+        deliverAll(order)
+        service.confirmPurchase(memberId, order.id!!, order.soId(1L))
+        assertEquals(1, pointEarner.calls.size)
+
+        service.confirmPurchase(memberId, order.id, order.soId(1L))
+
+        assertEquals(1, pointEarner.calls.size)
+    }
+
+    @Test
+    fun 자동_확정도_같은_인자로_적립한다() {
+        val order = spec6Order()
+        deliverAll(order)
+
+        service.autoConfirm(order.soId(1L))
+        service.autoConfirm(order.soId(1L))
+
+        assertEquals(listOf(FakePointEarner.Earn(memberId, order.soId(1L), 21_438)), pointEarner.calls)
     }
 }

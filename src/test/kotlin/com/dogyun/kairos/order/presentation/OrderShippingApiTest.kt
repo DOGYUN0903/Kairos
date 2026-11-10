@@ -1,6 +1,8 @@
 package com.dogyun.kairos.order.presentation
 
 import com.dogyun.kairos.CommerceTestSupport
+import com.dogyun.kairos.order.application.PurchaseAutoConfirmService
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.web.servlet.ResultActionsDsl
 import tools.jackson.databind.JsonNode
 import java.util.UUID
@@ -12,6 +14,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OrderShippingApiTest : CommerceTestSupport() {
+
+    @Autowired
+    private lateinit var purchaseAutoConfirmService: PurchaseAutoConfirmService
 
     private class Shop(val sellerToken: String, val skuId: Long)
 
@@ -144,6 +149,74 @@ class OrderShippingApiTest : CommerceTestSupport() {
                 }
                 else -> throw AssertionError(detail)
             }
+        }
+    }
+
+    // ---- C3: 구매 확정 포인트 적립 ----
+
+    private fun earnPurchaseAmounts(memberId: Long): List<Long> =
+        jdbcTemplate.queryForList(
+            "select amount from point_transaction where member_id = ? and transaction_type = 'EARN_PURCHASE' and ref_type = 'PURCHASE_CONFIRM' and ref_id > 0 order by id", Long::class.java, memberId,
+        ).filterNotNull()
+
+    @Test
+    fun 스펙_6장_주문을_B_C_각각_확정하면_214P와_275P가_적립된다() {
+        val b = shop(30_000)
+        val c = shop(20_000)
+        val user = newUserToken()
+        val memberId = memberIdOf(user)
+        val platform = claimCoupon(user, adminCouponPolicy(couponPolicyBody()))
+        val seller = claimCoupon(
+            user, sellerCouponPolicy(c.sellerToken, couponPolicyBody(targetType = "SELLER", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000)),
+        )
+        val cart = claimCoupon(
+            user,
+            adminCouponPolicy(couponPolicyBody(couponType = "CART", targetType = "NONE", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000, minOrderAmount = 50_000)),
+        )
+        grantPoints(memberId, 20_000)
+        val order = paidOrder(
+            user, listOf(b.skuId to 1, c.skuId to 2), 49_000,
+            productCoupons = listOf(b.skuId to platform, c.skuId to seller), cartCouponId = cart, pointsToUse = 10_000,
+        )
+        val orderId = order.get("orderId").asLong()
+        val sellerOrders = order.get("sellerOrders").associate { so ->
+            so.get("items").get(0).get("skuId").asLong() to so.get("sellerOrderId").asLong()
+        }
+        for ((shop, soId) in listOf(b to sellerOrders.getValue(b.skuId), c to sellerOrders.getValue(c.skuId))) {
+            ship(shop.sellerToken, soId).andExpect { status { isOk() } }
+            deliver(shop.sellerToken, soId).andExpect { status { isOk() } }
+        }
+        val balanceBefore = pointBalance(memberId)
+
+        patch("/api/v1/orders/$orderId/seller-orders/${sellerOrders.getValue(b.skuId)}/confirm", user).andExpect { status { isOk() } }
+        assertEquals(listOf(214L), earnPurchaseAmounts(memberId))
+        patch("/api/v1/orders/$orderId/seller-orders/${sellerOrders.getValue(c.skuId)}/confirm", user).andExpect { status { isOk() } }
+        assertEquals(listOf(214L, 275L), earnPurchaseAmounts(memberId))
+        // 이미 확정된 건을 다시 확정해도 더 적립되지 않는다.
+        patch("/api/v1/orders/$orderId/seller-orders/${sellerOrders.getValue(c.skuId)}/confirm", user).andExpect { status { isOk() } }
+        assertEquals(listOf(214L, 275L), earnPurchaseAmounts(memberId))
+        assertEquals(balanceBefore + 489, pointBalance(memberId))
+        assertEquals(pointBalance(memberId), lotRemainingSum(memberId))
+    }
+
+    @Test
+    fun 사용자_확정과_자동_확정을_동시에_실행해도_적립은_한_번이다() {
+        repeat(3) {
+            val shop = shop(20_000)
+            val user = newUserToken()
+            val memberId = memberIdOf(user)
+            val p = paid(user, shop, 20_000)
+            ship(shop.sellerToken, p.sellerOrderId).andExpect { status { isOk() } }
+            deliver(shop.sellerToken, p.sellerOrderId).andExpect { status { isOk() } }
+            jdbcTemplate.update("update seller_order set delivered_at = ? where id = ?", java.time.LocalDateTime.now().minusDays(8), p.sellerOrderId)
+
+            val statuses = runConcurrently(2) { i ->
+                if (i == 0) confirm(user, p).andReturn().response.status else { purchaseAutoConfirmService.confirmDelivered(); 0 }
+            }
+
+            assertEquals(200, statuses[0])
+            assertEquals("CONFIRMED", sellerOrderStatus(p.sellerOrderId))
+            assertEquals(listOf(200L), earnPurchaseAmounts(memberId))
         }
     }
 

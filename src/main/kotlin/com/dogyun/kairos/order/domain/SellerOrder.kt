@@ -37,6 +37,8 @@ class SellerOrder(
         get() = items.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.lineAmount }
     val remainingPaidAmount: Long
         get() = items.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.paidAmount }
+    /** 구매 확정 적립 기준: 취소되지 않은(`ORDERED`) 항목의 `paidAmount` 합(배송비 제외). */
+    val confirmedPaidAmount: Long get() = remainingPaidAmount
     val hasCancelRequested: Boolean get() = items.any { it.status == OrderItemStatus.CANCEL_REQUESTED }
 
     fun markPaid() = transit(setOf(SellerOrderStatus.PENDING_PAYMENT), SellerOrderStatus.PAID)
