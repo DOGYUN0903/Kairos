@@ -1889,6 +1889,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/orders:
+    post:
+      tags: [Order]
+      operationId: createOrder
+      summary: 주문 생성 (결제 대기, 재고 차감)
+      description: |
+        같은 SKU 는 수량을 합산한다. `expectedTotalAmount` 는 클라이언트가 본 총액(상품 금액 + 구매자 부담 배송비)이며
+        현재 가격으로 계산한 총액과 다르면 409 `ORDER_PRICE_CHANGED` 다. 재고는 SKU ID 오름차순으로 조건부 차감하고,
+        하나라도 부족하면 전부 롤백한다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: 주문 생성(PENDING_PAYMENT). `expiresAt` 까지 결제하지 않으면 만료된다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateOrderResponse'
+        '400':
+          description: "`ORDER_INVALID`(항목 없음·수량 범위 밖·배송지 누락), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: "`ORDER_PRICE_CHANGED`, `STOCK_SOLD_OUT`, `SKU_NOT_ORDERABLE` 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
 components:
   securitySchemes:
     bearerAuth:
@@ -3104,3 +3149,70 @@ components:
           type: integer
           format: int64
           description: AVAILABLE 항목의 lineAmount 합
+    ShippingAddress:
+      type: object
+      required: [receiverName, phone, zipCode, address1, address2]
+      properties:
+        receiverName:
+          type: string
+          maxLength: 50
+        phone:
+          type: string
+          maxLength: 20
+        zipCode:
+          type: string
+          maxLength: 10
+        address1:
+          type: string
+          maxLength: 200
+        address2:
+          type: string
+          maxLength: 200
+        memo:
+          type: string
+          nullable: true
+          maxLength: 200
+    CreateOrderItemRequest:
+      type: object
+      required: [skuId, quantity]
+      properties:
+        skuId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 999
+    CreateOrderRequest:
+      type: object
+      required: [items, expectedTotalAmount, shippingAddress]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateOrderItemRequest'
+        expectedTotalAmount:
+          type: integer
+          format: int64
+          description: 클라이언트가 본 총액(상품 금액 + 구매자 부담 배송비)
+        shippingAddress:
+          $ref: '#/components/schemas/ShippingAddress'
+    CreateOrderResponse:
+      type: object
+      required: [orderId, orderNo, totalAmount, expiresAt]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+          description: 토스 결제창의 orderId 로도 쓴다
+        totalAmount:
+          type: integer
+          format: int64
+        expiresAt:
+          type: string
+          format: date-time
+          description: 결제 만료 시각(오프셋 없는 KST)

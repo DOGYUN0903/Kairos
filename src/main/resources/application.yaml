@@ -67,6 +67,13 @@ kairos:
   admin:
     email: ${KAIROS_ADMIN_EMAIL}
     password: ${KAIROS_ADMIN_PASSWORD}
+  order:
+    payment-ttl: 15m
+    free-shipping-threshold: 50000
+    base-shipping-fee: 3000
+    auto-confirm-after: 7d
+    in-progress-timeout: 5m
+    cancel-request-timeout: 1m
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s

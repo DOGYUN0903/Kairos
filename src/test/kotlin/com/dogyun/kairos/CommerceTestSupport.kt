@@ -29,6 +29,10 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from order_item")
+        jdbcTemplate.update("delete from seller_order")
+        jdbcTemplate.update("delete from orders")
+        jdbcTemplate.update("delete from idempotency_key")
         jdbcTemplate.update("delete from payment")
         jdbcTemplate.update("delete from cart_item")
         jdbcTemplate.update("delete from product_change_request")
@@ -222,6 +226,38 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             .andExpect { status { isOk() } }
         return json(result).get("data").get("cartItemId").asLong()
     }
+
+    protected fun address(): Map<String, Any?> = mapOf(
+        "receiverName" to "홍길동",
+        "phone" to "010-1234-5678",
+        "zipCode" to "06236",
+        "address1" to "서울 강남구 테헤란로 1",
+        "address2" to "101호",
+        "memo" to null,
+    )
+
+    /** `Idempotency-Key` 헤더를 붙여 POST 한다. */
+    protected fun postIdem(path: String, token: String?, body: Any?, idemKey: String = UUID.randomUUID().toString()): ResultActionsDsl =
+        mockMvc.post(path) {
+            prepare(token, body)
+            header("Idempotency-Key", idemKey)
+        }
+
+    /** items 는 (skuId, quantity) 쌍. 주문 생성 요청을 보낸다. */
+    protected fun placeOrder(
+        token: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+    ): ResultActionsDsl = postIdem(
+        "/api/v1/orders", token,
+        mapOf(
+            "items" to items.map { mapOf("skuId" to it.first, "quantity" to it.second) },
+            "expectedTotalAmount" to expectedTotal,
+            "shippingAddress" to address(),
+        ),
+        idemKey,
+    )
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
