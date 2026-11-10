@@ -2811,6 +2811,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/points/me:
+    get:
+      tags: [Point]
+      operationId: getMyPoints
+      summary: 내 포인트 잔액과 30일 내 만료 예정
+      responses:
+        '200':
+          description: 잔액과 만료 예정 포인트
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PointSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/points/me/transactions:
+    get:
+      tags: [Point]
+      operationId: listMyPointTransactions
+      summary: 내 포인트 내역 (최신순)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 포인트 원장
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/PointTransactionResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/admin/members/{memberId}/points:
+    get:
+      tags: [Admin Point]
+      operationId: getMemberPointsForAdmin
+      summary: 회원 포인트 조회 (관리자)
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 잔액, 만료 예정, 내역
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AdminMemberPoints'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     bearerAuth:
@@ -4756,3 +4838,58 @@ components:
           allOf:
             - $ref: '#/components/schemas/LocalDateTime'
           nullable: true
+    PointSummary:
+      type: object
+      required: [balance, expiringWithin30Days]
+      properties:
+        balance:
+          type: integer
+          format: int64
+        expiringWithin30Days:
+          type: integer
+          format: int64
+          description: 지금부터 30일 안에 만료되는 로트의 남은 포인트 합
+    PointTransactionResult:
+      type: object
+      required: [transactionId, type, amount, balanceAfter, refType, refId, createdAt]
+      properties:
+        transactionId:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [EARN_PURCHASE, EARN_REVIEW, USE, REFUND, EXPIRE]
+        amount:
+          type: integer
+          format: int64
+          description: 부호 있는 변동량(적립·환급 양수, 사용·만료 음수)
+        balanceAfter:
+          type: integer
+          format: int64
+        refType:
+          type: string
+          enum: [PURCHASE_CONFIRM, REVIEW, ORDER, ORDER_ITEM, POINT_LOT]
+        refId:
+          type: integer
+          format: int64
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+    AdminMemberPoints:
+      type: object
+      required: [balance, expiringWithin30Days, transactions]
+      properties:
+        balance:
+          type: integer
+          format: int64
+        expiringWithin30Days:
+          type: integer
+          format: int64
+        transactions:
+          allOf:
+            - $ref: '#/components/schemas/PageResponse'
+            - type: object
+              properties:
+                content:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PointTransactionResult'

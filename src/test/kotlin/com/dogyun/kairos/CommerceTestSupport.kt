@@ -27,6 +27,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     @Autowired
     protected lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    protected lateinit var jwtProvider: com.dogyun.kairos.common.security.JwtProvider
+
+    @Autowired
+    protected lateinit var pointService: com.dogyun.kairos.benefit.application.PointService
+
     @BeforeTest
     fun cleanUp() {
         // C3 테이블은 각 Task 가 만들 때 FK 자식 순서로 이 줄 앞에 추가한다:
@@ -334,6 +340,31 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         val claimed = postIdem("/api/v1/coupons/policies/$policyId/claim", token, null).andExpect { status { isCreated() } }
         return json(claimed).get("data").get("couponId").asLong()
     }
+
+    /** 액세스 토큰의 회원 id. */
+    protected fun memberIdOf(token: String): Long = requireNotNull(jwtProvider.parseAccessToken(token)).memberId
+
+    /** 구매 적립 로트를 직접 만든다(원장 ref 는 겹치지 않는 음수 난수). 기본 만료는 365일 뒤. */
+    protected fun grantPoints(
+        memberId: Long,
+        amount: Long,
+        expiresAt: java.time.LocalDateTime = java.time.LocalDateTime.now().plusDays(365),
+    ) {
+        pointService.earn(
+            memberId, amount,
+            com.dogyun.kairos.benefit.domain.PointTransactionType.EARN_PURCHASE,
+            com.dogyun.kairos.benefit.domain.PointSourceType.PURCHASE,
+            com.dogyun.kairos.benefit.domain.PointRefType.PURCHASE_CONFIRM,
+            -(java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE)),
+            expiresAt,
+        )
+    }
+
+    protected fun pointBalance(memberId: Long): Long =
+        jdbcTemplate.queryForObject("select coalesce(sum(balance), 0) from member_point where member_id = ?", Long::class.java, memberId) ?: 0L
+
+    protected fun lotRemainingSum(memberId: Long): Long =
+        jdbcTemplate.queryForObject("select coalesce(sum(remaining_amount), 0) from point_lot where member_id = ?", Long::class.java, memberId) ?: 0L
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
