@@ -189,3 +189,27 @@ data class ConfirmedItemResult(
     val productName: String,
     val confirmedAt: LocalDateTime?,
 )
+
+/** 정산용 확정 판매자 주문. 저장된 스냅샷 값만 담는다. */
+data class ConfirmedSellerOrderResult(
+    val sellerOrderId: Long,
+    val sellerId: Long,
+    val orderId: Long,
+    val orderNo: String,
+    val confirmedAt: LocalDateTime,
+    val commissionRateBp: Int,
+    val shippingFee: Long,
+    /** 판매자 귀책 완료 반품으로 구매자에게 돌려준 발송 배송비. */
+    val buyerShippingFeeRefunded: Long,
+    val items: List<ConfirmedSellerOrderItemResult>,
+)
+
+data class ConfirmedSellerOrderItemResult(
+    val orderItemId: Long,
+    val status: String,
+    val lineAmount: Long,
+    val productCouponDiscount: Long,
+    val productCouponIssuer: String?,
+    /** 이 항목 `COMPLETED` 반품의 `sellerBorneFee`(없으면 0). */
+    val sellerBorneReturnFee: Long,
+)

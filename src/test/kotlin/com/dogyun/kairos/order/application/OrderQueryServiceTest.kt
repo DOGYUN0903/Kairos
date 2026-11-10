@@ -2,6 +2,7 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.Clock
 import java.time.LocalDateTime
@@ -28,6 +29,13 @@ class OrderQueryServiceTest {
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
         OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
+    )
+    private val tx = InlineTransactionRunner()
+    private val pointEarner = FakePointEarner()
+    private val paymentService = OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), tx, clock)
+    private val shippingService = OrderShippingService(orderRepository, tx, clock, pointEarner)
+    private val returnService = OrderReturnService(
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, OrderProperties(), tx, clock,
     )
     private val service = OrderQueryService(orderRepository, paymentGateway, OrderProperties())
 
@@ -184,5 +192,64 @@ class OrderQueryServiceTest {
         assertError(ErrorCode.INVALID_REQUEST) { service.listMine(memberId, 0, 101) }
         assertError(ErrorCode.INVALID_REQUEST) { service.listForSeller(1L, null, 0, 0) }
         assertError(ErrorCode.INVALID_REQUEST) { service.listForAdmin(null, null, null, 0, 101) }
+    }
+
+    @Test
+    fun findConfirmedForSettlement는_CONFIRMED이고_confirmed_at_반열린_구간의_판매자_주문을_id_keyset으로_주고_항목별_sellerBorneReturnFee를_담는다() {
+        productReader.put(11L, sellerId = 1L, salePrice = 9_000)
+        stockManager.stock[11L] = 50
+        val a = orderService.place(
+            memberId, PlaceOrderCommand(listOf(OrderItemCommand(10L, 1), OrderItemCommand(11L, 1), OrderItemCommand(20L, 1)), 33_000, address),
+        )
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, 33_000, 33_000, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(a.orderNo, "pay-${a.orderId}", 33_000))
+        val b = place(10L)
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, 12_000, 12_000, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(b.orderNo, "pay-${b.orderId}", 12_000))
+        listOf(a, b).forEach { o ->
+            orderRepository.findById(o.orderId)!!.sellerOrders.forEach {
+                shippingService.ship(it.sellerId, it.id!!, "04", "T-${it.id}")
+                shippingService.deliver(it.sellerId, it.id!!)
+            }
+        }
+        val seller1A = sellerOrderIdOf(a, 1L)
+        val seller2A = sellerOrderIdOf(a, 2L)
+        val seller1B = sellerOrderIdOf(b, 1L)
+        // 판매자 1의 항목 11 불량 반품 완료(판매자 부담 3,000), 이후 판매자 주문 1·2(주문 A) 구매 확정. B 는 배송 완료 상태로 둔다.
+        val item11 = orderRepository.findById(a.orderId)!!.allItems.first { it.skuId == 11L }.id!!
+        val returnId = returnService.request(memberId, a.orderId, item11, RequestReturnCommand("DEFECTIVE", null)).returnId
+        returnService.approveBySeller(1L, returnId)
+        paymentGateway.nextCancel = PgOutcome.Done(
+            PgPaymentInfo(PgPaymentStatus.PARTIAL_CANCELED, 33_000, 24_000, listOf(PgCancelInfo(9_000, "사유"))),
+        )
+        returnService.receiveBySeller(1L, returnId)
+        shippingService.confirmPurchase(memberId, a.orderId, seller1A)
+        shippingService.confirmPurchase(memberId, a.orderId, seller2A)
+
+        val all = service.findConfirmedForSettlement(now, now.plusSeconds(1), 0, 10)
+
+        assertEquals(listOf(seller1A, seller2A).sorted(), all.map { it.sellerOrderId })
+        assertEquals(false, seller1B in all.map { it.sellerOrderId }) // 배송 완료 상태(CONFIRMED 아님)
+        val first = all.first { it.sellerOrderId == seller1A }
+        assertEquals(1L, first.sellerId)
+        assertEquals(a.orderId, first.orderId)
+        assertEquals(a.orderNo, first.orderNo)
+        assertEquals(now, first.confirmedAt)
+        assertEquals(3_000, first.shippingFee)
+        assertEquals(0, first.buyerShippingFeeRefunded)
+        assertEquals(
+            mapOf("ORDERED" to 0L, "RETURNED" to 3_000L),
+            first.items.associate { it.status to it.sellerBorneReturnFee },
+        )
+        assertEquals(OrderItemStatus.RETURNED.name, first.items.first { it.orderItemId == item11 }.status)
+        assertEquals(9_000, first.items.first { it.orderItemId == item11 }.lineAmount)
+        assertEquals(null, first.items.first { it.status == "ORDERED" }.productCouponIssuer)
+
+        // keyset·limit
+        assertEquals(listOf(all[1].sellerOrderId), service.findConfirmedForSettlement(now, now.plusSeconds(1), all[0].sellerOrderId, 10).map { it.sellerOrderId })
+        assertEquals(listOf(all[0].sellerOrderId), service.findConfirmedForSettlement(now, now.plusSeconds(1), 0, 1).map { it.sellerOrderId })
+        // 반열린 구간: to 는 포함하지 않고 from 은 포함한다
+        assertEquals(emptyList(), service.findConfirmedForSettlement(now.minusDays(1), now, 0, 10))
+        assertEquals(2, service.findConfirmedForSettlement(now, now.plusDays(1), 0, 10).size)
     }
 }

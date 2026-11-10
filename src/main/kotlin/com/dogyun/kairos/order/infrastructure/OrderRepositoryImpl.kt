@@ -134,6 +134,15 @@ class OrderRepositoryImpl(
             .fetch()
     }
 
+    override fun findSellerOrderIdsConfirmedBetween(from: LocalDateTime, to: LocalDateTime, afterId: Long, limit: Int): List<Long> {
+        val so = QSellerOrderEntity.sellerOrderEntity
+        return queryFactory.select(so.id).from(so)
+            .where(so.sellerOrderStatus.eq(SellerOrderStatus.CONFIRMED), so.confirmedAt.goe(from), so.confirmedAt.lt(to), so.id.gt(afterId))
+            .orderBy(so.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+    }
+
     override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long> {
         val so = QSellerOrderEntity.sellerOrderEntity
         return queryFactory.select(so.id).from(so)

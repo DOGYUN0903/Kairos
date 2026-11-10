@@ -29,6 +29,11 @@ interface OrderRepository {
     /** 정리 작업용 조회는 모두 id 오름차순 keyset(`id > afterId`)이다. 처리하지 못해 집합에 남는 항목이 뒤의 항목을 막지 않게 한다. */
     fun findExpiredPendingIds(now: LocalDateTime, afterId: Long, limit: Int): List<Long>
     fun findSellerOrderIdsByStatus(status: SellerOrderStatus, afterId: Long, limit: Int): List<Long>
+    /**
+     * 정산용: `seller_order_status = CONFIRMED AND confirmed_at >= from AND confirmed_at < to AND id > afterId`,
+     * 판매자 주문 id 오름차순(결정적 순서) keyset.
+     */
+    fun findSellerOrderIdsConfirmedBetween(from: LocalDateTime, to: LocalDateTime, afterId: Long, limit: Int): List<Long>
     fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long>
 
     /**

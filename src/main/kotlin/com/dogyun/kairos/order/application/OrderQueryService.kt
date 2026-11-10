@@ -8,11 +8,13 @@ import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
+import com.dogyun.kairos.order.domain.ReturnStatus
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import com.dogyun.kairos.order.domain.ShippingAddress
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 /** 구매자·판매자·관리자용 주문 조회. 남의 주문은 존재 여부를 숨기려 404 로 답한다. */
 @Service
@@ -46,6 +48,38 @@ class OrderQueryService(
             productName = item.productName,
             confirmedAt = if (confirmed) sellerOrder.confirmedAt else null,
         )
+    }
+
+    /**
+     * 정산용 확정 판매자 주문(settlement 모듈이 포트로 읽는다). `confirmed_at ∈ [from, to)`, id 오름차순 keyset.
+     * 확정된 판매자 주문은 더 바뀌지 않으므로 일반 읽기로 충분하고, 정산은 주문 행 락을 잡지 않는다.
+     */
+    fun findConfirmedForSettlement(from: LocalDateTime, to: LocalDateTime, afterId: Long, limit: Int): List<ConfirmedSellerOrderResult> {
+        if (limit < 1) throw DomainException(ErrorCode.INVALID_REQUEST)
+        return orderRepository.findSellerOrderIdsConfirmedBetween(from, to, afterId, limit).mapNotNull { sellerOrderId ->
+            val order = orderRepository.findBySellerOrderId(sellerOrderId) ?: return@mapNotNull null
+            val so = order.findSellerOrder(sellerOrderId)
+            ConfirmedSellerOrderResult(
+                sellerOrderId = sellerOrderId,
+                sellerId = so.sellerId,
+                orderId = requireNotNull(order.id),
+                orderNo = order.orderNo,
+                confirmedAt = requireNotNull(so.confirmedAt) { "CONFIRMED 판매자 주문에 confirmedAt 이 없다: $sellerOrderId" },
+                commissionRateBp = so.commissionRateBp,
+                shippingFee = so.shippingFee,
+                buyerShippingFeeRefunded = so.buyerShippingFeeRefunded,
+                items = so.items.map { item ->
+                    ConfirmedSellerOrderItemResult(
+                        orderItemId = requireNotNull(item.id),
+                        status = item.status.name,
+                        lineAmount = item.lineAmount,
+                        productCouponDiscount = item.productCouponDiscount,
+                        productCouponIssuer = item.productCouponIssuer?.name,
+                        sellerBorneReturnFee = item.returnRequest?.takeIf { it.status == ReturnStatus.COMPLETED }?.sellerBorneFee ?: 0L,
+                    )
+                },
+            )
+        }
     }
 
     fun listMine(memberId: Long, page: Int, size: Int): PageResult<OrderSummary> {

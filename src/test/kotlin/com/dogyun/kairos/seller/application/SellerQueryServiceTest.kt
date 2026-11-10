@@ -51,7 +51,7 @@ class SellerQueryServiceTest {
         val snapshots = queryService.findSettlementSnapshots(listOf(id, 999L))
 
         assertEquals(setOf(id), snapshots.keys)
-        assertEquals(SellerSettlementSnapshot(id, "키로스상사", 1000, canManage = true), snapshots.getValue(id))
+        assertEquals(SellerSettlementSnapshot(id, "키로스상사", 1000, canManage = true, sellerStatus = "APPROVED"), snapshots.getValue(id))
         assertTrue(snapshots.getValue(id).canManage)
     }
 }

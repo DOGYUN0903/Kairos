@@ -96,6 +96,11 @@ class FakeOrderRepository : OrderRepository {
         rows.values.flatMap { it.sellerOrders }.filter { it.status == status }
             .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
 
+    override fun findSellerOrderIdsConfirmedBetween(from: LocalDateTime, to: LocalDateTime, afterId: Long, limit: Int): List<Long> =
+        rows.values.flatMap { it.sellerOrders }
+            .filter { it.status == SellerOrderStatus.CONFIRMED && it.confirmedAt?.let { c -> !c.isBefore(from) && c.isBefore(to) } == true }
+            .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
+
     override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long> =
         rows.values.flatMap { it.sellerOrders }
             .filter { it.status == SellerOrderStatus.DELIVERED && it.deliveredAt?.isBefore(threshold) == true }

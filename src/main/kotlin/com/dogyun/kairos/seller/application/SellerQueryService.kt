@@ -30,7 +30,7 @@ class SellerQueryService(private val sellerRepository: SellerRepository) {
     fun findSettlementSnapshots(sellerIds: Collection<Long>): Map<Long, SellerSettlementSnapshot> =
         sellerRepository.findAllByIds(sellerIds.map(::SellerId)).associate {
             val id = requireNotNull(it.id).value
-            id to SellerSettlementSnapshot(id, it.companyName, it.commissionRateBp, it.canManage)
+            id to SellerSettlementSnapshot(id, it.companyName, it.commissionRateBp, it.canManage, it.status.name)
         }
 
     fun listForAdmin(status: SellerStatus?, page: Int, size: Int): PageResult<SellerDetail> {
