@@ -232,6 +232,49 @@ class OrderPaymentServiceTest {
         assertEquals(5, stockManager.stock[10L])
     }
 
+    private fun voidOutcomes() = listOf(
+        PgOutcome.Unknown,
+        PgOutcome.Failed("REJECT_CANCEL", "취소가 거절되었습니다."),
+        pgDone(21_000, PgPaymentStatus.DONE),
+    )
+
+    @Test
+    fun PG_금액이_다르고_void가_확인되지_않으면_402이지만_결제는_UNKNOWN으로_남는다() {
+        stockManager.stock[10L] = 50
+        voidOutcomes().forEach { cancel ->
+            val order = place()
+            paymentGateway.nextConfirm = pgDone(1_000)
+            paymentGateway.nextCancel = cancel
+
+            assertError(ErrorCode.PAYMENT_REJECTED) { confirm(order, "pay-${order.orderId}") }
+
+            assertEquals("UNKNOWN", paymentGateway.get(order.orderId).status, "$cancel")
+            assertEquals(OrderStatus.PENDING_PAYMENT, orderRepository.findById(order.orderId)!!.status)
+        }
+    }
+
+    @Test
+    fun 주문이_닫힌_뒤_void가_확인되지_않으면_409이지만_결제는_UNKNOWN으로_남는다() {
+        stockManager.stock[10L] = 50
+        voidOutcomes().forEach { cancel ->
+            val order = place()
+            paymentGateway.nextConfirm = pgDone(21_000)
+            paymentGateway.nextCancel = cancel
+            paymentGateway.duringConfirm = {
+                val closed = orderRepository.findById(order.orderId)!!
+                closed.cancelForPaymentFailure()
+                orderRepository.save(closed)
+            }
+
+            assertError(ErrorCode.ORDER_INVALID_STATE_TRANSITION) { confirm(order, "pay-${order.orderId}") }
+
+            val payment = paymentGateway.get(order.orderId)
+            assertEquals("UNKNOWN", payment.status, "$cancel")
+            assertEquals(0L, payment.refundedAmount)
+            assertTrue(order.orderId !in paymentGateway.voidedOrderIds)
+        }
+    }
+
     @Test
     fun judge는_ABORTED_EXPIRED_CANCELED_Failed를_REJECT_OTHER_Unknown을_HOLD로_본다() {
         assertEquals(PgVerdict.APPROVE, judge(pgDone(100), 100))

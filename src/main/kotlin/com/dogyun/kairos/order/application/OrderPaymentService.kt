@@ -61,21 +61,32 @@ class OrderPaymentService(
         val outcome = paymentGateway.confirmWithPg(cmd.paymentKey, cmd.orderNo, cmd.amount)
         var verdict = judge(outcome, started.totalAmount)
         var failReason = failReasonOf(outcome)
+        // 사용자에게는 거절(402)로 답하지만, PG 취소가 확인되지 않았으면 결제를 UNKNOWN 으로 남겨 대사가 다시 확인하게 한다.
+        var rejectedButUnvoided = false
         if (verdict == PgVerdict.VOID_THEN_REJECT) {
             val pgTotal = (outcome as PgOutcome.Done).payment.totalAmount
-            paymentGateway.cancelWithPg(cmd.paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId")
-            verdict = PgVerdict.REJECT
+            val voided = isCanceled(paymentGateway.cancelWithPg(cmd.paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId"))
+            verdict = if (voided) PgVerdict.REJECT else PgVerdict.HOLD
+            rejectedButUnvoided = !voided
             failReason = "amount-mismatch"
         }
 
         return when (finishApproval(orderId, cmd.paymentKey, verdict, failReason)) {
             ApprovalFinish.PAID -> ConfirmPaymentResult(orderId, cmd.orderNo, OrderStatus.PAID.name, "APPROVED")
             ApprovalFinish.REJECTED -> throw DomainException(ErrorCode.PAYMENT_REJECTED)
-            ApprovalFinish.UNKNOWN -> ConfirmPaymentResult(orderId, cmd.orderNo, OrderStatus.PENDING_PAYMENT.name, "UNKNOWN")
+            ApprovalFinish.UNKNOWN -> if (rejectedButUnvoided) {
+                throw DomainException(ErrorCode.PAYMENT_REJECTED)
+            } else ConfirmPaymentResult(orderId, cmd.orderNo, OrderStatus.PENDING_PAYMENT.name, "UNKNOWN")
             ApprovalFinish.ORDER_ALREADY_CLOSED -> {
                 if (verdict == PgVerdict.APPROVE) {
-                    paymentGateway.cancelWithPg(cmd.paymentKey, cmd.amount, "order-closed:$orderId", "void-$orderId")
-                    tx.run { paymentGateway.voidAfterApproval(orderId) }
+                    val voided = isCanceled(
+                        paymentGateway.cancelWithPg(cmd.paymentKey, cmd.amount, "order-closed:$orderId", "void-$orderId"),
+                    )
+                    // 취소가 확인된 때만 결제를 닫는다. 아니면 UNKNOWN 으로 남겨 대사가 PG 를 다시 조회하게 한다.
+                    tx.run {
+                        if (voided) paymentGateway.voidAfterApproval(orderId)
+                        else if (paymentGateway.get(orderId).status == "IN_PROGRESS") paymentGateway.markUnknown(orderId)
+                    }
                 }
                 throw DomainException(ErrorCode.ORDER_INVALID_STATE_TRANSITION)
             }
@@ -149,6 +160,9 @@ class OrderPaymentService(
 
     private fun resultOf(order: Order, payment: PaymentInfo) =
         ConfirmPaymentResult(requireNotNull(order.id), order.orderNo, order.status.name, payment.status)
+
+    private fun isCanceled(outcome: PgOutcome) =
+        outcome is PgOutcome.Done && outcome.payment.status == PgPaymentStatus.CANCELED
 
     private fun failReasonOf(outcome: PgOutcome): String = when (outcome) {
         is PgOutcome.Failed -> outcome.code
