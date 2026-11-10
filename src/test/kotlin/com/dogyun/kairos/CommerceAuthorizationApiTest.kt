@@ -125,4 +125,74 @@ class CommerceAuthorizationApiTest : CommerceTestSupport() {
         val path = imageUrl.substring(imageUrl.indexOf("/files/"))
         assertEquals(200, mockMvc.get(path).andReturn().response.status)
     }
+
+    /** 판매자(sellerToken)의 SKU 하나가 담긴 주문을 구매자가 결제까지 마친 상태로 만든다. 상품 가격 8,000, 수량 1, 배송비 3,000. */
+    private fun paidOrderOf(sellerToken: String, buyerToken: String): Triple<Long, Long, Long> {
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)))
+        val skuId = skuIdsOf(sellerToken, productId).first()
+        val order = paidOrder(buyerToken, listOf(skuId to 1), 11000)
+        val sellerOrder = order.get("sellerOrders").get(0)
+        return Triple(order.get("orderId").asLong(), sellerOrder.get("sellerOrderId").asLong(), sellerOrder.get("items").get(0).get("orderItemId").asLong())
+    }
+
+    @Test
+    fun 판매자_토큰으로_관리자_주문_API는_403() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        get("/api/v1/admin/orders", sellerToken).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/orders/1", sellerToken).andExpect { status { isForbidden() } }
+        postIdem("/api/v1/admin/orders/1/items/1/cancel", sellerToken, mapOf("reason" to "x"))
+            .andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 판매자가_아닌_회원의_판매자_주문_API는_403() {
+        val token = newUserToken()
+        get("/api/v1/seller/orders", token).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/orders/1", token).andExpect { status { isForbidden() } }
+        postIdem("/api/v1/seller/orders/1/items/1/cancel", token, mapOf("reason" to "x"))
+            .andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/orders/1/ship", token, mapOf("carrierCode" to "04", "trackingNumber" to "1234567890"))
+            .andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/orders/1/deliver", token).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 다른_회원의_주문_상세와_항목_취소는_404() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val owner = newUserToken()
+        val (orderId, _, orderItemId) = paidOrderOf(sellerToken, owner)
+
+        val other = newUserToken()
+        get("/api/v1/orders/$orderId", other)
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("ORDER_NOT_FOUND") } }
+        postIdem("/api/v1/orders/$orderId/items/$orderItemId/cancel", other, mapOf("reason" to "변심"))
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("ORDER_NOT_FOUND") } }
+    }
+
+    @Test
+    fun 다른_판매자의_배송_시작은_404() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val (_, sellerOrderId, _) = paidOrderOf(sellerToken, newUserToken())
+
+        val otherSeller = newUserToken()
+        approvedSeller(otherSeller)
+        patch(
+            "/api/v1/seller/orders/$sellerOrderId/ship", otherSeller,
+            mapOf("carrierCode" to "04", "trackingNumber" to "1234567890"),
+        ).andExpect { status { isNotFound() }; jsonPath("$.code") { value("SELLER_ORDER_NOT_FOUND") } }
+    }
+
+    @Test
+    fun 비로그인_장바구니와_주문은_401() {
+        get("/api/v1/cart").andExpect { status { isUnauthorized() } }
+        post("/api/v1/cart/items", null, mapOf("skuId" to 1, "quantity" to 1)).andExpect { status { isUnauthorized() } }
+        get("/api/v1/orders").andExpect { status { isUnauthorized() } }
+        get("/api/v1/orders/1").andExpect { status { isUnauthorized() } }
+        postIdem("/api/v1/orders", null, mapOf("items" to emptyList<Any>())).andExpect { status { isUnauthorized() } }
+        postIdem("/api/v1/payments/confirm", null, mapOf("orderNo" to "x", "paymentKey" to "k", "amount" to 1))
+            .andExpect { status { isUnauthorized() } }
+    }
 }

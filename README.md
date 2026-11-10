@@ -25,7 +25,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - [x] Phase 1. 모놀리식 기본 구현
 - [x] Phase 2. 기준선 측정 (k6) — [측정 리포트](docs/perf/2026-11-08-phase2-baseline.md)
 - [x] C1. 판매자와 상품
-- [ ] C2. 구매
+- [x] C2. 구매
 - [ ] C3. 혜택과 후기
 - [ ] C4. 정산
 - [ ] C5. 운영 데이터
@@ -39,8 +39,12 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - 구현 계획: `docs/superpowers/plans/2026-11-08-kairos-phase0-1.md`
 - 커머스 로드맵: `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`
 - C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
+- C2 스펙: `docs/superpowers/specs/2026-11-09-c2-purchase-design.md`
+- C2 구현 계획: `docs/superpowers/plans/2026-11-09-c2-purchase.md`
+- ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`
 - ADR 0002(카탈로그 검색의 읽기 전용 조인): `docs/adr/0002-catalog-search-cross-module-read-join.md`
 - 업로드 파일은 로컬 `uploads/`에 저장된다(경로는 `.env`의 `KAIROS_FILE_DIR`).
+- Mock PG(기본): 설정 없이 `KAIROS_PG_PROVIDER=mock`으로 동작한다. `paymentKey`가 `fail-`, `unknown-`으로 시작하면 실패·불확실 응답을 흉내 낸다.
 - 토스페이먼츠 테스트 모드: `.env`에 `KAIROS_PG_PROVIDER=toss`와 `TOSS_SECRET_KEY=test_sk_...`(테스트 키만)를 넣는다. 기본값은 `mock`이다.
 - API 계약: `docs/api/openapi.yaml` (`OpenApiContractTest`가 구현과의 일치를 검증)
 - 아키텍처 결정 기록: `docs/adr/`
