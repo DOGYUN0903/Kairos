@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
     C1: 판매자·브랜드·카테고리·상품·파일
     C2: 장바구니·주문·결제·취소·배송
+    C3: 쿠폰·포인트·후기·좋아요
 
     - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
     - 모든 에러 응답은 `ErrorResponse`.
@@ -41,6 +42,14 @@ tags:
   - name: Admin Product
   - name: Seller Change Request
   - name: Admin Change Request
+  - name: Coupon
+  - name: Seller Coupon
+  - name: Admin Coupon
+  - name: Point
+  - name: Admin Point
+  - name: Review
+  - name: Seller Review
+  - name: Product Like
 security:
   - bearerAuth: []
 paths:
@@ -2817,6 +2826,22 @@ components:
             - IDEMPOTENCY_KEY_REQUIRED
             - IDEMPOTENCY_KEY_REUSED
             - IDEMPOTENCY_IN_PROGRESS
+            - COUPON_POLICY_INVALID
+            - COUPON_POLICY_NOT_FOUND
+            - COUPON_POLICY_ENDED
+            - COUPON_SOLD_OUT
+            - COUPON_ALREADY_ISSUED
+            - COUPON_NOT_FOUND
+            - COUPON_NOT_AVAILABLE
+            - COUPON_NOT_APPLICABLE
+            - COUPON_MIN_AMOUNT_NOT_MET
+            - POINT_INVALID_AMOUNT
+            - POINT_EXCEEDS_LIMIT
+            - POINT_INSUFFICIENT
+            - REVIEW_INVALID
+            - REVIEW_NOT_ELIGIBLE
+            - REVIEW_ALREADY_WRITTEN
+            - REVIEW_NOT_FOUND
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -3418,12 +3443,12 @@ components:
           $ref: '#/components/schemas/ProductContentResult'
     ProductSort:
       type: string
-      description: LATEST 는 onSaleAt 내림차순, PRICE_* 는 상품 판매가 기준, POPULAR 는 salesCount 내림차순(동률은 최신순).
-      enum: [LATEST, PRICE_ASC, PRICE_DESC, POPULAR]
+      description: LATEST 는 onSaleAt 내림차순, PRICE_* 는 상품 판매가 기준, POPULAR 는 salesCount 내림차순(동률은 최신순), LIKES 는 likeCount 내림차순(동률은 최신순).
+      enum: [LATEST, PRICE_ASC, PRICE_DESC, POPULAR, LIKES]
       default: LATEST
     ProductSummary:
       type: object
-      required: [productId, thumbnailUrl, brandName, name, originalPrice, salePrice, discountRate, soldOut]
+      required: [productId, thumbnailUrl, brandName, name, originalPrice, salePrice, discountRate, soldOut, likeCount, reviewCount, averageRating]
       properties:
         productId:
           type: integer
@@ -3447,6 +3472,19 @@ components:
           description: (정가 - 판매가) * 100 / 정가, 내림
         soldOut:
           type: boolean
+        likeCount:
+          type: integer
+          format: int64
+        reviewCount:
+          type: integer
+          format: int64
+        averageRating:
+          type: number
+          description: 평균 별점(소수 첫째 자리, 후기 없으면 0.0)
+        liked:
+          type: boolean
+          nullable: true
+          description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
     PublicSku:
       type: object
       description: 재고 숫자는 노출하지 않는다.
@@ -3471,6 +3509,9 @@ components:
     ProductDetail:
       type: object
       required:
+        - likeCount
+        - reviewCount
+        - averageRating
         - productId
         - brandId
         - brandName
@@ -3525,6 +3566,19 @@ components:
           description: ACTIVE SKU 만
           items:
             $ref: '#/components/schemas/PublicSku'
+        likeCount:
+          type: integer
+          format: int64
+        reviewCount:
+          type: integer
+          format: int64
+        averageRating:
+          type: number
+          description: 평균 별점(소수 첫째 자리, 후기 없으면 0.0)
+        liked:
+          type: boolean
+          nullable: true
+          description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
     SellerProductSummary:
       type: object
       required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut]
@@ -3788,6 +3842,30 @@ components:
           description: 클라이언트가 본 총액(상품 금액 + 구매자 부담 배송비)
         shippingAddress:
           $ref: '#/components/schemas/ShippingAddress'
+        productCoupons:
+          type: array
+          description: 항목(SKU)별 상품 쿠폰. 같은 쿠폰 ID·같은 SKU 중복 지정은 `ORDER_INVALID`.
+          items:
+            type: object
+            required: [skuId, couponId]
+            properties:
+              skuId:
+                type: integer
+                format: int64
+              couponId:
+                type: integer
+                format: int64
+        cartCouponId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 장바구니 쿠폰(주문 전체에 한 장)
+        pointsToUse:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+          description: 사용할 포인트(0 이상 10의 배수)
     ShipRequest:
       type: object
       required: [carrierCode, trackingNumber]
@@ -3837,6 +3915,10 @@ components:
         shippingFeeDeducted:
           type: integer
           format: int64
+        pointsRefund:
+          type: integer
+          format: int64
+          description: 되돌려진 포인트
     ConfirmPaymentRequest:
       type: object
       required: [orderNo, paymentKey, amount]
@@ -3881,6 +3963,13 @@ components:
           type: string
           format: date-time
           description: 결제 만료 시각(오프셋 없는 KST)
+        orderStatus:
+          $ref: '#/components/schemas/OrderStatus'
+          description: 0원 주문이면 `PAID`, 아니면 `PENDING_PAYMENT`
+        paymentStatus:
+          type: string
+          enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
+          description: 0원 주문이면 `APPROVED`(PG 없이 승인), 아니면 `READY`
     OrderStatus:
       type: string
       enum: [PENDING_PAYMENT, PAID, COMPLETED, CANCELED]
@@ -3933,6 +4022,34 @@ components:
         refundAmount:
           type: integer
           format: int64
+        productCouponId:
+          type: integer
+          format: int64
+          nullable: true
+        productCouponDiscount:
+          type: integer
+          format: int64
+          description: 상품 쿠폰 할인액(없으면 0)
+        productCouponIssuer:
+          type: string
+          nullable: true
+          enum: [PLATFORM, SELLER]
+        cartCouponAllocated:
+          type: integer
+          format: int64
+          description: 항목에 배분된 장바구니 쿠폰 할인액
+        pointsAllocated:
+          type: integer
+          format: int64
+          description: 항목에 배분된 사용 포인트
+        paidAmount:
+          type: integer
+          format: int64
+          description: lineAmount - 쿠폰 할인 - 포인트 배분(실제 현금 결제 몫)
+        pointsRefunded:
+          type: integer
+          format: int64
+          description: 취소로 되돌려진 포인트
     OrderShippingAddress:
       type: object
       required: [receiverName, phone, zipCode, address1, address2]
@@ -4034,6 +4151,22 @@ components:
           type: integer
           format: int64
         refundedAmount:
+          type: integer
+          format: int64
+        productCouponDiscount:
+          type: integer
+          format: int64
+        cartCouponId:
+          type: integer
+          format: int64
+          nullable: true
+        cartCouponDiscount:
+          type: integer
+          format: int64
+        pointsUsed:
+          type: integer
+          format: int64
+        pointsRefunded:
           type: integer
           format: int64
         expiresAt:

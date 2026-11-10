@@ -29,6 +29,9 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        // C3 테이블은 각 Task 가 만들 때 FK 자식 순서로 이 줄 앞에 추가한다:
+        // review_image, review, product_like, point_lot_usage, point_transaction, point_lot, member_point, coupon, coupon_policy
+        // (order_item 이 쿠폰·후기를 참조하므로 review → coupon 계열은 order_item 삭제 전에 지운다)
         jdbcTemplate.update("delete from order_item")
         jdbcTemplate.update("delete from seller_order")
         jdbcTemplate.update("delete from orders")

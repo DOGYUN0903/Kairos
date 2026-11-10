@@ -6,7 +6,7 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 /** 4계층 DDD 아키텍처 규칙. root 를 바꿔 fixture 에도 동일하게 적용할 수 있다. */
 class ArchitectureRules(private val root: String) {
 
-    private val modules = listOf("member", "deal", "cart", "order", "payment", "seller", "catalog", "file")
+    private val modules = listOf("member", "deal", "cart", "order", "payment", "seller", "catalog", "file", "benefit", "review")
     private val pairs = modules.flatMap { a -> modules.filter { it != a }.map { b -> a to b } }
 
     fun domainHasNoFramework(): ArchRule =

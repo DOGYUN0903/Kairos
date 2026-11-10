@@ -74,6 +74,17 @@ kairos:
     auto-confirm-after: 7d
     in-progress-timeout: 5m
     cancel-request-timeout: 1m
+  benefit:
+    earn-rate-bp: 100
+    min-usable-balance: 1000
+    use-unit: 10
+    max-use-rate-bp: 3000
+    earn-expiry: 365d
+    refund-lot-expiry: 30d
+    review-reward-text: 100
+    review-reward-photo: 500
+  review:
+    write-deadline: 90d
   jobs:
     enabled: true
     order-expiry-delay: 60s
@@ -81,6 +92,7 @@ kairos:
     delivery-poll-delay: 10m
     auto-confirm-delay: 1h
     idempotency-cleanup-delay: 1h
+    point-expiry-delay: 1h
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s
