@@ -139,7 +139,14 @@ class FakeStockManager : StockManager {
         stock.putAll(remaining)
     }
 
-    override fun restore(items: List<SkuQuantity>) = items.forEach { stock.merge(it.skuId, it.quantity, Int::plus) }
+    /** restore 호출 때 받은 목록(순서 그대로). */
+    val restoreCalls = mutableListOf<SkuQuantity>()
+
+    override fun restore(items: List<SkuQuantity>) {
+        restoreCalls.addAll(items)
+        items.forEach { stock.merge(it.skuId, it.quantity, Int::plus) }
+    }
+
     val sales = mutableMapOf<Long, Int>()
 
     override fun increaseSales(items: List<ProductQuantity>) = items.forEach { sales.merge(it.productId, it.quantity, Int::plus) }
@@ -193,7 +200,15 @@ class FakePaymentGateway : PaymentGateway {
         voidedOrderIds += orderId
     }
 
-    override fun recordRefund(orderId: Long, amount: Long) = unsupported()
+    override fun recordRefund(orderId: Long, amount: Long) {
+        val current = get(orderId)
+        if (current.status !in setOf("APPROVED", "PARTIAL_CANCELED") || amount <= 0 || current.refundedAmount + amount > current.amount) {
+            throw DomainException(ErrorCode.PAYMENT_INVALID_STATE_TRANSITION)
+        }
+        val refunded = current.refundedAmount + amount
+        payments[orderId] = current.copy(refundedAmount = refunded, status = if (refunded == current.amount) "CANCELED" else "PARTIAL_CANCELED")
+    }
+
     override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> = unsupported()
 
     override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome {

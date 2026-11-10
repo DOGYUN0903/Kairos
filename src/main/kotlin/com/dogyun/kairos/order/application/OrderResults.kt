@@ -118,3 +118,11 @@ data class SellerOrderSummary(
     val firstProductName: String,
     val orderedAt: LocalDateTime,
 )
+
+data class CancelItemResult(
+    val orderItemId: Long,
+    /** ORDERED, CANCEL_REQUESTED, CANCELED */
+    val itemStatus: String,
+    val refundAmount: Long,
+    val shippingFeeDeducted: Long,
+)

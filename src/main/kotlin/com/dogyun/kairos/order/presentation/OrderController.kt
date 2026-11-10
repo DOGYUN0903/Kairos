@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.presentation
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.security.LoginMember
 import com.dogyun.kairos.common.presentation.PageResponse
+import com.dogyun.kairos.order.application.OrderCancelService
 import com.dogyun.kairos.order.application.OrderDetail
 import com.dogyun.kairos.order.application.OrderQueryService
 import com.dogyun.kairos.order.application.OrderService
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController
 class OrderController(
     private val orderService: OrderService,
     private val orderQueryService: OrderQueryService,
+    private val orderCancelService: OrderCancelService,
 ) {
 
     /** `Idempotency-Key` 헤더는 필터가 검증·처리한다(IdempotencyProperties.paths). */
@@ -46,4 +48,15 @@ class OrderController(
         @AuthenticationPrincipal loginMember: LoginMember,
         @PathVariable orderId: Long,
     ): ResponseEntity<ApiResponse<OrderDetail>> = ApiResponse.ok(orderQueryService.getMine(loginMember.id, orderId))
+
+    /** `Idempotency-Key` 헤더는 필터가 검증·처리한다(IdempotencyProperties.paths). */
+    @PostMapping("/{orderId}/items/{orderItemId}/cancel")
+    fun cancelItem(
+        @AuthenticationPrincipal loginMember: LoginMember,
+        @PathVariable orderId: Long,
+        @PathVariable orderItemId: Long,
+        @Valid @RequestBody request: CancelItemRequest,
+    ): ResponseEntity<ApiResponse<CancelItemResponse>> = ApiResponse.ok(
+        CancelItemResponse.from(orderCancelService.cancelByBuyer(loginMember.id, orderId, orderItemId, request.reason)),
+    )
 }

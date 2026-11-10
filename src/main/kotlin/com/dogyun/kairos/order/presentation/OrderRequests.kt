@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.presentation
 
+import com.dogyun.kairos.order.application.CancelItemResult
 import com.dogyun.kairos.order.application.ConfirmPaymentCommand
 import com.dogyun.kairos.order.application.ConfirmPaymentResult
 import com.dogyun.kairos.order.application.OrderItemCommand
@@ -70,5 +71,21 @@ data class ConfirmPaymentResponse(
     companion object {
         fun from(result: ConfirmPaymentResult) =
             ConfirmPaymentResponse(result.orderId, result.orderNo, result.orderStatus, result.paymentStatus)
+    }
+}
+
+data class CancelItemRequest(
+    @field:NotBlank @field:Size(max = 500) val reason: String,
+)
+
+data class CancelItemResponse(
+    val orderItemId: Long,
+    val itemStatus: String,
+    val refundAmount: Long,
+    val shippingFeeDeducted: Long,
+) {
+    companion object {
+        fun from(result: CancelItemResult) =
+            CancelItemResponse(result.orderItemId, result.itemStatus, result.refundAmount, result.shippingFeeDeducted)
     }
 }
