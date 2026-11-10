@@ -1,7 +1,7 @@
 package com.dogyun.kairos.catalog.domain
 
-/** 사용자 상품 목록 정렬. LATEST 는 onSaleAt, PRICE_* 는 상품 판매가(SKU 추가 금액 미반영), POPULAR 는 salesCount(동률은 최신순). */
-enum class ProductSort { LATEST, PRICE_ASC, PRICE_DESC, POPULAR }
+/** 사용자 상품 목록 정렬. LATEST 는 onSaleAt, PRICE_* 는 상품 판매가(SKU 추가 금액 미반영), POPULAR 는 salesCount(동률은 최신순), LIKES 는 likeCount(동률은 id 내림차순). */
+enum class ProductSort { LATEST, PRICE_ASC, PRICE_DESC, POPULAR, LIKES }
 
 /**
  * 사용자 상품 검색 조건. 노출 조건(ON_SALE + 브랜드 APPROVED + 판매자 APPROVED)은 저장소가 항상 건다.
@@ -26,4 +26,7 @@ data class ProductListRow(
     val originalPrice: Long,
     val salePrice: Long,
     val soldOut: Boolean,
+    val likeCount: Long,
+    val reviewCount: Long,
+    val ratingSum: Long,
 )

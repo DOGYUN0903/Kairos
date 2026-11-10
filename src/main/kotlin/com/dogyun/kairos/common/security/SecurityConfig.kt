@@ -59,6 +59,7 @@ class SecurityConfig {
                         "/swagger-ui/**",
                     ).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/deals/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/products/me/likes").authenticated()
                     .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/products/**",

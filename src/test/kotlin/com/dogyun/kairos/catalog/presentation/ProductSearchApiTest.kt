@@ -301,4 +301,40 @@ class ProductSearchApiTest : CommerceTestSupport() {
         assertEquals("티셔츠", row.get("name").asString())
         assertEquals(listOf(mainUrl, images[1].get("url").asString()), detail(productId).get("imageUrls").list().map { it.asString() })
     }
+
+    @Test
+    fun LIKES_정렬은_like_count_내림차순_id_내림차순이다() {
+        val s = scene()
+        val a = onSale(s)
+        val b = onSale(s)
+        val c = onSale(s)
+        val d = onSale(s)
+        likeProduct(newUserToken(), c)
+        newUserToken().let { likeProduct(it, b); likeProduct(it, c) }
+        // like_count: c=2, b=1, a=d=0 (동률은 id 내림차순)
+
+        assertEquals(listOf(c, b, d, a), listIds("?sort=LIKES"))
+    }
+
+    @Test
+    fun 로그인하면_liked가_채워지고_비로그인은_null이다() {
+        val s = scene()
+        val liked = onSale(s)
+        val notLiked = onSale(s)
+        val me = newUserToken()
+        likeProduct(me, liked)
+
+        val anonymous = listPage().get("content").list().associate { it.get("productId").asLong() to it.get("liked") }
+        assertTrue(anonymous.values.all { it == null || it.isNull })
+
+        val mine = json(get("/api/v1/products", me).andExpect { status { isOk() } }).get("data").get("content").list()
+            .associate { it.get("productId").asLong() to it.get("liked").asBoolean() }
+        assertEquals(mapOf(liked to true, notLiked to false), mine)
+
+        assertEquals(true, json(get("/api/v1/products/$liked", me).andExpect { status { isOk() } }).get("data").get("liked").asBoolean())
+        assertTrue(detail(liked).get("liked").isNull)
+        assertEquals(1L, detail(liked).get("likeCount").asLong())
+        assertEquals(0L, detail(liked).get("reviewCount").asLong())
+        assertEquals(0.0, detail(liked).get("averageRating").asDouble())
+    }
 }

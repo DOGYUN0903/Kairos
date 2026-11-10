@@ -27,8 +27,26 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     @Autowired
     protected lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    protected lateinit var jwtProvider: com.dogyun.kairos.common.security.JwtProvider
+
+    @Autowired
+    protected lateinit var pointService: com.dogyun.kairos.benefit.application.PointService
+
     @BeforeTest
     fun cleanUp() {
+        // C3 테이블은 각 Task 가 만들 때 FK 자식 순서로 이 줄 앞에 추가한다:
+        // review_image, review, product_like, point_lot_usage, point_transaction, point_lot, member_point, coupon, coupon_policy
+        // (order_item 이 쿠폰·후기를 참조하므로 review → coupon 계열은 order_item 삭제 전에 지운다)
+        jdbcTemplate.update("delete from review_image")
+        jdbcTemplate.update("delete from review")
+        jdbcTemplate.update("delete from point_lot_usage")
+        jdbcTemplate.update("delete from product_like")
+        jdbcTemplate.update("delete from point_transaction")
+        jdbcTemplate.update("delete from point_lot")
+        jdbcTemplate.update("delete from member_point")
+        jdbcTemplate.update("delete from coupon")
+        jdbcTemplate.update("delete from coupon_policy")
         jdbcTemplate.update("delete from order_item")
         jdbcTemplate.update("delete from seller_order")
         jdbcTemplate.update("delete from orders")
@@ -65,11 +83,11 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun adminToken(): String = login("admin@kairos.test", "test-admin-password")
 
     /** 랜덤 이메일로 가입하고 로그인한 일반 회원의 액세스 토큰. */
-    protected fun newUserToken(): String {
+    protected fun newUserToken(name: String = "홍길동"): String {
         val email = "user-${UUID.randomUUID()}@kairos.com"
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to "password1", "name" to "홍길동"))
+            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to "password1", "name" to name))
         }
         return login(email, "password1")
     }
@@ -243,18 +261,24 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             header("Idempotency-Key", idemKey)
         }
 
-    /** items 는 (skuId, quantity) 쌍. 주문 생성 요청을 보낸다. */
+    /** items 는 (skuId, quantity), productCoupons 는 (skuId, couponId) 쌍. 주문 생성 요청을 보낸다. */
     protected fun placeOrder(
         token: String,
         items: List<Pair<Long, Int>>,
         expectedTotal: Long,
         idemKey: String = UUID.randomUUID().toString(),
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
     ): ResultActionsDsl = postIdem(
         "/api/v1/orders", token,
         mapOf(
             "items" to items.map { mapOf("skuId" to it.first, "quantity" to it.second) },
             "expectedTotalAmount" to expectedTotal,
             "shippingAddress" to address(),
+            "productCoupons" to productCoupons.map { mapOf("skuId" to it.first, "couponId" to it.second) },
+            "cartCouponId" to cartCouponId,
+            "pointsToUse" to pointsToUse,
         ),
         idemKey,
     )
@@ -273,12 +297,162 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     )
 
     /** 주문을 만들고 승인해 PAID 로 만든 뒤 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data 를 돌려준다. */
-    protected fun paidOrder(token: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
-        val orderNo = json(placeOrder(token, items, expectedTotal).andExpect { status { isCreated() } }).get("data").get("orderNo").asString()
+    protected fun paidOrder(
+        token: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
+    ): JsonNode {
+        val orderNo = json(
+            placeOrder(token, items, expectedTotal, idemKey, productCoupons, cartCouponId, pointsToUse).andExpect { status { isCreated() } },
+        ).get("data").get("orderNo").asString()
         val confirmed = json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
         val orderId = confirmed.get("orderId").asLong()
         return json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
     }
+
+    /** 유효 기간은 어제부터 30일 뒤까지. 기본값은 전 상품 대상 2,000원 정액 쿠폰. */
+    protected fun couponPolicyBody(
+        couponType: String = "PRODUCT",
+        targetType: String = "ALL_PRODUCTS",
+        discountType: String = "FIXED",
+        discountValue: Long = 2_000L,
+        maxDiscount: Long? = null,
+        minOrderAmount: Long? = null,
+        totalQuantity: Int? = null,
+        validityDays: Int? = null,
+        targetProductId: Long? = null,
+    ): Map<String, Any?> {
+        val today = java.time.LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+        return mapOf(
+            "name" to "테스트 쿠폰",
+            "couponType" to couponType,
+            "targetType" to targetType,
+            "targetProductId" to targetProductId,
+            "discountType" to discountType,
+            "discountValue" to discountValue,
+            "maxDiscount" to maxDiscount,
+            "minOrderAmount" to minOrderAmount,
+            "totalQuantity" to totalQuantity,
+            "validityDays" to validityDays,
+            "validFrom" to today.minusDays(1).toString(),
+            "validUntil" to today.plusDays(30).toString(),
+        )
+    }
+
+    /** 관리자(플랫폼) 쿠폰 정책을 만들고 policyId 를 돌려준다. */
+    protected fun adminCouponPolicy(body: Map<String, Any?>): Long {
+        val created = postIdem("/api/v1/admin/coupons/policies", adminToken(), body).andExpect { status { isCreated() } }
+        return json(created).get("data").get("policyId").asLong()
+    }
+
+    protected fun sellerCouponPolicy(sellerToken: String, body: Map<String, Any?>): Long {
+        val created = postIdem("/api/v1/seller/coupons/policies", sellerToken, body).andExpect { status { isCreated() } }
+        return json(created).get("data").get("policyId").asLong()
+    }
+
+    /** 쿠폰을 발급받고 couponId 를 돌려준다. */
+    protected fun claimCoupon(token: String, policyId: Long): Long {
+        val claimed = postIdem("/api/v1/coupons/policies/$policyId/claim", token, null).andExpect { status { isCreated() } }
+        return json(claimed).get("data").get("couponId").asLong()
+    }
+
+    /** 액세스 토큰의 회원 id. */
+    protected fun memberIdOf(token: String): Long = requireNotNull(jwtProvider.parseAccessToken(token)).memberId
+
+    /** 구매 적립 로트를 직접 만든다(원장 ref 는 겹치지 않는 음수 난수). 기본 만료는 365일 뒤. */
+    protected fun grantPoints(
+        memberId: Long,
+        amount: Long,
+        expiresAt: java.time.LocalDateTime = java.time.LocalDateTime.now().plusDays(365),
+    ) {
+        pointService.earn(
+            memberId, amount,
+            com.dogyun.kairos.benefit.domain.PointTransactionType.EARN_PURCHASE,
+            com.dogyun.kairos.benefit.domain.PointSourceType.PURCHASE,
+            com.dogyun.kairos.benefit.domain.PointRefType.PURCHASE_CONFIRM,
+            -(java.util.concurrent.ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE)),
+            expiresAt,
+        )
+    }
+
+    /** `PUT /api/v1/products/{id}/like` 를 200 으로 확인한다. */
+    protected fun likeProduct(token: String, productId: Long) {
+        put("/api/v1/products/$productId/like", token).andExpect { status { isOk() } }
+    }
+
+    protected fun likeCountOf(productId: Long): Long =
+        jdbcTemplate.queryForObject("select like_count from product where id = ?", Long::class.java, productId)!!
+
+    protected fun pointBalance(memberId: Long): Long =
+        jdbcTemplate.queryForObject("select coalesce(sum(balance), 0) from member_point where member_id = ?", Long::class.java, memberId) ?: 0L
+
+    protected fun lotRemainingSum(memberId: Long): Long =
+        jdbcTemplate.queryForObject("select coalesce(sum(remaining_amount), 0) from point_lot where member_id = ?", Long::class.java, memberId) ?: 0L
+
+    /** `GET /api/v1/coupons/me` 기준 쿠폰 ID → 상태(AVAILABLE/USED/EXPIRED). */
+    protected fun myCouponStatuses(token: String): Map<Long, String> {
+        val content = json(get("/api/v1/coupons/me?size=100", token).andExpect { status { isOk() } }).get("data").get("content")
+        return (0 until content.size()).associate { content.get(it).get("couponId").asLong() to content.get(it).get("status").asString() }
+    }
+
+    /** 회원의 원장 행 수(transaction_type 이 [type] 인 것). */
+    protected fun pointTransactionCount(memberId: Long, type: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from point_transaction where member_id = ? and transaction_type = ?", Int::class.java, memberId, type,
+        ) ?: 0
+
+    /** 항목 취소(구매자) 응답의 data. */
+    protected fun cancelItem(token: String, orderId: Long, itemId: Long, reason: String = "단순 변심"): JsonNode =
+        json(
+            postIdem("/api/v1/orders/$orderId/items/$itemId/cancel", token, mapOf("reason" to reason)).andExpect { status { isOk() } },
+        ).get("data")
+
+    /** 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data. */
+    protected fun orderDetail(token: String, orderId: Long): JsonNode =
+        json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 결제 → 판매자 주문마다 배송 시작(`-D` 송장) → 배송 완료 → 구매 확정까지 마치고 내 주문 상세의 data 를 돌려준다. */
+    protected fun confirmedOrder(buyerToken: String, sellerToken: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
+        val order = paidOrder(buyerToken, items, expectedTotal)
+        val orderId = order.get("orderId").asLong()
+        val sellerOrders = order.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val soId = sellerOrders.get(i).get("sellerOrderId").asLong()
+            patch("/api/v1/seller/orders/$soId/ship", sellerToken, mapOf("carrierCode" to "04", "trackingNumber" to "T-$soId-D"))
+                .andExpect { status { isOk() } }
+            patch("/api/v1/seller/orders/$soId/deliver", sellerToken).andExpect { status { isOk() } }
+            patch("/api/v1/orders/$orderId/seller-orders/$soId/confirm", buyerToken).andExpect { status { isOk() } }
+        }
+        return orderDetail(buyerToken, orderId)
+    }
+
+    /** 후기를 쓰고(201) reviewId 를 돌려준다. */
+    protected fun writeReview(
+        token: String,
+        orderId: Long,
+        orderItemId: Long,
+        rating: Int = 5,
+        content: String = "열 글자 이상 되는 후기 본문입니다",
+        imageFileIds: List<Long> = emptyList(),
+    ): Long {
+        val created = postIdem(
+            "/api/v1/orders/$orderId/items/$orderItemId/reviews", token,
+            mapOf("rating" to rating, "content" to content, "imageFileIds" to imageFileIds),
+        ).andExpect { status { isCreated() } }
+        return json(created).get("data").get("reviewId").asLong()
+    }
+
+    /** product 의 (review_count, rating_sum, like_count). */
+    protected fun productStats(productId: Long): Triple<Long, Long, Long> =
+        jdbcTemplate.queryForObject(
+            "select review_count, rating_sum, like_count from product where id = ?",
+            { rs, _ -> Triple(rs.getLong(1), rs.getLong(2), rs.getLong(3)) },
+            productId,
+        )!!
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))

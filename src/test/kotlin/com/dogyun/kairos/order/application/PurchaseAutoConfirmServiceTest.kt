@@ -11,7 +11,7 @@ class PurchaseAutoConfirmServiceTest {
     private val service = PurchaseAutoConfirmService(f.orderRepository, f.shippingService, f.properties, f.clock)
 
     /** 배송 완료 시각만 다르게 하려고 시계가 다른 서비스로 배송 처리한다. */
-    private fun shippingServiceAt(days: Long) = OrderShippingService(f.orderRepository, f.tx, f.clockAt(f.now.minusDays(days)))
+    private fun shippingServiceAt(days: Long) = OrderShippingService(f.orderRepository, f.tx, f.clockAt(f.now.minusDays(days)), f.pointEarner)
 
     @Test
     fun 일곱_일_지난_DELIVERED만_CONFIRMED가_된다() {

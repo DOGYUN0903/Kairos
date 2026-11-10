@@ -40,7 +40,8 @@ class ProductSearchRepositoryImpl(
         val mainFileId = mainFileId()
         val soldOut = soldOut()
         val rows = exposedQuery()
-            .select(product.id, mainFileId, brand.name, product.name, product.originalPrice, product.salePrice, soldOut)
+            .select(product.id, mainFileId, brand.name, product.name, product.originalPrice, product.salePrice, soldOut,
+                product.likeCount, product.reviewCount, product.ratingSum)
             .where(*where.toTypedArray())
             .orderBy(*orderBy(condition.sort))
             .offset(page.toLong() * size)
@@ -55,6 +56,9 @@ class ProductSearchRepositoryImpl(
                     originalPrice = tuple.get(product.originalPrice)!!,
                     salePrice = tuple.get(product.salePrice)!!,
                     soldOut = tuple.get(soldOut) ?: true,
+                    likeCount = tuple.get(product.likeCount)!!,
+                    reviewCount = tuple.get(product.reviewCount)!!,
+                    ratingSum = tuple.get(product.ratingSum)!!,
                 )
             }
         val total = exposedQuery().select(product.count()).where(*where.toTypedArray()).fetchOne() ?: 0L
@@ -116,6 +120,7 @@ class ProductSearchRepositoryImpl(
         ProductSort.LATEST -> arrayOf(product.onSaleAt.desc(), product.id.desc())
         ProductSort.PRICE_ASC -> arrayOf(product.salePrice.asc(), product.id.desc())
         ProductSort.PRICE_DESC -> arrayOf(product.salePrice.desc(), product.id.desc())
+        ProductSort.LIKES -> arrayOf(product.likeCount.desc(), product.id.desc())
         ProductSort.POPULAR -> arrayOf(product.salesCount.desc(), product.onSaleAt.desc(), product.id.desc())
     }
 

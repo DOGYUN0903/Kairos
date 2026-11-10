@@ -23,6 +23,7 @@ class OrderShippingService(
     private val orderRepository: OrderRepository,
     private val tx: TransactionRunner,
     private val clock: Clock,
+    private val pointEarner: PointEarner,
 ) {
 
     fun ship(sellerId: Long, sellerOrderId: Long, carrierCode: String, trackingNumber: String): SellerOrderState =
@@ -48,7 +49,9 @@ class OrderShippingService(
         val order = orderRepository.findByIdForUpdate(orderId)?.takeIf { it.memberId == memberId }
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
         val sellerOrder = order.findSellerOrder(sellerOrderId)
+        val wasConfirmed = sellerOrder.status == SellerOrderStatus.CONFIRMED
         order.confirmPurchase(sellerOrderId, now())
+        if (!wasConfirmed) earn(order, sellerOrder)
         save(order, sellerOrder)
     }
 
@@ -59,8 +62,14 @@ class OrderShippingService(
             val order = orderRepository.findByIdForUpdate(orderId) ?: return@run
             if (order.findSellerOrder(sellerOrderId).status != SellerOrderStatus.DELIVERED) return@run
             order.confirmPurchase(sellerOrderId, now())
+            earn(order, order.findSellerOrder(sellerOrderId))
             orderRepository.save(order)
         }
+    }
+
+    /** 확정과 같은 트랜잭션에서 적립한다(주문 행 락 → member_point 락). 원장 UNIQUE 로 판매자 주문당 한 번만 적립된다. */
+    private fun earn(order: Order, sellerOrder: SellerOrder) {
+        pointEarner.earnForPurchase(order.memberId, requireNotNull(sellerOrder.id), sellerOrder.confirmedPaidAmount)
     }
 
     private fun forSeller(sellerId: Long, sellerOrderId: Long, change: (Order) -> Unit): SellerOrderState {

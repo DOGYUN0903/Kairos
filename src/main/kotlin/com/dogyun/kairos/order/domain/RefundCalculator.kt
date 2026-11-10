@@ -5,16 +5,18 @@ import com.dogyun.kairos.common.domain.ErrorCode
 
 /**
  * 항목 하나를 취소할 때의 환불 내역. 환불 금액 계산은 [RefundCalculator] 한 곳에서만 한다.
- * `refundAmount = itemAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`.
+ * `refundAmount = paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`.
  */
 data class RefundPlan(
     val itemId: Long,
-    val itemAmount: Long,
+    val paidAmount: Long,
     val shippingFeeRefund: Long,
     val shippingFeeDeducted: Long,
     val shippingFeeReturned: Long,
+    val pointsRefund: Long,
+    val productCouponReturn: Long?,
 ) {
-    val refundAmount: Long get() = itemAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned
+    val refundAmount: Long get() = paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned
 }
 
 /** 스펙 5장. 상태는 바꾸지 않는 순수 계산이다. */
@@ -32,8 +34,8 @@ object RefundCalculator {
             throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         }
 
-        val itemAmount = item.lineAmount
-        val remainingAfter = order.remainingItemsAmount - itemAmount
+        // 무료배송 기준은 할인 전 금액(lineAmount)으로 판정한다(스펙 4-3). 환불 현금은 실제로 낸 paidAmount 다.
+        val remainingAfter = order.remainingItemsAmount - item.lineAmount
         val sellerOrderEmptied = sellerOrder.items.none { it.status == OrderItemStatus.ORDERED && it.id != itemId }
 
         // 구매자가 낸 배송비는 그 판매자 주문이 통째로 비면 돌려준다.
@@ -54,12 +56,16 @@ object RefundCalculator {
             // 이 취소로 처음 기준 아래로 떨어질 때만. 판매자·관리자 취소로 이미 깨졌다면 구매자 책임이 아니다.
             order.remainingItemsAmount >= policy.freeShippingThreshold
         ) {
-            shippingFeeDeducted = minOf(policy.baseShippingFee, itemAmount + shippingFeeRefund)
+            shippingFeeDeducted = minOf(policy.baseShippingFee, item.paidAmount + shippingFeeRefund)
         }
 
-        val plan = RefundPlan(itemId, itemAmount, shippingFeeRefund, shippingFeeDeducted, shippingFeeReturned)
+        val plan = RefundPlan(
+            itemId, item.paidAmount, shippingFeeRefund, shippingFeeDeducted, shippingFeeReturned,
+            pointsRefund = item.pointsAllocated, productCouponReturn = item.productCouponId,
+        )
         check(plan.refundAmount >= 0) { "환불액은 0 이상이어야 한다: $plan" }
         check(order.refundedAmount + plan.refundAmount <= order.totalAmount) { "누적 환불액이 결제 금액을 넘는다: $plan" }
+        check(order.pointsRefunded + plan.pointsRefund <= order.pointsUsed) { "누적 포인트 되돌림이 사용액을 넘는다: $plan" }
         return plan
     }
 }

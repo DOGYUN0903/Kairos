@@ -22,6 +22,14 @@ class OrderItem(
     shippingFeeDeducted: Long,
     shippingFeeReturned: Long,
     canceledAt: LocalDateTime?,
+    val productCouponId: Long?,
+    val productCouponDiscount: Long,
+    val productCouponIssuer: CouponIssuer?,
+    val cartCouponAllocated: Long,
+    val pointsAllocated: Long,
+    /** 저장값. `lineAmount - productCouponDiscount - cartCouponAllocated - pointsAllocated` 를 만들 때 계산해 넣고 복원 시 그대로 읽는다. */
+    val paidAmount: Long,
+    pointsRefunded: Long,
 ) {
     var status: OrderItemStatus = status
         private set
@@ -37,13 +45,15 @@ class OrderItem(
         private set
     var canceledAt: LocalDateTime? = canceledAt
         private set
+    var pointsRefunded: Long = pointsRefunded
+        private set
 
     val unitPrice: Long get() = salePrice + extraPrice
     val lineAmount: Long get() = unitPrice * quantity
 
     fun requestCancel(actor: CancelActor, reason: String?, plan: RefundPlan) {
         if (status != OrderItemStatus.ORDERED) throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
-        if (plan.itemId != id || plan.itemAmount != lineAmount) throw DomainException(ErrorCode.ORDER_INVALID)
+        if (plan.itemId != id || plan.paidAmount != paidAmount || plan.pointsRefund != pointsAllocated) throw DomainException(ErrorCode.ORDER_INVALID)
         status = OrderItemStatus.CANCEL_REQUESTED
         cancelActor = actor
         cancelReason = reason
@@ -55,15 +65,18 @@ class OrderItem(
     /** 요청 시 저장해 둔 값에서 환불 계획을 복원한다(PG 취소 후 확정 단계에서 쓴다). */
     fun toRefundPlan(): RefundPlan = RefundPlan(
         itemId = checkNotNull(id) { "저장되지 않은 항목" },
-        itemAmount = lineAmount,
-        shippingFeeRefund = refundAmount - lineAmount + shippingFeeDeducted - shippingFeeReturned,
+        paidAmount = paidAmount,
+        shippingFeeRefund = refundAmount - paidAmount + shippingFeeDeducted - shippingFeeReturned,
         shippingFeeDeducted = shippingFeeDeducted,
         shippingFeeReturned = shippingFeeReturned,
+        pointsRefund = pointsAllocated,
+        productCouponReturn = productCouponId,
     )
 
-    fun confirmCancel(now: LocalDateTime) {
+    fun confirmCancel(now: LocalDateTime, pointsRefund: Long = pointsAllocated) {
         if (status != OrderItemStatus.CANCEL_REQUESTED) throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         status = OrderItemStatus.CANCELED
+        pointsRefunded = pointsRefund
         canceledAt = now
     }
 

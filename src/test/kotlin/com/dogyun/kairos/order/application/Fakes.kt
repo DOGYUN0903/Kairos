@@ -8,6 +8,7 @@ import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
+import com.dogyun.kairos.order.domain.PointUsePolicy
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.LocalDateTime
@@ -29,7 +30,9 @@ class FakeOrderRepository : OrderRepository {
         val id = order.id ?: ++orderSeq
         val saved = Order(
             id, order.orderNo, order.memberId, order.status, order.shippingAddress, order.itemsAmount, order.buyerShippingFee,
-            order.totalAmount, order.freeShippingApplied, order.shippingFeeRecovered, order.refundedAmount, order.expiresAt,
+            order.totalAmount, order.freeShippingApplied, order.shippingFeeRecovered, order.refundedAmount,
+            order.productCouponDiscount, order.cartCouponId, order.cartCouponDiscount, order.pointsUsed, order.pointsRefunded,
+            order.expiresAt,
             order.paidAt, order.sellerOrders.map { so ->
                 SellerOrder(
                     so.id ?: ++sellerOrderSeq, so.sellerId, so.sellerName, so.commissionRateBp, so.status, so.shippingFee,
@@ -38,7 +41,9 @@ class FakeOrderRepository : OrderRepository {
                         OrderItem(
                             it.id ?: ++itemSeq, it.skuId, it.productId, it.productName, it.brandName, it.optionDisplayName,
                             it.salePrice, it.extraPrice, it.quantity, it.status, it.cancelActor, it.cancelReason,
-                            it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt,
+                            it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
+                            it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated,
+                            it.paidAmount, it.pointsRefunded,
                         )
                     },
                 )
@@ -55,6 +60,9 @@ class FakeOrderRepository : OrderRepository {
     override fun findByOrderNoForUpdate(orderNo: String): Order? = findByOrderNo(orderNo)
     override fun findBySellerOrderId(sellerOrderId: Long): Order? =
         rows.values.firstOrNull { o -> o.sellerOrders.any { it.id == sellerOrderId } }
+
+    override fun findByOrderItemId(orderItemId: Long): Order? =
+        rows.values.firstOrNull { o -> o.sellerOrders.any { so -> so.items.any { it.id == orderItemId } } }
 
     override fun findOrderIdBySellerOrderId(sellerOrderId: Long): Long? = findBySellerOrderId(sellerOrderId)?.id
 
@@ -129,7 +137,8 @@ class FakeSellerReader : SellerReader {
         sellerIds.mapNotNull { sellers[it] }.associateBy { it.sellerId }
 }
 
-class FakeStockManager : StockManager {
+/** [events] 를 [FakeBenefitReverter] 와 공유하면 호출 순서("restore")를 확인할 수 있다. */
+class FakeStockManager(val events: MutableList<String> = mutableListOf()) : StockManager {
     val stock = mutableMapOf<Long, Int>()
 
     /** decrease 호출 때 받은 목록(순서 그대로). */
@@ -151,6 +160,7 @@ class FakeStockManager : StockManager {
 
     override fun restore(items: List<SkuQuantity>) {
         restoreCalls.addAll(items)
+        events += "restore"
         items.forEach { stock.merge(it.skuId, it.quantity, Int::plus) }
     }
 
@@ -192,6 +202,12 @@ class FakePaymentGateway : PaymentGateway {
 
     override fun approve(orderId: Long) {
         change(orderId, setOf("IN_PROGRESS", "UNKNOWN")) { it.copy(status = "APPROVED") }
+    }
+
+    override fun approveWithoutPg(orderId: Long) {
+        val current = get(orderId)
+        if (current.amount != 0L) throw DomainException(ErrorCode.PAYMENT_INVALID_STATE_TRANSITION)
+        change(orderId, setOf("READY")) { it.copy(status = "APPROVED") }
     }
 
     override fun fail(orderId: Long, reason: String) {
@@ -268,5 +284,91 @@ class FakeDeliveryTracker : DeliveryTracker {
     override fun track(carrierCode: String, trackingNumber: String): TrackingResult {
         calls += carrierCode to trackingNumber
         return results[trackingNumber] ?: TrackingResult.IN_TRANSIT
+    }
+}
+
+/** 쿠폰 조건과 포인트 잔액을 메모리에 두고 reserve·commit 호출을 기록한다. */
+class FakeBenefitApplier : BenefitApplier {
+    val coupons = mutableMapOf<Long, ReservedCoupon>()
+    val used = mutableSetOf<Long>()
+    var balance: Long = 0
+    var policy = PointUsePolicy(minUsableBalance = 1_000, useUnit = 10, maxUseRateBp = 3_000)
+
+    /** reserve 로 USED 가 된 쿠폰 ID 묶음(호출 순서대로). */
+    val reserved = mutableListOf<Set<Long>>()
+
+    data class Commit(val memberId: Long, val orderId: Long, val couponIds: Set<Long>, val pointsToUse: Long)
+
+    val committed = mutableListOf<Commit>()
+
+    /** 호출 순서 기록: "reserve", "commit". */
+    val calls = mutableListOf<String>()
+
+    fun product(couponId: Long, issuer: String = "PLATFORM", target: String = "ALL_PRODUCTS", discountType: String = "FIXED",
+                value: Long = 2_000, max: Long? = null, min: Long? = null, sellerId: Long? = null, productId: Long? = null) {
+        coupons[couponId] = ReservedCoupon(couponId, couponId, "PRODUCT", issuer, target, productId, sellerId, discountType, value, max, min)
+    }
+
+    fun cart(couponId: Long, discountType: String = "RATE", value: Long = 1_000, max: Long? = 5_000, min: Long? = null) {
+        coupons[couponId] = ReservedCoupon(couponId, couponId, "CART", "PLATFORM", "NONE", null, null, discountType, value, max, min)
+    }
+
+    private fun lookup(couponIds: Collection<Long>): Map<Long, ReservedCoupon> = couponIds.associateWith {
+        coupons[it] ?: throw DomainException(ErrorCode.COUPON_NOT_FOUND)
+    }
+
+    override fun quote(memberId: Long, couponIds: Collection<Long>): BenefitReservation {
+        val found = lookup(couponIds)
+        if (couponIds.any { it in used }) throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+        return BenefitReservation(found, balance, policy)
+    }
+
+    override fun reserve(memberId: Long, couponIds: Collection<Long>): BenefitReservation {
+        calls += "reserve"
+        val found = lookup(couponIds)
+        if (couponIds.any { it in used }) throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+        used += couponIds
+        reserved += couponIds.toSet()
+        return BenefitReservation(found, balance, policy)
+    }
+
+    override fun commit(memberId: Long, orderId: Long, couponIds: Collection<Long>, pointsToUse: Long) {
+        calls += "commit"
+        if (balance < pointsToUse) throw DomainException(ErrorCode.POINT_INSUFFICIENT)
+        balance -= pointsToUse
+        committed += Commit(memberId, orderId, couponIds.toSet(), pointsToUse)
+    }
+}
+
+/** revertAll·revertItem 호출을 기록한다. [events] 를 [FakeStockManager] 와 공유하면 호출 순서를 확인할 수 있다. */
+class FakeBenefitReverter(val events: MutableList<String> = mutableListOf()) : BenefitReverter {
+    data class RevertAll(val orderId: Long, val memberId: Long, val couponIds: Set<Long>, val pointsUsed: Long)
+    data class RevertItem(
+        val orderId: Long, val memberId: Long, val orderItemId: Long, val pointsRefund: Long, val productCouponId: Long?, val cartCouponId: Long?,
+    )
+
+    val revertAllCalls = mutableListOf<RevertAll>()
+    val revertItemCalls = mutableListOf<RevertItem>()
+
+    override fun revertAll(orderId: Long, memberId: Long, couponIds: Collection<Long>, pointsUsed: Long) {
+        revertAllCalls += RevertAll(orderId, memberId, couponIds.toSet(), pointsUsed)
+        events += "revertAll"
+    }
+
+    override fun revertItem(orderId: Long, memberId: Long, orderItemId: Long, pointsRefund: Long, productCouponId: Long?, cartCouponId: Long?) {
+        revertItemCalls += RevertItem(orderId, memberId, orderItemId, pointsRefund, productCouponId, cartCouponId)
+        events += "revertItem"
+    }
+}
+
+/** earnForPurchase 호출을 기록한다. 적립 값은 1%(버림)로 흉내 낸다. */
+class FakePointEarner : PointEarner {
+    data class Earn(val memberId: Long, val sellerOrderId: Long, val paidAmount: Long)
+
+    val calls = mutableListOf<Earn>()
+
+    override fun earnForPurchase(memberId: Long, sellerOrderId: Long, paidAmount: Long): Long {
+        calls += Earn(memberId, sellerOrderId, paidAmount)
+        return paidAmount / 100
     }
 }

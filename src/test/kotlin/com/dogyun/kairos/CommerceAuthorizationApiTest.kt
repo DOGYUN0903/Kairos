@@ -201,4 +201,65 @@ class CommerceAuthorizationApiTest : CommerceTestSupport() {
         postIdem("/api/v1/payments/confirm", null, mapOf("orderNo" to "x", "paymentKey" to "k", "amount" to 1))
             .andExpect { status { isUnauthorized() } }
     }
+
+    @Test
+    fun 판매자_토큰으로_관리자_쿠폰_정책_API는_403() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        postIdem("/api/v1/admin/coupons/policies", sellerToken, couponPolicyBody()).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/coupons/policies", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/coupons/policies/1/end", sellerToken).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/members/1/points", sellerToken).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 일반_회원의_판매자_쿠폰_정책과_판매자_후기_API는_403() {
+        val token = newUserToken()
+        postIdem("/api/v1/seller/coupons/policies", token, couponPolicyBody()).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/coupons/policies", token).andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/coupons/policies/1/end", token).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/reviews", token).andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/reviews/1/reply", token, mapOf("content" to "감사합니다")).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 다른_회원의_후기_수정_삭제는_404() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val owner = newUserToken()
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)))
+        val skuId = skuIdsOf(sellerToken, productId).first()
+        val order = confirmedOrder(owner, sellerToken, listOf(skuId to 1), 11000)
+        val orderId = order.get("orderId").asLong()
+        val itemId = order.get("sellerOrders").get(0).get("items").get(0).get("orderItemId").asLong()
+        val reviewId = writeReview(owner, orderId, itemId)
+
+        val other = newUserToken()
+        patch("/api/v1/reviews/$reviewId", other, mapOf("rating" to 1, "content" to "열 글자 이상 되는 수정 본문입니다", "imageFileIds" to emptyList<Long>()))
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("REVIEW_NOT_FOUND") } }
+        delete("/api/v1/reviews/$reviewId", other)
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("REVIEW_NOT_FOUND") } }
+    }
+
+    @Test
+    fun 비로그인_쿠폰_발급_포인트_조회_좋아요_후기_작성은_401() {
+        postIdem("/api/v1/coupons/policies/1/claim", null, null).andExpect { status { isUnauthorized() } }
+        get("/api/v1/coupons/me").andExpect { status { isUnauthorized() } }
+        get("/api/v1/points/me").andExpect { status { isUnauthorized() } }
+        get("/api/v1/points/me/transactions").andExpect { status { isUnauthorized() } }
+        put("/api/v1/products/1/like").andExpect { status { isUnauthorized() } }
+        delete("/api/v1/products/1/like").andExpect { status { isUnauthorized() } }
+        get("/api/v1/products/me/likes").andExpect { status { isUnauthorized() } }
+        postIdem("/api/v1/orders/1/items/1/reviews", null, mapOf("rating" to 5, "content" to "열 글자 이상 되는 후기 본문입니다"))
+            .andExpect { status { isUnauthorized() } }
+        get("/api/v1/reviews/me").andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun 비로그인_상품_후기_목록은_200() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)))
+        get("/api/v1/products/$productId/reviews").andExpect { status { isOk() } }
+    }
 }

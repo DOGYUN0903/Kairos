@@ -69,6 +69,25 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     PAYMENT_REJECTED(402, "결제가 승인되지 않았습니다."),
     PAYMENT_CANCEL_FAILED(409, "결제 취소에 실패했습니다."),
 
+    COUPON_POLICY_INVALID(400, "쿠폰 정책 값이 올바르지 않습니다."),
+    COUPON_POLICY_NOT_FOUND(404, "쿠폰 정책을 찾을 수 없습니다."),
+    COUPON_POLICY_ENDED(409, "종료되었거나 발급 기간이 아닌 쿠폰 정책입니다."),
+    COUPON_SOLD_OUT(409, "쿠폰이 모두 소진되었습니다."),
+    COUPON_ALREADY_ISSUED(409, "이미 발급받은 쿠폰입니다."),
+    COUPON_NOT_FOUND(404, "쿠폰을 찾을 수 없습니다."),
+    COUPON_NOT_AVAILABLE(409, "사용할 수 없는 쿠폰입니다. 이미 사용되었거나 만료되었습니다."),
+    COUPON_NOT_APPLICABLE(400, "이 주문에 적용할 수 없는 쿠폰입니다."),
+    COUPON_MIN_AMOUNT_NOT_MET(400, "쿠폰의 최소 주문 금액을 채우지 못했습니다."),
+
+    POINT_INVALID_AMOUNT(400, "포인트는 0 이상 10P 단위로 사용할 수 있습니다."),
+    POINT_EXCEEDS_LIMIT(400, "포인트 사용 한도를 초과했거나 사용 가능 잔액에 못 미칩니다."),
+    POINT_INSUFFICIENT(409, "포인트 잔액이 부족합니다."),
+
+    REVIEW_INVALID(400, "후기 정보가 올바르지 않습니다."),
+    REVIEW_NOT_ELIGIBLE(409, "후기를 작성할 수 없는 주문 항목입니다."),
+    REVIEW_ALREADY_WRITTEN(409, "이미 후기를 작성한 주문 항목입니다."),
+    REVIEW_NOT_FOUND(404, "후기를 찾을 수 없습니다."),
+
     IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
     IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
     IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),

@@ -17,6 +17,11 @@ class Order(
     val freeShippingApplied: Boolean,
     shippingFeeRecovered: Long,
     refundedAmount: Long,
+    val productCouponDiscount: Long,
+    val cartCouponId: Long?,
+    val cartCouponDiscount: Long,
+    val pointsUsed: Long,
+    pointsRefunded: Long,
     val expiresAt: LocalDateTime,
     paidAt: LocalDateTime?,
     val sellerOrders: List<SellerOrder>,
@@ -32,9 +37,14 @@ class Order(
         private set
     var paidAt: LocalDateTime? = paidAt
         private set
+    var pointsRefunded: Long = pointsRefunded
+        private set
 
     val allItems: List<OrderItem> get() = sellerOrders.flatMap { it.items }
     val remainingItemsAmount: Long get() = sellerOrders.sumOf { it.remainingItemsAmount }
+    /** 아직 취소되지 않은(ORDERED) 항목이 실제로 낸 금액 합계. 배송비는 포함하지 않는다. */
+    val remainingPaidAmount: Long get() = allItems.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.paidAmount }
+    val allItemsCanceled: Boolean get() = allItems.all { it.status == OrderItemStatus.CANCELED }
     val remainingBuyerShippingFee: Long
         get() = sellerOrders
             .filter { it.status != SellerOrderStatus.CANCELED && it.shippingFeePayer == ShippingFeePayer.BUYER }
@@ -43,6 +53,9 @@ class Order(
     /** SKU별 수량 합계, SKU ID 오름차순(재고 복구 순서). */
     val skuQuantities: List<Pair<Long, Int>>
         get() = allItems.groupBy { it.skuId }.map { (sku, items) -> sku to items.sumOf { it.quantity } }.sortedBy { it.first }
+
+    /** 이 주문이 쓴 쿠폰(상품 쿠폰 + 장바구니 쿠폰) ID. */
+    fun usedCouponIds(): List<Long> = allItems.mapNotNull { it.productCouponId } + listOfNotNull(cartCouponId)
 
     fun findItem(itemId: Long): OrderItem =
         allItems.firstOrNull { it.id == itemId } ?: throw DomainException(ErrorCode.ORDER_ITEM_NOT_FOUND)
@@ -84,8 +97,9 @@ class Order(
         val item = findItem(itemId)
         if (item.status != OrderItemStatus.CANCEL_REQUESTED) throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         if (plan != item.toRefundPlan()) throw DomainException(ErrorCode.ORDER_INVALID)
-        item.confirmCancel(now)
+        item.confirmCancel(now, plan.pointsRefund)
         refundedAmount += plan.refundAmount
+        pointsRefunded += plan.pointsRefund
         shippingFeeRecovered += plan.shippingFeeDeducted - plan.shippingFeeReturned
         val sellerOrder = sellerOrderOf(itemId)
         if (sellerOrder.items.all { it.status == OrderItemStatus.CANCELED }) sellerOrder.cancel()
@@ -124,6 +138,7 @@ class Order(
             orderNo: String,
             memberId: Long,
             lines: List<OrderLine>,
+            allocation: DiscountAllocation,
             address: ShippingAddress,
             policy: ShippingPolicy,
             now: LocalDateTime,
@@ -134,6 +149,8 @@ class Order(
                 throw DomainException(ErrorCode.ORDER_INVALID)
             }
             if (lines.map { it.skuId }.toSet().size != lines.size) throw DomainException(ErrorCode.ORDER_INVALID)
+
+            if (allocation.lines.keys != lines.map { it.skuId }.toSet()) throw DomainException(ErrorCode.ORDER_INVALID)
 
             val itemsAmount = lines.sumOf { (it.salePrice + it.extraPrice) * it.quantity }
             val free = itemsAmount >= policy.freeShippingThreshold
@@ -154,22 +171,32 @@ class Order(
                     deliveredAt = null,
                     confirmedAt = null,
                     items = sellerLines.map {
+                        val a = allocation.lines.getValue(it.skuId)
+                        val lineAmount = (it.salePrice + it.extraPrice) * it.quantity
+                        val paid = lineAmount - a.productCouponDiscount - a.cartCouponAllocated - a.pointsAllocated
+                        if (paid < 0) throw DomainException(ErrorCode.ORDER_INVALID)
                         OrderItem(
                             id = null, skuId = it.skuId, productId = it.productId, productName = it.productName,
                             brandName = it.brandName, optionDisplayName = it.optionDisplayName, salePrice = it.salePrice,
                             extraPrice = it.extraPrice, quantity = it.quantity, status = OrderItemStatus.ORDERED,
                             cancelActor = null, cancelReason = null, refundAmount = 0, shippingFeeDeducted = 0,
                             shippingFeeReturned = 0, canceledAt = null,
+                            productCouponId = a.productCouponId, productCouponDiscount = a.productCouponDiscount,
+                            productCouponIssuer = a.productCouponIssuer, cartCouponAllocated = a.cartCouponAllocated,
+                            pointsAllocated = a.pointsAllocated, paidAmount = paid, pointsRefunded = 0,
                         )
                     },
                 )
             }
+            val paidItems = sellerOrders.sumOf { so -> so.items.sumOf { it.paidAmount } }
             val buyerShippingFee = sellerOrders.filter { it.shippingFeePayer == ShippingFeePayer.BUYER }.sumOf { it.shippingFee }
             return Order(
                 id = null, orderNo = orderNo, memberId = memberId, status = OrderStatus.PENDING_PAYMENT,
                 shippingAddress = address, itemsAmount = itemsAmount, buyerShippingFee = buyerShippingFee,
-                totalAmount = itemsAmount + buyerShippingFee, freeShippingApplied = free, shippingFeeRecovered = 0,
-                refundedAmount = 0, expiresAt = now.plus(paymentTtl), paidAt = null, sellerOrders = sellerOrders,
+                totalAmount = paidItems + buyerShippingFee, freeShippingApplied = free, shippingFeeRecovered = 0,
+                refundedAmount = 0, productCouponDiscount = allocation.productCouponDiscount,
+                cartCouponId = allocation.cartCouponId, cartCouponDiscount = allocation.cartCouponDiscount,
+                pointsUsed = allocation.pointsUsed, pointsRefunded = 0, expiresAt = now.plus(paymentTtl), paidAt = null, sellerOrders = sellerOrders,
                 createdAt = null,
             )
         }
@@ -186,13 +213,19 @@ class Order(
             freeShippingApplied: Boolean,
             shippingFeeRecovered: Long,
             refundedAmount: Long,
+            productCouponDiscount: Long,
+            cartCouponId: Long?,
+            cartCouponDiscount: Long,
+            pointsUsed: Long,
+            pointsRefunded: Long,
             expiresAt: LocalDateTime,
             paidAt: LocalDateTime?,
             sellerOrders: List<SellerOrder>,
             createdAt: LocalDateTime?,
         ) = Order(
             id, orderNo, memberId, status, shippingAddress, itemsAmount, buyerShippingFee, totalAmount,
-            freeShippingApplied, shippingFeeRecovered, refundedAmount, expiresAt, paidAt, sellerOrders, createdAt,
+            freeShippingApplied, shippingFeeRecovered, refundedAmount, productCouponDiscount, cartCouponId,
+            cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, paidAt, sellerOrders, createdAt,
         )
     }
 }

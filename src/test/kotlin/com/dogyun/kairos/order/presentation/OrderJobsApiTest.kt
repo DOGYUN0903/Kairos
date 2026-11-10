@@ -27,6 +27,8 @@ class OrderJobsApiTest : CommerceTestSupport() {
     @Autowired private lateinit var purchaseAutoConfirmService: PurchaseAutoConfirmService
     @Autowired private lateinit var pgClient: PgClient
     @Autowired private lateinit var clock: Clock
+    @Autowired private lateinit var benefitReverter: com.dogyun.kairos.order.application.BenefitReverter
+    @Autowired private lateinit var tx: com.dogyun.kairos.order.application.TransactionRunner
 
     private class Shop(val sellerToken: String, val productId: Long, val skuId: Long)
 
@@ -269,6 +271,88 @@ class OrderJobsApiTest : CommerceTestSupport() {
 
         assertEquals("CONFIRMED", sellerOrderStatus(soId))
         assertEquals("COMPLETED", orderStatus(orderId))
+    }
+
+    // ---- C3: 결제 전 닫힘의 쿠폰·포인트 되돌림 ----
+
+    private class BenefitPlaced(val user: String, val memberId: Long, val couponId: Long, val placed: Placed)
+
+    /** 8,000원 한 개 + 배송비 3,000원에 2,000원 쿠폰과 포인트 1,000(잔액 10,000) → 8,000원. 결제는 하지 않는다. */
+    private fun placeWithBenefits(): BenefitPlaced {
+        val shop = shop()
+        val user = newUserToken()
+        val memberId = memberIdOf(user)
+        grantPoints(memberId, 10_000)
+        val couponId = claimCoupon(user, adminCouponPolicy(couponPolicyBody()))
+        val total = 8_000L
+        val orderNo = json(
+            placeOrder(user, listOf(shop.skuId to 1), total, productCoupons = listOf(shop.skuId to couponId), pointsToUse = 1_000)
+                .andExpect { status { isCreated() } },
+        ).get("data").get("orderNo").asString()
+        val orderId = jdbcTemplate.queryForObject("select id from orders where order_no = ?", Long::class.java, orderNo)!!
+        assertEquals(9_000L, pointBalance(memberId))
+        assertEquals("USED", myCouponStatuses(user).getValue(couponId))
+        return BenefitPlaced(user, memberId, couponId, Placed(orderNo, orderId, total))
+    }
+
+    private fun assertBenefitsReturned(f: BenefitPlaced) {
+        assertEquals("CANCELED", orderStatus(f.placed.orderId))
+        assertEquals("AVAILABLE", myCouponStatuses(f.user).getValue(f.couponId))
+        assertEquals(10_000L, pointBalance(f.memberId))
+        assertEquals(pointBalance(f.memberId), lotRemainingSum(f.memberId))
+        assertEquals(1, pointTransactionCount(f.memberId, "REFUND"))
+    }
+
+    @Test
+    fun 결제_만료되면_쿠폰과_포인트가_돌아온다() {
+        val f = placeWithBenefits()
+        pastExpiry(f.placed.orderId)
+
+        assertEquals(1, expiryService.expirePendingOrders())
+
+        assertBenefitsReturned(f)
+    }
+
+    @Test
+    fun fail_키_승인_거절에서_쿠폰과_포인트가_돌아온다() {
+        val f = placeWithBenefits()
+
+        confirmPayment(f.user, f.placed.orderNo, key("fail"), f.placed.total).andExpect { status { isEqualTo(402) } }
+
+        assertBenefitsReturned(f)
+    }
+
+    @Test
+    fun 금액_불일치_void에서_쿠폰과_포인트가_돌아온다() {
+        val f = placeWithBenefits()
+        val payKey = key("pay")
+        // PG 에 다른 금액(1,000원)으로 승인된 결제가 이미 있게 해 승인 응답 금액이 주문과 다르게 한다.
+        pgClient.confirm(payKey, f.placed.orderNo, 1_000)
+
+        confirmPayment(f.user, f.placed.orderNo, payKey, f.placed.total).andExpect { status { isEqualTo(402) } }
+
+        assertEquals("CANCELED", ((pgClient.find(payKey) as PgResult.Done).payment.status).name)
+        assertBenefitsReturned(f)
+    }
+
+    @Test
+    fun 같은_주문의_되돌림을_두_번_실행해도_원장_REFUND는_한_건이다() {
+        val f = placeWithBenefits()
+        pastExpiry(f.placed.orderId)
+
+        assertEquals(1, expiryService.expirePendingOrders())
+        assertEquals(0, expiryService.expirePendingOrders())
+        // 주문 상태 확인을 건너뛰고 되돌림 자체를 한 번 더 실행해도 원장 UNIQUE 가 막는다.
+        tx.run { benefitReverter.revertAll(f.placed.orderId, f.memberId, listOf(f.couponId), 1_000) }
+
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                "select count(*) from point_transaction where transaction_type = 'REFUND' and ref_type = 'ORDER' and ref_id = ?",
+                Int::class.java, f.placed.orderId,
+            ),
+        )
+        assertBenefitsReturned(f)
     }
 
     private fun <T> runConcurrently(count: Int, task: (Int) -> T): List<T> {

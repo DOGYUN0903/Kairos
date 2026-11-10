@@ -43,10 +43,19 @@ class OrderEntity(
     val freeShippingApplied: Boolean,
     @Column(name = "expires_at", nullable = false, updatable = false)
     val expiresAt: LocalDateTime,
+    @Column(name = "product_coupon_discount", nullable = false, updatable = false)
+    val productCouponDiscount: Long,
+    @Column(name = "cart_coupon_id", updatable = false)
+    val cartCouponId: Long?,
+    @Column(name = "cart_coupon_discount", nullable = false, updatable = false)
+    val cartCouponDiscount: Long,
+    @Column(name = "points_used", nullable = false, updatable = false)
+    val pointsUsed: Long,
     orderStatus: OrderStatus,
     shippingFeeRecovered: Long,
     refundedAmount: Long,
     paidAt: LocalDateTime?,
+    pointsRefunded: Long,
 ) : BaseEntity() {
 
     @Id
@@ -71,7 +80,18 @@ class OrderEntity(
     var paidAt: LocalDateTime? = paidAt
         protected set
 
-    fun change(orderStatus: OrderStatus, shippingFeeRecovered: Long, refundedAmount: Long, paidAt: LocalDateTime?) {
+    @Column(name = "points_refunded", nullable = false)
+    var pointsRefunded: Long = pointsRefunded
+        protected set
+
+    fun change(
+        orderStatus: OrderStatus,
+        shippingFeeRecovered: Long,
+        refundedAmount: Long,
+        paidAt: LocalDateTime?,
+        pointsRefunded: Long,
+    ) {
+        this.pointsRefunded = pointsRefunded
         this.orderStatus = orderStatus
         this.shippingFeeRecovered = shippingFeeRecovered
         this.refundedAmount = refundedAmount

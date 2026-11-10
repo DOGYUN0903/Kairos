@@ -25,8 +25,14 @@ class OrderServiceTest {
     private val sellerReader = FakeSellerReader()
     private val stockManager = FakeStockManager()
     private val paymentGateway = FakePaymentGateway()
+    private val benefitApplier = FakeBenefitApplier()
+    private val cartItemRemover = FakeCartItemRemover()
+    private val paymentService = OrderPaymentService(
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), cartItemRemover, InlineTransactionRunner(), clock,
+    )
     private val service = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, OrderProperties(), clock, Random(7),
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, paymentService,
+        OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
@@ -150,5 +156,155 @@ class OrderServiceTest {
 
         assertEquals(5, stockManager.stock[10L])
         assertEquals(emptyList(), orderRepository.all)
+    }
+
+    // ---- C3: 쿠폰·포인트 (스펙 6장 예시: 판매자 1 의 31 = 30,000 x1, 판매자 2 의 32 = 20,000 x2) ----
+
+    private fun spec6Fixture() {
+        productReader.put(31L, sellerId = 1L, salePrice = 30_000)
+        productReader.put(32L, sellerId = 2L, salePrice = 20_000)
+        stockManager.stock[31L] = 5
+        stockManager.stock[32L] = 5
+        benefitApplier.product(501L, issuer = "PLATFORM", value = 2_000)
+        benefitApplier.product(502L, issuer = "SELLER", target = "SELLER", sellerId = 2L, discountType = "RATE", value = 1_000, max = 5_000)
+        benefitApplier.cart(503L, value = 1_000, max = 5_000, min = 50_000)
+        benefitApplier.balance = 20_000
+    }
+
+    private fun spec6Command(
+        expected: Long = 49_000,
+        productCoupons: List<ProductCouponCommand> = listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 502L)),
+        cartCouponId: Long? = 503L,
+        points: Long = 10_000,
+    ) = PlaceOrderCommand(
+        listOf(OrderItemCommand(31L, 1), OrderItemCommand(32L, 2)), expected, address, productCoupons, cartCouponId, points,
+    )
+
+    @Test
+    fun 쿠폰과_포인트를_쓰면_reserve_commit_순서로_호출되고_totalAmount는_paidAmount_합이다() {
+        spec6Fixture()
+
+        val result = service.place(7L, spec6Command())
+
+        assertEquals(listOf("reserve", "commit"), benefitApplier.calls)
+        assertEquals(listOf(setOf(501L, 502L, 503L)), benefitApplier.reserved)
+        assertEquals(listOf(FakeBenefitApplier.Commit(7L, result.orderId, setOf(501L, 502L, 503L), 10_000)), benefitApplier.committed)
+        val order = orderRepository.findById(result.orderId)!!
+        assertEquals(49_000L, order.totalAmount)
+        assertEquals(49_000L, result.totalAmount)
+        assertEquals(order.allItems.sumOf { it.paidAmount }, order.totalAmount)
+        assertEquals(mapOf(31L to 21_438L, 32L to 27_562L), order.allItems.associate { it.skuId to it.paidAmount })
+        assertEquals(6_000L, order.productCouponDiscount)
+        assertEquals(5_000L, order.cartCouponDiscount)
+        assertEquals(10_000L, order.pointsUsed)
+        assertEquals("PENDING_PAYMENT", result.orderStatus)
+        assertEquals("READY", result.paymentStatus)
+        assertEquals(49_000L, paymentGateway.get(result.orderId).amount)
+    }
+
+    @Test
+    fun 같은_쿠폰_ID를_두_번_지정하면_ORDER_INVALID이고_쿠폰은_AVAILABLE_그대로다() {
+        spec6Fixture()
+
+        assertError(ErrorCode.ORDER_INVALID) {
+            service.place(7L, spec6Command(productCoupons = listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 501L))))
+        }
+        assertError(ErrorCode.ORDER_INVALID) {
+            service.place(7L, spec6Command(productCoupons = listOf(ProductCouponCommand(31L, 503L))))
+        }
+        assertError(ErrorCode.ORDER_INVALID) {
+            service.place(7L, spec6Command(productCoupons = listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(31L, 502L))))
+        }
+
+        assertEquals(emptyList(), benefitApplier.reserved)
+        assertEquals(emptySet(), benefitApplier.used)
+    }
+
+    @Test
+    fun 항목에_없는_skuId에_쿠폰을_지정하면_ORDER_INVALID() {
+        spec6Fixture()
+
+        assertError(ErrorCode.ORDER_INVALID) {
+            service.place(7L, spec6Command(productCoupons = listOf(ProductCouponCommand(10L, 501L))))
+        }
+        assertEquals(emptyList(), benefitApplier.reserved)
+    }
+
+    @Test
+    fun 예상_총액이_다르면_ORDER_PRICE_CHANGED이고_commit과_재고_차감은_없다() {
+        spec6Fixture()
+
+        assertError(ErrorCode.ORDER_PRICE_CHANGED) { service.place(7L, spec6Command(expected = 50_000)) }
+
+        assertEquals(emptyList(), benefitApplier.committed)
+        assertEquals(emptyList(), stockManager.calls)
+        assertEquals(emptyList(), orderRepository.all)
+    }
+
+    @Test
+    fun 재고_부족이면_STOCK_SOLD_OUT이고_commit은_없다() {
+        spec6Fixture()
+        stockManager.stock[32L] = 1
+
+        assertError(ErrorCode.STOCK_SOLD_OUT) { service.place(7L, spec6Command()) }
+
+        assertEquals(emptyList(), benefitApplier.committed)
+        assertEquals(emptyList(), orderRepository.all)
+    }
+
+    @Test
+    fun `0원_주문은_place_뒤_approveWithoutPg가_불려_PAID_APPROVED다`() {
+        spec6Fixture()
+        benefitApplier.product(601L, value = 30_000)
+        benefitApplier.product(602L, value = 40_000)
+
+        val result = service.place(
+            7L, spec6Command(expected = 0, productCoupons = listOf(ProductCouponCommand(31L, 601L), ProductCouponCommand(32L, 602L)), cartCouponId = null, points = 0),
+        )
+
+        assertEquals(0L, result.totalAmount)
+        assertEquals("PAID", result.orderStatus)
+        assertEquals("APPROVED", result.paymentStatus)
+        val order = orderRepository.findById(result.orderId)!!
+        assertEquals(OrderStatus.PAID, order.status)
+        assertEquals(now, order.paidAt)
+        val payment = paymentGateway.get(result.orderId)
+        assertEquals("APPROVED", payment.status)
+        assertEquals(null, payment.paymentKey)
+        assertEquals(emptyList(), paymentGateway.confirmCalls)
+        assertEquals(mapOf(131L to 1, 132L to 2), stockManager.sales)
+        assertEquals(listOf(7L to setOf(31L, 32L)), cartItemRemover.removed)
+    }
+
+    @Test
+    fun quote는_저장하지_않고_maxUsablePoints를_준다() {
+        spec6Fixture()
+
+        val quote = service.quote(
+            7L,
+            QuoteOrderCommand(
+                listOf(OrderItemCommand(31L, 1), OrderItemCommand(32L, 2)),
+                listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 502L)), 503L, 10_000,
+            ),
+        )
+
+        assertEquals(70_000L, quote.itemsAmount)
+        assertEquals(6_000L, quote.productCouponDiscount)
+        assertEquals(5_000L, quote.cartCouponDiscount)
+        assertEquals(10_000L, quote.pointsUsed)
+        assertEquals(0L, quote.buyerShippingFee)
+        assertEquals(49_000L, quote.totalAmount)
+        assertEquals(17_700L, quote.maxUsablePoints)
+        assertEquals(
+            listOf(
+                QuoteLine(31L, 1, 30_000, 2_000, 2_187, 4_375, 21_438),
+                QuoteLine(32L, 2, 40_000, 4_000, 2_813, 5_625, 27_562),
+            ),
+            quote.items,
+        )
+        assertEquals(emptyList(), orderRepository.all)
+        assertEquals(emptyList(), benefitApplier.reserved)
+        assertEquals(emptyList(), benefitApplier.committed)
+        assertEquals(emptyList(), stockManager.calls)
     }
 }

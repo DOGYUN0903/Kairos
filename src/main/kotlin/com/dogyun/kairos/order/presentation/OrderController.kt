@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.security.LoginMember
 import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.order.application.OrderCancelService
 import com.dogyun.kairos.order.application.OrderDetail
+import com.dogyun.kairos.order.application.OrderQuote
 import com.dogyun.kairos.order.application.OrderQueryService
 import com.dogyun.kairos.order.application.OrderShippingService
 import com.dogyun.kairos.order.application.OrderService
@@ -37,6 +38,13 @@ class OrderController(
         @Valid @RequestBody request: CreateOrderRequest,
     ): ResponseEntity<ApiResponse<CreateOrderResponse>> =
         ApiResponse.created(CreateOrderResponse.from(orderService.place(loginMember.id, request.toCommand())))
+
+    /** 쿠폰·포인트 조합의 금액 미리보기. 상태를 바꾸지 않으므로 `Idempotency-Key` 가 없다. */
+    @PostMapping("/quote")
+    fun quote(
+        @AuthenticationPrincipal loginMember: LoginMember,
+        @Valid @RequestBody request: QuoteOrderRequest,
+    ): ResponseEntity<ApiResponse<OrderQuote>> = ApiResponse.ok(orderService.quote(loginMember.id, request.toCommand()))
 
     @GetMapping
     fun listMine(

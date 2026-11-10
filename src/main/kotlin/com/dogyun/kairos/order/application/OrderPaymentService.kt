@@ -49,6 +49,7 @@ class OrderPaymentService(
     private val orderRepository: OrderRepository,
     private val paymentGateway: PaymentGateway,
     private val stockManager: StockManager,
+    private val benefitReverter: BenefitReverter,
     private val cartItemRemover: CartItemRemover,
     private val tx: TransactionRunner,
     private val clock: Clock,
@@ -138,6 +139,10 @@ class OrderPaymentService(
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
         val orderId = requireNotNull(order.id)
         val payment = paymentGateway.get(orderId)
+        // 0원 주문은 PG 없이 이미 승인됐다(paymentKey 없음). 결제창에서 다시 승인을 보내도 그 결과를 돌려준다(스펙 7-1).
+        if (payment.paymentKey == null && payment.status == "APPROVED" && order.status == OrderStatus.PAID) {
+            return Claim.Done(resultOf(order, payment))
+        }
         val sameKey = payment.paymentKey == cmd.paymentKey
         if (sameKey && (payment.status == "APPROVED" || payment.status == "UNKNOWN")) return Claim.Done(resultOf(order, payment))
         // 다른 키여도 선점된 결제가 PG 결과를 기다리는 중이거나 대사 대기 중이므로 새 승인을 시작하지 않는다.
@@ -162,19 +167,16 @@ class OrderPaymentService(
 
         when (verdict) {
             PgVerdict.APPROVE -> {
-                order.markPaid(LocalDateTime.now(clock))
-                orderRepository.save(order)
                 paymentGateway.approve(orderId)
-                stockManager.increaseSales(order.allItems.groupBy { it.productId }.map { (productId, items) ->
-                    ProductQuantity(productId, items.sumOf { it.quantity })
-                })
-                cartItemRemover.removeBySkuIds(order.memberId, order.allItems.map { it.skuId }.toSet())
+                applyApproval(order)
                 ApprovalFinish.PAID
             }
             PgVerdict.REJECT, PgVerdict.VOID_THEN_REJECT -> {
                 paymentGateway.fail(orderId, failReason)
                 order.cancelForPaymentFailure()
                 orderRepository.save(order)
+                // 쿠폰·포인트를 재고보다 먼저 되돌린다(락 순서: orders → member_point → coupon → sku).
+                benefitReverter.revertAll(orderId, order.memberId, order.usedCouponIds(), order.pointsUsed)
                 stockManager.restore(order.skuQuantities.map { (skuId, quantity) -> SkuQuantity(skuId, quantity) })
                 ApprovalFinish.REJECTED
             }
@@ -183,6 +185,31 @@ class OrderPaymentService(
                 ApprovalFinish.UNKNOWN
             }
         }
+    }
+
+    /**
+     * 0원 주문의 승인 확정(ADR 0004). 주문 생성 트랜잭션이 커밋된 뒤 불린다. 주문 행 락 아래에서 결제가 `READY`·0원이고
+     * 주문이 `PENDING_PAYMENT` 일 때만 PG 없이 승인하고 PG 승인과 같은 마무리([applyApproval])를 한다. 아니면 [ApprovalFinish.ALREADY_SETTLED].
+     */
+    fun approveWithoutPg(orderId: Long): ApprovalFinish = tx.run {
+        val order = orderRepository.findByIdForUpdate(orderId) ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
+        val payment = paymentGateway.get(orderId)
+        if (payment.status != "READY" || payment.amount != 0L || order.status != OrderStatus.PENDING_PAYMENT) {
+            return@run ApprovalFinish.ALREADY_SETTLED
+        }
+        paymentGateway.approveWithoutPg(orderId)
+        applyApproval(order)
+        ApprovalFinish.PAID
+    }
+
+    /** 승인 뒤 처리: 주문 PAID·paidAt, 판매량 증가, 장바구니 항목 삭제. PG 승인과 0원 승인이 같은 단계를 쓴다. 주문 행 락 아래에서 부른다. */
+    private fun applyApproval(order: Order) {
+        order.markPaid(LocalDateTime.now(clock))
+        orderRepository.save(order)
+        stockManager.increaseSales(order.allItems.groupBy { it.productId }.map { (productId, items) ->
+            ProductQuantity(productId, items.sumOf { it.quantity })
+        })
+        cartItemRemover.removeBySkuIds(order.memberId, order.allItems.map { it.skuId }.toSet())
     }
 
     /** 다른 흐름이 먼저 끝낸 결제의 현재 상태를 응답으로 바꾼다. */

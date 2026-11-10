@@ -2,6 +2,7 @@ package com.dogyun.kairos.order.infrastructure
 
 import com.dogyun.kairos.common.infrastructure.BaseEntity
 import com.dogyun.kairos.order.domain.CancelActor
+import com.dogyun.kairos.order.domain.CouponIssuer
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -48,6 +49,20 @@ class OrderItemEntity(
     shippingFeeDeducted: Long,
     shippingFeeReturned: Long,
     canceledAt: LocalDateTime?,
+    @Column(name = "product_coupon_id", updatable = false)
+    val productCouponId: Long?,
+    @Column(name = "product_coupon_discount", nullable = false, updatable = false)
+    val productCouponDiscount: Long,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "product_coupon_issuer", updatable = false, length = 20)
+    val productCouponIssuer: CouponIssuer?,
+    @Column(name = "cart_coupon_allocated", nullable = false, updatable = false)
+    val cartCouponAllocated: Long,
+    @Column(name = "points_allocated", nullable = false, updatable = false)
+    val pointsAllocated: Long,
+    @Column(name = "paid_amount", nullable = false, updatable = false)
+    val paidAmount: Long,
+    pointsRefunded: Long,
 ) : BaseEntity() {
 
     @Id
@@ -85,6 +100,10 @@ class OrderItemEntity(
     var canceledAt: LocalDateTime? = canceledAt
         protected set
 
+    @Column(name = "points_refunded", nullable = false)
+    var pointsRefunded: Long = pointsRefunded
+        protected set
+
     fun change(
         orderItemStatus: OrderItemStatus,
         cancelActor: CancelActor?,
@@ -93,7 +112,9 @@ class OrderItemEntity(
         shippingFeeDeducted: Long,
         shippingFeeReturned: Long,
         canceledAt: LocalDateTime?,
+        pointsRefunded: Long,
     ) {
+        this.pointsRefunded = pointsRefunded
         this.orderItemStatus = orderItemStatus
         this.cancelActor = cancelActor
         this.cancelReason = cancelReason

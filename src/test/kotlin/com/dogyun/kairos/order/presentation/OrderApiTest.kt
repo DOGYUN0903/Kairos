@@ -1,6 +1,7 @@
 package com.dogyun.kairos.order.presentation
 
 import com.dogyun.kairos.CommerceTestSupport
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.web.servlet.ResultActionsDsl
 import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
@@ -20,7 +21,7 @@ class OrderApiTest : CommerceTestSupport() {
     private fun shop(salePrice: Long = 8_000, stock: Int = 5): Shop {
         val token = newUserToken()
         approvedSeller(token)
-        val productId = onSaleProduct(token, approvedBrand(token), leafCategory(), listOf(uploadImage(token)), salePrice = salePrice, stock = stock)
+        val productId = onSaleProduct(token, approvedBrand(token), leafCategory(), listOf(uploadImage(token)), originalPrice = maxOf(10_000, salePrice), salePrice = salePrice, stock = stock)
         return Shop(token, productId, skuIdsOf(token, productId).sorted())
     }
 
@@ -182,6 +183,184 @@ class OrderApiTest : CommerceTestSupport() {
         statuses.filter { it.first != 201 }.forEach { assertEquals(409 to "STOCK_SOLD_OUT", it) }
         assertEquals(0, stockOf(a, a.skuIds[0]))
         assertEquals(3, orderCount())
+    }
+
+    // ---- C3: 쿠폰·포인트 ----
+
+    /** 스펙 6장 준비: 판매자 B 30,000 x1, 판매자 C 20,000 x2, 플랫폼 정액 2,000·C 의 판매자 정률 10%(최대 5,000)·장바구니 10%(최대 5,000, 최소 50,000), 포인트 20,000. */
+    private class Spec6(val user: String, val b: Shop, val c: Shop, val platformCoupon: Long, val sellerCoupon: Long, val cartCoupon: Long)
+
+    private fun spec6(): Spec6 {
+        val b = shop(salePrice = 30_000)
+        val c = shop(salePrice = 20_000)
+        val user = newUserToken()
+        val platform = adminCouponPolicy(couponPolicyBody())
+        val seller = sellerCouponPolicy(c.sellerToken, couponPolicyBody(targetType = "SELLER", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000))
+        val cart = adminCouponPolicy(
+            couponPolicyBody(couponType = "CART", targetType = "NONE", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000, minOrderAmount = 50_000),
+        )
+        grantPoints(memberIdOf(user), 20_000)
+        return Spec6(user, b, c, claimCoupon(user, platform), claimCoupon(user, seller), claimCoupon(user, cart))
+    }
+
+    private fun couponStatus(couponId: Long): String =
+        jdbcTemplate.queryForObject("select coupon_status from coupon where id = ?", String::class.java, couponId)!!
+
+    @Test
+    fun 스펙_6장_예시대로_주문하면_PG_금액이_49000이고_항목별_paidAmount가_21438_27562다() {
+        val f = spec6()
+        val bSku = f.b.skuIds[0]
+        val cSku = f.c.skuIds[0]
+
+        val placed = json(
+            placeOrder(
+                f.user, listOf(bSku to 1, cSku to 2), 49_000,
+                productCoupons = listOf(bSku to f.platformCoupon, cSku to f.sellerCoupon), cartCouponId = f.cartCoupon, pointsToUse = 10_000,
+            ).andExpect { status { isCreated() } },
+        ).get("data")
+        assertEquals(49_000L, placed.get("totalAmount").asLong())
+        assertEquals("PENDING_PAYMENT", placed.get("orderStatus").asString())
+        assertEquals("READY", placed.get("paymentStatus").asString())
+        val orderId = placed.get("orderId").asLong()
+
+        confirmPayment(f.user, placed.get("orderNo").asString(), "pay-${UUID.randomUUID()}", 49_000).andExpect { status { isOk() } }
+        val detail = json(get("/api/v1/orders/$orderId", f.user).andExpect { status { isOk() } }).get("data")
+        assertEquals(70_000L, detail.get("itemsAmount").asLong())
+        assertEquals(6_000L, detail.get("productCouponDiscount").asLong())
+        assertEquals(f.cartCoupon, detail.get("cartCouponId").asLong())
+        assertEquals(5_000L, detail.get("cartCouponDiscount").asLong())
+        assertEquals(10_000L, detail.get("pointsUsed").asLong())
+        assertEquals(49_000L, detail.get("totalAmount").asLong())
+        assertEquals(49_000L, detail.get("payment").get("amount").asLong())
+        assertEquals("APPROVED", detail.get("payment").get("status").asString())
+        val items = detail.get("sellerOrders").flatMap { it.get("items") }.associateBy { it.get("skuId").asLong() }
+        assertEquals(21_438L, items.getValue(bSku).get("paidAmount").asLong())
+        assertEquals(27_562L, items.getValue(cSku).get("paidAmount").asLong())
+        assertEquals(2_187L, items.getValue(bSku).get("cartCouponAllocated").asLong())
+        assertEquals(5_625L, items.getValue(cSku).get("pointsAllocated").asLong())
+        assertEquals("SELLER", items.getValue(cSku).get("productCouponIssuer").asString())
+        assertEquals(f.platformCoupon, items.getValue(bSku).get("productCouponId").asLong())
+
+        assertEquals(listOf("USED", "USED", "USED"), listOf(f.platformCoupon, f.sellerCoupon, f.cartCoupon).map(::couponStatus))
+        assertEquals(
+            3,
+            jdbcTemplate.queryForObject("select count(*) from coupon where used_order_id = ?", Int::class.java, orderId),
+        )
+        val memberId = memberIdOf(f.user)
+        assertEquals(10_000L, pointBalance(memberId))
+        assertEquals(10_000L, lotRemainingSum(memberId))
+    }
+
+    @Test
+    fun 같은_쿠폰으로_두_주문을_동시에_만들면_하나만_201이고_실패한_주문은_재고와_포인트까지_롤백된다() {
+        val a = shop(salePrice = 30_000)
+        val user = newUserToken()
+        val couponId = claimCoupon(user, adminCouponPolicy(couponPolicyBody()))
+        val memberId = memberIdOf(user)
+        grantPoints(memberId, 5_000)
+
+        // 30,000 - 쿠폰 2,000 - 포인트 1,000 + 배송비 3,000
+        val results = runConcurrently(2) {
+            val response = placeOrder(
+                user, listOf(a.skuIds[0] to 1), 30_000, productCoupons = listOf(a.skuIds[0] to couponId), pointsToUse = 1_000,
+            ).andReturn().response
+            response.status to (if (response.status == 201) "" else json(response).get("code").asString())
+        }
+
+        assertEquals(1, results.count { it.first == 201 })
+        assertEquals(listOf(409 to "COUPON_NOT_AVAILABLE"), results.filter { it.first != 201 })
+        assertEquals(1, orderCount())
+        assertEquals(4, stockOf(a, a.skuIds[0]))
+        assertEquals(4_000L, pointBalance(memberId))
+        assertEquals(4_000L, lotRemainingSum(memberId))
+        assertEquals("USED", couponStatus(couponId))
+    }
+
+    @Test
+    fun 잔액_1000P로_두_주문이_각_1000P를_동시에_쓰면_하나만_성공하고_잔액은_0이다() {
+        val a = shop(salePrice = 30_000)
+        val user = newUserToken()
+        val memberId = memberIdOf(user)
+        grantPoints(memberId, 1_000)
+
+        val results = runConcurrently(2) {
+            val response = placeOrder(user, listOf(a.skuIds[0] to 1), 32_000, pointsToUse = 1_000).andReturn().response
+            response.status to (if (response.status == 201) "" else json(response).get("code").asString())
+        }
+
+        assertEquals(1, results.count { it.first == 201 })
+        // 뒤에 락을 잡은 주문은 잔액 0 을 보므로 최소 사용 잔액(1,000P) 미달이다(스펙 5-3).
+        assertEquals(listOf(400 to "POINT_EXCEEDS_LIMIT"), results.filter { it.first != 201 })
+        assertEquals(1, orderCount())
+        assertEquals(4, stockOf(a, a.skuIds[0]))
+        assertEquals(0L, pointBalance(memberId))
+        assertEquals(0L, lotRemainingSum(memberId))
+    }
+
+    @Autowired
+    private lateinit var mockPgClient: com.dogyun.kairos.payment.infrastructure.MockPgClient
+
+    /** Mock PG 가 이 주문번호로 승인한 기록이 있는지. */
+    private fun pgApproved(orderNo: String): Boolean {
+        val field = mockPgClient.javaClass.getDeclaredField("payments").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val payments = field.get(mockPgClient) as Map<String, com.dogyun.kairos.payment.application.PgPayment>
+        return payments.values.any { it.pgOrderId == orderNo }
+    }
+
+    /** 50,000원 상품을 장바구니에 담고 50,000원 정액 쿠폰으로 0원 주문(무료배송)을 만든다. */
+    private fun zeroWonOrder(): Triple<String, Shop, JsonNode> {
+        val a = shop(salePrice = 50_000)
+        val user = newUserToken()
+        addToCart(user, a.skuIds[0], 1)
+        val couponId = claimCoupon(user, adminCouponPolicy(couponPolicyBody(discountValue = 50_000)))
+        val placed = json(
+            placeOrder(user, listOf(a.skuIds[0] to 1), 0, productCoupons = listOf(a.skuIds[0] to couponId)).andExpect { status { isCreated() } },
+        ).get("data")
+        return Triple(user, a, placed)
+    }
+
+    @Test
+    fun 쿠폰과_포인트로_전액_결제한_주문은_PG_없이_PAID이고_판매량과_장바구니가_승인과_같다() {
+        val (user, a, placed) = zeroWonOrder()
+
+        assertEquals(0L, placed.get("totalAmount").asLong())
+        assertEquals("PAID", placed.get("orderStatus").asString())
+        assertEquals("APPROVED", placed.get("paymentStatus").asString())
+        val detail = json(get("/api/v1/orders/${placed.get("orderId").asLong()}", user).andExpect { status { isOk() } }).get("data")
+        assertEquals("PAID", detail.get("status").asString())
+        assertTrue(!detail.get("paidAt").isNull)
+        assertEquals("APPROVED", detail.get("payment").get("status").asString())
+        assertTrue(detail.get("payment").get("paymentKey").isNull)
+        assertTrue(!pgApproved(placed.get("orderNo").asString()))
+        assertEquals(1L, sellerProductDetail(a.sellerToken, a.productId).get("salesCount").asLong())
+        assertEquals(0, json(get("/api/v1/cart", user).andExpect { status { isOk() } }).get("data").get("items").size())
+    }
+
+    @Test
+    fun `0원_주문을_payments_confirm으로_다시_승인하면_PG_없이_200이다`() {
+        val (user, _, placed) = zeroWonOrder()
+        val orderNo = placed.get("orderNo").asString()
+
+        val confirmed = json(confirmPayment(user, orderNo, "pay-${UUID.randomUUID()}", 0).andExpect { status { isOk() } }).get("data")
+
+        assertEquals("PAID", confirmed.get("orderStatus").asString())
+        assertEquals("APPROVED", confirmed.get("paymentStatus").asString())
+        assertTrue(!pgApproved(orderNo))
+        assertEquals(null, jdbcTemplate.queryForObject("select payment_key from payment where order_id = ?", String::class.java, placed.get("orderId").asLong()))
+    }
+
+    @Test
+    fun 종료된_정책의_쿠폰은_만료_전이면_주문에_쓸_수_있다() {
+        val a = shop(salePrice = 30_000)
+        val user = newUserToken()
+        val policyId = adminCouponPolicy(couponPolicyBody())
+        val couponId = claimCoupon(user, policyId)
+        patch("/api/v1/admin/coupons/policies/$policyId/end", adminToken()).andExpect { status { isOk() } }
+
+        placeOrder(user, listOf(a.skuIds[0] to 1), 31_000, productCoupons = listOf(a.skuIds[0] to couponId))
+            .andExpect { status { isCreated() } }
+        assertEquals("USED", couponStatus(couponId))
     }
 
     private fun json(result: org.springframework.mock.web.MockHttpServletResponse): JsonNode =
