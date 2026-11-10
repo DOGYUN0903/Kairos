@@ -14,6 +14,7 @@ interface OrderRepository {
     fun findBySellerOrderId(sellerOrderId: Long): Order?
     fun findBySellerOrderIdForUpdate(sellerOrderId: Long): Order?
     fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order>
+    /** 결제 전(PENDING_PAYMENT) 판매자 주문은 제외한다. 돌려주는 주문에는 다른 판매자의 판매자 주문도 담겨 있다. */
     fun findPageBySellerId(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<Order>
     fun findPageForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<Order>
     fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long>

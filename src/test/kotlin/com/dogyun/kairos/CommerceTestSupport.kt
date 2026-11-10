@@ -272,13 +272,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         idemKey,
     )
 
-    /**
-     * 주문을 만들고 승인해 PAID 로 만든 뒤 승인 응답의 data(orderId, orderNo, orderStatus, paymentStatus)를 돌려준다.
-     * 주문 상세 조회 API 가 생기면 상세 JSON 을 돌려주도록 바꾼다.
-     */
+    /** 주문을 만들고 승인해 PAID 로 만든 뒤 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data 를 돌려준다. */
     protected fun paidOrder(token: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
         val orderNo = json(placeOrder(token, items, expectedTotal).andExpect { status { isCreated() } }).get("data").get("orderNo").asString()
-        return json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
+        val confirmed = json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
+        val orderId = confirmed.get("orderId").asLong()
+        return json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
     }
 
     protected fun suspendSeller(sellerId: Long) {

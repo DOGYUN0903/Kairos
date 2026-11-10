@@ -42,7 +42,7 @@ class FakeOrderRepository : OrderRepository {
                     },
                 )
             },
-            order.createdAt,
+            order.createdAt ?: LocalDateTime.of(2026, 11, 10, 12, 0),
         )
         rows[id] = saved
         return saved
@@ -61,7 +61,11 @@ class FakeOrderRepository : OrderRepository {
         rows.values.filter { it.memberId == memberId }.sortedByDescending { it.id }.let { page(it, page, size) }
 
     override fun findPageBySellerId(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<Order> =
-        rows.values.filter { o -> o.sellerOrders.any { it.sellerId == sellerId && (status == null || it.status == status) } }
+        rows.values.filter { o ->
+            o.sellerOrders.any {
+                it.sellerId == sellerId && it.status != SellerOrderStatus.PENDING_PAYMENT && (status == null || it.status == status)
+            }
+        }
             .sortedByDescending { it.id }.let { page(it, page, size) }
 
     override fun findPageForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<Order> =

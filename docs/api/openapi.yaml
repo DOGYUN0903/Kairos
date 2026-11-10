@@ -1934,6 +1934,215 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+    get:
+      tags: [Order]
+      operationId: listMyOrders
+      summary: 내 주문 목록 (최신순)
+      description: 결제 대기·만료된 주문도 포함한다. 항목이 여러 개면 `firstProductName` 은 첫 항목의 상품명이다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 주문 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/OrderSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [Order]
+      operationId: getMyOrder
+      summary: 내 주문 상세 (판매자별 묶음, 항목, 배송지, 결제 정보)
+      responses:
+        '200':
+          description: 주문 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`ORDER_NOT_FOUND` 없거나 내 주문이 아니다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/orders:
+    get:
+      tags: [Seller Order]
+      operationId: listSellerOrders
+      summary: 판매자 주문 목록 (APPROVED·SUSPENDED 판매자, 최신순)
+      description: 결제 전(`PENDING_PAYMENT`) 판매자 주문은 보이지 않는다. `status=PENDING_PAYMENT` 는 빈 목록이다.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/SellerOrderStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 판매자 주문 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SellerOrderSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/orders/{sellerOrderId}:
+    parameters:
+      - $ref: '#/components/parameters/SellerOrderId'
+    get:
+      tags: [Seller Order]
+      operationId: getSellerOrder
+      summary: 판매자 주문 상세 (배송지 포함, 내 항목만)
+      responses:
+        '200':
+          description: 판매자 주문 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerOrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SELLER_ORDER_NOT_FOUND` 없거나 내 판매자 주문이 아니거나 결제 전이다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/admin/orders:
+    get:
+      tags: [Admin Order]
+      operationId: listAdminOrders
+      summary: 주문 목록 (관리자, 최신순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: memberId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: orderNo
+          in: query
+          required: false
+          description: 주문번호 정확히 일치
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 주문 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/OrderSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [Admin Order]
+      operationId: getAdminOrder
+      summary: 주문 상세 (관리자)
+      responses:
+        '200':
+          description: 주문 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`ORDER_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/payments/confirm:
     post:
       tags: [Payment]
@@ -2055,6 +2264,27 @@ components:
         type: string
         minLength: 1
         maxLength: 100
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SellerOrderId:
+      name: sellerOrderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderItemId:
+      name: orderItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
   responses:
     InvalidRequest:
       description: "`INVALID_REQUEST` 요청 검증 실패"
@@ -3301,3 +3531,269 @@ components:
           type: string
           format: date-time
           description: 결제 만료 시각(오프셋 없는 KST)
+    OrderStatus:
+      type: string
+      enum: [PENDING_PAYMENT, PAID, COMPLETED, CANCELED]
+    SellerOrderStatus:
+      type: string
+      enum: [PENDING_PAYMENT, PAID, SHIPPING, DELIVERED, CONFIRMED, CANCELED]
+    OrderItemResult:
+      type: object
+      required: [orderItemId, skuId, productId, productName, brandName, optionDisplayName, salePrice, extraPrice, quantity, lineAmount, status, refundAmount]
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+        skuId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+          description: 주문 시점 스냅샷
+        brandName:
+          type: string
+        optionDisplayName:
+          type: string
+        salePrice:
+          type: integer
+          format: int64
+        extraPrice:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+        lineAmount:
+          type: integer
+          format: int64
+          description: (salePrice + extraPrice) * quantity
+        status:
+          type: string
+          enum: [ORDERED, CANCEL_REQUESTED, CANCELED]
+        cancelActor:
+          type: string
+          nullable: true
+          enum: [BUYER, SELLER, ADMIN, SYSTEM]
+        cancelReason:
+          type: string
+          nullable: true
+        refundAmount:
+          type: integer
+          format: int64
+    OrderShippingAddress:
+      type: object
+      required: [receiverName, phone, zipCode, address1, address2]
+      properties:
+        receiverName:
+          type: string
+        phone:
+          type: string
+        zipCode:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        memo:
+          type: string
+          nullable: true
+    SellerOrderResult:
+      type: object
+      required: [sellerOrderId, sellerId, sellerName, status, shippingFee, shippingFeePayer, items]
+      properties:
+        sellerOrderId:
+          type: integer
+          format: int64
+        sellerId:
+          type: integer
+          format: int64
+        sellerName:
+          type: string
+        status:
+          $ref: '#/components/schemas/SellerOrderStatus'
+        shippingFee:
+          type: integer
+          format: int64
+        shippingFeePayer:
+          type: string
+          enum: [BUYER, PLATFORM]
+        carrierCode:
+          type: string
+          nullable: true
+        trackingNumber:
+          type: string
+          nullable: true
+        shippedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResult'
+    PaymentResult:
+      type: object
+      required: [amount, refundedAmount, status]
+      properties:
+        paymentKey:
+          type: string
+          nullable: true
+        amount:
+          type: integer
+          format: int64
+        refundedAmount:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
+    OrderDetail:
+      type: object
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, expiresAt, createdAt, shippingAddress, sellerOrders]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        itemsAmount:
+          type: integer
+          format: int64
+        buyerShippingFee:
+          type: integer
+          format: int64
+        totalAmount:
+          type: integer
+          format: int64
+        freeShippingApplied:
+          type: boolean
+        shippingFeeRecovered:
+          type: integer
+          format: int64
+        refundedAmount:
+          type: integer
+          format: int64
+        expiresAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        shippingAddress:
+          $ref: '#/components/schemas/OrderShippingAddress'
+        sellerOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/SellerOrderResult'
+        payment:
+          allOf:
+            - $ref: '#/components/schemas/PaymentResult'
+          nullable: true
+    OrderSummary:
+      type: object
+      required: [orderId, orderNo, status, totalAmount, itemCount, firstProductName, createdAt]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        totalAmount:
+          type: integer
+          format: int64
+        itemCount:
+          type: integer
+          format: int32
+        firstProductName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    SellerOrderDetail:
+      type: object
+      required: [sellerOrderId, orderId, orderNo, status, shippingFee, shippingFeePayer, shippingAddress, items, orderedAt]
+      properties:
+        sellerOrderId:
+          type: integer
+          format: int64
+        orderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        status:
+          $ref: '#/components/schemas/SellerOrderStatus'
+        shippingFee:
+          type: integer
+          format: int64
+        shippingFeePayer:
+          type: string
+          enum: [BUYER, PLATFORM]
+        carrierCode:
+          type: string
+          nullable: true
+        trackingNumber:
+          type: string
+          nullable: true
+        shippedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveredAt:
+          type: string
+          format: date-time
+          nullable: true
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        shippingAddress:
+          $ref: '#/components/schemas/OrderShippingAddress'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResult'
+        orderedAt:
+          type: string
+          format: date-time
+    SellerOrderSummary:
+      type: object
+      required: [sellerOrderId, orderNo, status, itemsAmount, itemCount, firstProductName, orderedAt]
+      properties:
+        sellerOrderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        status:
+          $ref: '#/components/schemas/SellerOrderStatus'
+        itemsAmount:
+          type: integer
+          format: int64
+        itemCount:
+          type: integer
+          format: int32
+        firstProductName:
+          type: string
+        orderedAt:
+          type: string
+          format: date-time

@@ -8,6 +8,9 @@ import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import com.dogyun.kairos.order.domain.ShippingAddress
+import com.querydsl.core.BooleanBuilder
+import com.querydsl.core.types.Predicate
+import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
@@ -21,6 +24,7 @@ class OrderRepositoryImpl(
     private val orderJpaRepository: OrderJpaRepository,
     private val sellerOrderJpaRepository: SellerOrderJpaRepository,
     private val orderItemJpaRepository: OrderItemJpaRepository,
+    private val queryFactory: JPAQueryFactory,
 ) : OrderRepository {
 
     override fun save(order: Order): Order {
@@ -52,10 +56,55 @@ class OrderRepositoryImpl(
     override fun findBySellerOrderIdForUpdate(sellerOrderId: Long): Order? =
         sellerOrderJpaRepository.findOrderIdById(sellerOrderId)?.let(::findByIdForUpdate)
 
-    // 아래 목록·대사 조회는 해당 기능을 만드는 Task(주문 조회, 만료·대사 작업)에서 채운다.
-    override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> = notYet()
-    override fun findPageBySellerId(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<Order> = notYet()
-    override fun findPageForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<Order> = notYet()
+    override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> =
+        findPageOfOrders(QOrderEntity.orderEntity.memberId.eq(memberId), page, size)
+
+    /** 한 주문에는 판매자당 판매자 주문이 하나뿐이다. 결제 전 판매자 주문은 제외하고 판매자 주문 id 내림차순으로 정렬한다. */
+    override fun findPageBySellerId(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<Order> {
+        val so = QSellerOrderEntity.sellerOrderEntity
+        val where = BooleanBuilder()
+            .and(so.sellerId.eq(sellerId))
+            .and(so.sellerOrderStatus.ne(SellerOrderStatus.PENDING_PAYMENT))
+        status?.let { where.and(so.sellerOrderStatus.eq(it)) }
+        val orderIds = queryFactory.select(so.order.id).from(so)
+            .where(where)
+            .orderBy(so.id.desc())
+            .offset(page.toLong() * size)
+            .limit(size.toLong())
+            .fetch()
+        val total = queryFactory.select(so.count()).from(so).where(where).fetchOne() ?: 0L
+        return PageResult.of(loadInOrder(orderIds), page, size, total)
+    }
+
+    override fun findPageForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<Order> {
+        val o = QOrderEntity.orderEntity
+        val where = BooleanBuilder()
+        status?.let { where.and(o.orderStatus.eq(it)) }
+        memberId?.let { where.and(o.memberId.eq(it)) }
+        orderNo?.let { where.and(o.orderNo.eq(it)) }
+        return findPageOfOrders(where, page, size)
+    }
+
+    private fun findPageOfOrders(where: Predicate, page: Int, size: Int): PageResult<Order> {
+        val o = QOrderEntity.orderEntity
+        val orderIds = queryFactory.select(o.id).from(o)
+            .where(where)
+            .orderBy(o.id.desc())
+            .offset(page.toLong() * size)
+            .limit(size.toLong())
+            .fetch()
+        val total = queryFactory.select(o.count()).from(o).where(where).fetchOne() ?: 0L
+        return PageResult.of(loadInOrder(orderIds), page, size, total)
+    }
+
+    /** 주문 id 순서를 유지한 채 세 쿼리로 한꺼번에 조립한다. */
+    private fun loadInOrder(orderIds: List<Long>): List<Order> {
+        if (orderIds.isEmpty()) return emptyList()
+        val byId = assemble(orderJpaRepository.findAllById(orderIds)).associateBy { it.id }
+        return orderIds.mapNotNull { byId[it] }
+    }
+
+    // 아래 대사·만료 조회는 해당 기능을 만드는 Task(만료·대사 작업)에서 채운다.
     override fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long> = notYet()
     override fun findSellerOrderIdsByStatus(status: SellerOrderStatus, limit: Int): List<Long> = notYet()
     override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, limit: Int): List<Long> = notYet()
