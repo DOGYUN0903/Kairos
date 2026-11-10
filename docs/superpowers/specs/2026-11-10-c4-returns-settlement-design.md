@@ -156,7 +156,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 ### 8-6. 관리자 조정 (Claude 결정, 사용자 규칙 구체화)
 
 - `POST /api/v1/admin/sellers/{sellerId}/settlement-adjustments`(Idempotency-Key) 본문 `amount`(0 아닌 부호 있는 정수, 원), `reason`(≤500자), 선택 `refSellerOrderId`(근거 주문). `adjustment_type = MANUAL`.
-- 생성 시 `settlement_id NULL`. 정산 생성 트랜잭션이 `created_at < periodEnd` 이고 `settlement_id IS NULL`인 조정을 **조건부 UPDATE**(`SET settlement_id = ? WHERE seller_id = ? AND settlement_id IS NULL AND created_at < ?`)로 붙이고, 붙은 행만 합계에 더한다. 붙은 조정은 바꾸거나 지울 수 없다(정산 불변). 아직 안 붙은 조정은 관리자가 **삭제**(소프트, `status = DELETED`)할 수 있다. 틀렸을 때 비용: 기간 종료 직후·생성 직전에 넣은 조정은 이번 정산에 들어간다(`created_at < periodEnd` 조건으로 막는다. 즉 기간이 끝난 뒤 넣은 조정은 다음 정산).
+- 생성 시 `settlement_id NULL`. 정산 생성 트랜잭션이 `settlement_id IS NULL`인 조정을 **조건부 UPDATE**로 붙이고, 붙은 행만 합계에 더한다. `MANUAL` 조정은 `created_at < periodEnd`인 것만 붙인다(`SET settlement_id = ? WHERE seller_id = ? AND settlement_id IS NULL AND adjustment_type = 'MANUAL' AND created_at < ?`). `CARRY_OVER`는 `created_at`과 무관하게 다음으로 생성되는 정산에 붙인다(작업이 밀려 여러 기간을 한 번에 따라잡을 때 CARRY_OVER가 한 기간을 건너뛰는 것을 막기 위해서다). 붙은 조정은 바꾸거나 지울 수 없다(정산 불변). 아직 안 붙은 조정은 관리자가 **삭제**(소프트, `status = DELETED`)할 수 있다. 틀렸을 때 비용: 기간 종료 직후·생성 직전에 넣은 조정은 이번 정산에 들어간다(`MANUAL`은 `created_at < periodEnd` 조건으로 막는다. 즉 기간이 끝난 뒤 넣은 조정은 다음 정산).
 - 정산 합계: `total_amount = Σ line_amount + Σ adjustment.amount`(MANUAL + CARRY_OVER).
 
 ### 8-7. 정산 예시 (숫자로 고정)

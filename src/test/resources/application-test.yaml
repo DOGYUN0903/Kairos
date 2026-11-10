@@ -18,5 +18,7 @@ kairos:
   admin:
     email: admin@kairos.test
     password: test-admin-password
+  settlement:
+    start-date: 2026-10-05
   jobs:
     enabled: false

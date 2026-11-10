@@ -1,13 +1,14 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
     C1: 판매자·브랜드·카테고리·상품·파일
     C2: 장바구니·주문·결제·취소·배송
     C3: 쿠폰·포인트·후기·좋아요
+    C4: 반품·정산
 
     - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
     - 모든 에러 응답은 `ErrorResponse`.
@@ -50,6 +51,11 @@ tags:
   - name: Review
   - name: Seller Review
   - name: Product Like
+  - name: Return
+  - name: Seller Return
+  - name: Admin Return
+  - name: Seller Settlement
+  - name: Admin Settlement
 security:
   - bearerAuth: []
 paths:
@@ -2537,7 +2543,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: "`SELLER_ORDER_INVALID_STATE_TRANSITION`(배송 완료 전)"
+          description: "`SELLER_ORDER_INVALID_STATE_TRANSITION`(배송 완료 전) 또는 `SELLER_ORDER_HAS_OPEN_RETURN`(열린 반품이 있다)"
           content:
             application/json:
               schema:
@@ -3604,6 +3610,18 @@ components:
             - REVIEW_NOT_ELIGIBLE
             - REVIEW_ALREADY_WRITTEN
             - REVIEW_NOT_FOUND
+            - RETURN_INVALID
+            - RETURN_NOT_FOUND
+            - RETURN_NOT_ELIGIBLE
+            - RETURN_WINDOW_EXPIRED
+            - RETURN_ALREADY_REQUESTED
+            - RETURN_INVALID_STATE_TRANSITION
+            - SELLER_ORDER_HAS_OPEN_RETURN
+            - SETTLEMENT_NOT_FOUND
+            - SETTLEMENT_PERIOD_INVALID
+            - SETTLEMENT_INVALID_STATE_TRANSITION
+            - SETTLEMENT_ADJUSTMENT_INVALID
+            - SETTLEMENT_ADJUSTMENT_APPLIED
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -4961,7 +4979,7 @@ components:
           description: (salePrice + extraPrice) * quantity
         status:
           type: string
-          enum: [ORDERED, CANCEL_REQUESTED, CANCELED]
+          enum: [ORDERED, CANCEL_REQUESTED, CANCELED, RETURN_REQUESTED, RETURN_APPROVED, RETURN_REFUNDING, RETURNED]
         cancelActor:
           type: string
           nullable: true
@@ -5000,6 +5018,33 @@ components:
           type: integer
           format: int64
           description: 취소로 되돌려진 포인트
+        returnRequest:
+          allOf:
+            - $ref: '#/components/schemas/ReturnRequestSummary'
+          nullable: true
+          description: 이 항목의 반품 요청(없으면 null)
+    ReturnRequestSummary:
+      type: object
+      required: [returnId, reason, status, feeBearer, refundAmount, requestedAt]
+      properties:
+        returnId:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        status:
+          type: string
+          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED]
+        feeBearer:
+          type: string
+          enum: [BUYER, SELLER]
+        refundAmount:
+          type: integer
+          format: int64
+        requestedAt:
+          type: string
+          format: date-time
     OrderShippingAddress:
       type: object
       required: [receiverName, phone, zipCode, address1, address2]
@@ -5055,6 +5100,17 @@ components:
           type: string
           format: date-time
           nullable: true
+        returnableUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: "`DELIVERED` 일 때 deliveredAt + return-window, 그 밖에는 null"
+        allItemsReturned:
+          type: boolean
+          description: 모든 항목이 반품 완료(`RETURNED`)이거나 취소·반품으로 남은 항목이 없다
+        hasOpenReturn:
+          type: boolean
+          description: 열린 반품(요청·승인·환불 중)이 있다
         items:
           type: array
           items:
@@ -5103,6 +5159,14 @@ components:
         refundedAmount:
           type: integer
           format: int64
+        remainingPaidAmount:
+          type: integer
+          format: int64
+          description: 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합
+        remainingBuyerShippingFee:
+          type: integer
+          format: int64
+          description: 아직 환불되지 않은 구매자 부담 배송비(완료 반품의 배송비 환불 반영)
         productCouponDiscount:
           type: integer
           format: int64
@@ -5199,6 +5263,17 @@ components:
           type: string
           format: date-time
           nullable: true
+        returnableUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: "`DELIVERED` 일 때 deliveredAt + return-window, 그 밖에는 null"
+        allItemsReturned:
+          type: boolean
+          description: 모든 항목이 반품 완료(`RETURNED`)이거나 취소·반품으로 남은 항목이 없다
+        hasOpenReturn:
+          type: boolean
+          description: 열린 반품(요청·승인·환불 중)이 있다
         shippingAddress:
           $ref: '#/components/schemas/OrderShippingAddress'
         items:
