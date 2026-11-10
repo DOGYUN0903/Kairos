@@ -4,6 +4,7 @@ import com.dogyun.kairos.order.application.DeliveryTrackingService
 import com.dogyun.kairos.order.application.OrderExpiryService
 import com.dogyun.kairos.order.application.PaymentReconciliationService
 import com.dogyun.kairos.order.application.PurchaseAutoConfirmService
+import com.dogyun.kairos.order.application.ReturnAutoApproveService
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
@@ -17,6 +18,7 @@ class OrderScheduledJobs(
     private val reconciliationService: PaymentReconciliationService,
     private val deliveryTrackingService: DeliveryTrackingService,
     private val purchaseAutoConfirmService: PurchaseAutoConfirmService,
+    private val returnAutoApproveService: ReturnAutoApproveService,
 ) {
 
     @Scheduled(fixedDelayString = "\${kairos.jobs.order-expiry-delay:60s}")
@@ -34,6 +36,9 @@ class OrderScheduledJobs(
 
     @Scheduled(fixedDelayString = "\${kairos.jobs.auto-confirm-delay:1h}")
     fun confirmDelivered() = guarded("자동 구매 확정") { purchaseAutoConfirmService.confirmDelivered() }
+
+    @Scheduled(fixedDelayString = "\${kairos.jobs.return-auto-approve-delay:1h}")
+    fun approveStaleReturns() = guarded("반품 자동 승인") { returnAutoApproveService.approveStale() }
 
     private fun guarded(name: String, job: () -> Int) {
         try {
