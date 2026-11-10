@@ -32,6 +32,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         // C3 테이블은 각 Task 가 만들 때 FK 자식 순서로 이 줄 앞에 추가한다:
         // review_image, review, product_like, point_lot_usage, point_transaction, point_lot, member_point, coupon, coupon_policy
         // (order_item 이 쿠폰·후기를 참조하므로 review → coupon 계열은 order_item 삭제 전에 지운다)
+        jdbcTemplate.update("delete from point_lot_usage")
+        jdbcTemplate.update("delete from point_transaction")
+        jdbcTemplate.update("delete from point_lot")
+        jdbcTemplate.update("delete from member_point")
+        jdbcTemplate.update("delete from coupon")
+        jdbcTemplate.update("delete from coupon_policy")
         jdbcTemplate.update("delete from order_item")
         jdbcTemplate.update("delete from seller_order")
         jdbcTemplate.update("delete from orders")
@@ -281,6 +287,52 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         val confirmed = json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
         val orderId = confirmed.get("orderId").asLong()
         return json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
+    }
+
+    /** 유효 기간은 어제부터 30일 뒤까지. 기본값은 전 상품 대상 2,000원 정액 쿠폰. */
+    protected fun couponPolicyBody(
+        couponType: String = "PRODUCT",
+        targetType: String = "ALL_PRODUCTS",
+        discountType: String = "FIXED",
+        discountValue: Long = 2_000L,
+        maxDiscount: Long? = null,
+        minOrderAmount: Long? = null,
+        totalQuantity: Int? = null,
+        validityDays: Int? = null,
+        targetProductId: Long? = null,
+    ): Map<String, Any?> {
+        val today = java.time.LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+        return mapOf(
+            "name" to "테스트 쿠폰",
+            "couponType" to couponType,
+            "targetType" to targetType,
+            "targetProductId" to targetProductId,
+            "discountType" to discountType,
+            "discountValue" to discountValue,
+            "maxDiscount" to maxDiscount,
+            "minOrderAmount" to minOrderAmount,
+            "totalQuantity" to totalQuantity,
+            "validityDays" to validityDays,
+            "validFrom" to today.minusDays(1).toString(),
+            "validUntil" to today.plusDays(30).toString(),
+        )
+    }
+
+    /** 관리자(플랫폼) 쿠폰 정책을 만들고 policyId 를 돌려준다. */
+    protected fun adminCouponPolicy(body: Map<String, Any?>): Long {
+        val created = postIdem("/api/v1/admin/coupons/policies", adminToken(), body).andExpect { status { isCreated() } }
+        return json(created).get("data").get("policyId").asLong()
+    }
+
+    protected fun sellerCouponPolicy(sellerToken: String, body: Map<String, Any?>): Long {
+        val created = postIdem("/api/v1/seller/coupons/policies", sellerToken, body).andExpect { status { isCreated() } }
+        return json(created).get("data").get("policyId").asLong()
+    }
+
+    /** 쿠폰을 발급받고 couponId 를 돌려준다. */
+    protected fun claimCoupon(token: String, policyId: Long): Long {
+        val claimed = postIdem("/api/v1/coupons/policies/$policyId/claim", token, null).andExpect { status { isCreated() } }
+        return json(claimed).get("data").get("couponId").asLong()
     }
 
     protected fun suspendSeller(sellerId: Long) {

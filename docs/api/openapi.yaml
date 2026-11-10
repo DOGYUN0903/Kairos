@@ -2511,6 +2511,306 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/coupons/policies:
+    get:
+      tags: [Coupon]
+      operationId: listClaimableCoupons
+      summary: 발급 가능한 쿠폰 정책 (상품 상세·쿠폰 받기용)
+      description: |
+        ACTIVE·발급 기간 안·수량 미소진인 정책만 준다. 장바구니 쿠폰과 전 상품 대상 정책은 항상 포함하고,
+        `productId` 가 있으면 그 상품 대상 정책과 그 상품 판매자의 판매자 대상 정책도 포함한다. `claimed` 는 내가 이미 받았는지다.
+      parameters:
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 정책 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/CouponPolicyResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+  /api/v1/coupons/policies/{policyId}/claim:
+    post:
+      tags: [Coupon]
+      operationId: claimCoupon
+      summary: 쿠폰 받기 (정책당 회원 1장)
+      description: 발급 수량은 조건부 UPDATE 로 판정한다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/PolicyId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: 발급 완료. `expiresAt` 은 정책 종료일과 발급일 + 유효 일수 중 빠른 쪽이다.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ClaimCouponResponse'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyRequired'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`COUPON_POLICY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`COUPON_POLICY_ENDED` 종료됐거나 발급 기간이 아님, `COUPON_SOLD_OUT` 수량 소진, `COUPON_ALREADY_ISSUED` 이미 받음, 또는 `IDEMPOTENCY_KEY_REUSED`/`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/coupons/me:
+    get:
+      tags: [Coupon]
+      operationId: listMyCoupons
+      summary: 내 쿠폰 (최근 발급 순)
+      description: "`status` 는 저장값이 아니라 조회 시각 기준 계산값이다(`AVAILABLE`, `USED`, `EXPIRED`)."
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [AVAILABLE, USED, EXPIRED]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 쿠폰 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/CouponResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/seller/coupons/policies:
+    post:
+      tags: [Seller Coupon]
+      operationId: createSellerCouponPolicy
+      summary: 판매자 쿠폰 정책 생성 (APPROVED 판매자)
+      description: |
+        판매자 정책은 `PRODUCT` 쿠폰만, 대상은 `SELLER`(내 상품 전체) 또는 `PRODUCT`(내 상품 하나)다. `couponType` 은 `PRODUCT` 로 고정되며
+        남의 상품을 대상으로 하면 400 `COUPON_POLICY_INVALID` 다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCouponPolicyRequest'
+      responses:
+        '201':
+          description: 정책 생성
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateCouponPolicyResponse'
+        '400':
+          description: "`COUPON_POLICY_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      tags: [Seller Coupon]
+      operationId: listSellerCouponPolicies
+      summary: 내 쿠폰 정책 목록
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 정책 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/CouponPolicyResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/coupons/policies/{policyId}/end:
+    patch:
+      tags: [Seller Coupon]
+      operationId: endSellerCouponPolicy
+      summary: 내 쿠폰 정책 종료 (멱등)
+      description: 이미 발급된 쿠폰은 만료일까지 유효하다. 이미 종료된 정책도 200 이다.
+      parameters:
+        - $ref: '#/components/parameters/PolicyId'
+      responses:
+        '200':
+          description: 종료 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`COUPON_POLICY_NOT_FOUND` (남의 정책 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/coupons/policies:
+    post:
+      tags: [Admin Coupon]
+      operationId: createAdminCouponPolicy
+      summary: 플랫폼 쿠폰 정책 생성
+      description: 장바구니 쿠폰(`CART`/`NONE`)과 상품 쿠폰(`ALL_PRODUCTS` 또는 `PRODUCT`)을 만들 수 있다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCouponPolicyRequest'
+      responses:
+        '201':
+          description: 정책 생성
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateCouponPolicyResponse'
+        '400':
+          description: "`COUPON_POLICY_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      tags: [Admin Coupon]
+      operationId: listAdminCouponPolicies
+      summary: 플랫폼 쿠폰 정책 목록
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 정책 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/CouponPolicyResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/coupons/policies/{policyId}/end:
+    patch:
+      tags: [Admin Coupon]
+      operationId: endAdminCouponPolicy
+      summary: 쿠폰 정책 종료 (멱등, 판매자 정책 포함)
+      parameters:
+        - $ref: '#/components/parameters/PolicyId'
+      responses:
+        '200':
+          description: 종료 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`COUPON_POLICY_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -2590,6 +2890,13 @@ components:
         format: int64
     OrderItemId:
       name: orderItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PolicyId:
+      name: policyId
       in: path
       required: true
       schema:
@@ -4280,3 +4587,172 @@ components:
         orderedAt:
           type: string
           format: date-time
+    CreateCouponPolicyRequest:
+      type: object
+      required: [name, couponType, targetType, discountType, discountValue, validFrom, validUntil]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        couponType:
+          type: string
+          enum: [PRODUCT, CART]
+          description: 판매자 정책은 `PRODUCT` 로 고정된다.
+        targetType:
+          type: string
+          enum: [ALL_PRODUCTS, SELLER, PRODUCT, NONE]
+          description: "`CART` 는 `NONE`, 플랫폼 `PRODUCT` 는 `ALL_PRODUCTS`/`PRODUCT`, 판매자는 `SELLER`/`PRODUCT`"
+        targetProductId:
+          type: integer
+          format: int64
+          nullable: true
+          description: "`targetType=PRODUCT` 일 때만 필수"
+        discountType:
+          type: string
+          enum: [FIXED, RATE]
+        discountValue:
+          type: integer
+          format: int64
+          description: "`FIXED` 는 원(> 0), `RATE` 는 bp(1~10000, 1000 = 10%)"
+        maxDiscount:
+          type: integer
+          format: int64
+          nullable: true
+          description: "`RATE` 는 필수(> 0)"
+        minOrderAmount:
+          type: integer
+          format: int64
+          nullable: true
+        totalQuantity:
+          type: integer
+          format: int32
+          nullable: true
+          description: 없으면 무제한
+        validityDays:
+          type: integer
+          format: int32
+          nullable: true
+          description: 발급일 기준 유효 일수. 없으면 `validUntil` 까지
+        validFrom:
+          $ref: '#/components/schemas/LocalDateTime'
+        validUntil:
+          $ref: '#/components/schemas/LocalDateTime'
+    CreateCouponPolicyResponse:
+      type: object
+      required: [policyId]
+      properties:
+        policyId:
+          type: integer
+          format: int64
+    ClaimCouponResponse:
+      type: object
+      required: [couponId, expiresAt]
+      properties:
+        couponId:
+          type: integer
+          format: int64
+        expiresAt:
+          $ref: '#/components/schemas/LocalDateTime'
+    CouponPolicyResult:
+      type: object
+      required: [policyId, name, issuerType, couponType, targetType, discountType, discountValue, issuedCount, validFrom, validUntil, status, claimed]
+      properties:
+        policyId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        issuerType:
+          type: string
+          enum: [PLATFORM, SELLER]
+        couponType:
+          type: string
+          enum: [PRODUCT, CART]
+        targetType:
+          type: string
+          enum: [ALL_PRODUCTS, SELLER, PRODUCT, NONE]
+        targetProductId:
+          type: integer
+          format: int64
+          nullable: true
+        discountType:
+          type: string
+          enum: [FIXED, RATE]
+        discountValue:
+          type: integer
+          format: int64
+        maxDiscount:
+          type: integer
+          format: int64
+          nullable: true
+        minOrderAmount:
+          type: integer
+          format: int64
+          nullable: true
+        totalQuantity:
+          type: integer
+          format: int32
+          nullable: true
+        issuedCount:
+          type: integer
+          format: int32
+        validityDays:
+          type: integer
+          format: int32
+          nullable: true
+        validFrom:
+          $ref: '#/components/schemas/LocalDateTime'
+        validUntil:
+          $ref: '#/components/schemas/LocalDateTime'
+        status:
+          type: string
+          enum: [ACTIVE, ENDED]
+        claimed:
+          type: boolean
+          description: 내가 이미 받았는지(관리자·판매자 목록에서는 항상 false)
+    CouponResult:
+      type: object
+      required: [couponId, policyId, name, couponType, discountType, discountValue, status, issuedAt, expiresAt]
+      properties:
+        couponId:
+          type: integer
+          format: int64
+        policyId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        couponType:
+          type: string
+          enum: [PRODUCT, CART]
+        discountType:
+          type: string
+          enum: [FIXED, RATE]
+        discountValue:
+          type: integer
+          format: int64
+        maxDiscount:
+          type: integer
+          format: int64
+          nullable: true
+        minOrderAmount:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          type: string
+          enum: [AVAILABLE, USED, EXPIRED]
+          description: 조회 시각 기준 계산값
+        issuedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        expiresAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        usedOrderId:
+          type: integer
+          format: int64
+          nullable: true
+        usedAt:
+          allOf:
+            - $ref: '#/components/schemas/LocalDateTime'
+          nullable: true

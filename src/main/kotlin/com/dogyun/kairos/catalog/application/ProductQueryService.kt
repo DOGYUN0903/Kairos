@@ -12,6 +12,8 @@ import com.dogyun.kairos.common.security.SellerPrincipal
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+data class ProductRefResult(val productId: Long, val sellerId: Long)
+
 @Service
 @Transactional(readOnly = true)
 class ProductQueryService(
@@ -29,6 +31,10 @@ class ProductQueryService(
         val pending = changeRequestRepository.findPendingByProductId(productId)?.id
         return toSellerProductDetail(product, brandName, urls, pending)
     }
+
+    /** 다른 모듈(benefit)이 상품의 존재와 판매자만 확인할 때 쓴다. 삭제된 상품은 없는 것으로 본다. */
+    fun findProductRef(productId: Long): ProductRefResult? =
+        productRepository.findById(ProductId(productId))?.let { ProductRefResult(productId, it.sellerId) }
 
     fun listMine(seller: SellerPrincipal, status: ProductStatus?, page: Int, size: Int): PageResult<SellerProductSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
