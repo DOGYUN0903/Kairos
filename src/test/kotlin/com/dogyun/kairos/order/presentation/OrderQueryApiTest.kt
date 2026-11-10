@@ -133,4 +133,27 @@ class OrderQueryApiTest : CommerceTestSupport() {
     fun 판매자가_아닌_회원의_판매자_주문_조회는_403() {
         get("/api/v1/seller/orders", newUserToken()).andExpect { status { isForbidden() } }
     }
+
+    @Test
+    fun 판매자_주문_상세에_항목별_productCouponDiscount와_productCouponIssuer가_보인다() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)), originalPrice = 20_000, salePrice = 20_000, stock = 5)
+        val skuId = skuIdsOf(sellerToken, productId).sorted()[0]
+        val policyId = sellerCouponPolicy(
+            sellerToken, couponPolicyBody(targetType = "SELLER", discountType = "RATE", discountValue = 1000, maxDiscount = 5_000),
+        )
+        val buyer = newUserToken()
+        val couponId = claimCoupon(buyer, policyId)
+
+        // 20,000 x 2 = 40,000, 판매자 정률 10% = 4,000, 배송비 3,000
+        val order = paidOrder(buyer, listOf(skuId to 2), 39_000, productCoupons = listOf(skuId to couponId))
+        val sellerOrderId = order.get("sellerOrders").get(0).get("sellerOrderId").asLong()
+
+        val item = json(get("/api/v1/seller/orders/$sellerOrderId", sellerToken).andExpect { status { isOk() } }).get("data").get("items").get(0)
+        assertEquals(4_000L, item.get("productCouponDiscount").asLong())
+        assertEquals("SELLER", item.get("productCouponIssuer").asString())
+        assertEquals(couponId, item.get("productCouponId").asLong())
+        assertEquals(36_000L, item.get("paidAmount").asLong())
+    }
 }

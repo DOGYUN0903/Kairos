@@ -2795,6 +2795,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/reviews:
+    get:
+      tags: [Seller Review]
+      operationId: listSellerReviews
+      summary: 내 상품 후기 목록 (APPROVED 판매자, 최신순)
+      description: 삭제된 후기는 보이지 않는다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 후기 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReviewResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/reviews/{reviewId}/reply:
+    parameters:
+      - $ref: '#/components/parameters/ReviewId'
+    patch:
+      tags: [Seller Review]
+      operationId: replyReview
+      summary: 후기 답글 (판매자, 덮어쓰기·멱등)
+      description: 후기당 답글은 하나다. 같은 요청을 반복하면 마지막 내용이 남는다. 남의 상품 후기는 없는 것으로 본다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplyReviewRequest'
+      responses:
+        '200':
+          description: 답글이 달린 후기
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReviewResult'
+        '400':
+          description: "`REVIEW_INVALID`, `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`REVIEW_NOT_FOUND` 없거나 삭제됐거나 내 상품 후기가 아니다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
   /api/v1/coupons/policies:
     get:
       tags: [Coupon]
@@ -4195,6 +4275,13 @@ components:
           type: integer
           format: int64
           description: 이번 작성으로 적립된 포인트(100 또는 500)
+    ReplyReviewRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: 답글 내용(공백 불가, 최대 500자)
     ReviewResult:
       type: object
       required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, writerName, rewardPoints, createdAt, modifiedAt]

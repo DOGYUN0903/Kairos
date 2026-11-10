@@ -38,6 +38,13 @@ class ReviewQueryService(
         return toResults(PageResult.of(listOf(review), 0, 1, 1)).content.single()
     }
 
+    /** 판매자 답글 응답용. 내 상품 후기가 아니면 없는 것으로 본다. */
+    fun getForSeller(sellerId: Long, reviewId: Long): ReviewResult {
+        val review = reviewRepository.findById(reviewId)?.takeIf { it.sellerId == sellerId }
+            ?: throw DomainException(ErrorCode.REVIEW_NOT_FOUND)
+        return toResults(PageResult.of(listOf(review), 0, 1, 1)).content.single()
+    }
+
     private fun toResults(page: PageResult<Review>): PageResult<ReviewResult> {
         val reviews = page.content
         val urls = imageFileReader.findImages(reviews.flatMap { r -> r.images.map { it.fileId } }.toSet()).mapValues { it.value.url }
