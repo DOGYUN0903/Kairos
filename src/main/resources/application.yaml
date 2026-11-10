@@ -67,7 +67,28 @@ kairos:
   admin:
     email: ${KAIROS_ADMIN_EMAIL}
     password: ${KAIROS_ADMIN_PASSWORD}
-  mock-pg:
-    delay: 100ms
-    failure-rate: 0.0
-    timeout: 3s
+  order:
+    payment-ttl: 15m
+    free-shipping-threshold: 50000
+    base-shipping-fee: 3000
+    auto-confirm-after: 7d
+    in-progress-timeout: 5m
+    cancel-request-timeout: 1m
+  jobs:
+    enabled: true
+    order-expiry-delay: 60s
+    payment-reconcile-delay: 60s
+    delivery-poll-delay: 10m
+    auto-confirm-delay: 1h
+    idempotency-cleanup-delay: 1h
+  idempotency:
+    ttl: 24h
+    in-progress-timeout: 60s
+  delivery:
+    provider: ${KAIROS_DELIVERY_PROVIDER:mock}
+    sweet-tracker:
+      api-key: ${SWEETTRACKER_API_KEY:}
+  pg:
+    provider: ${KAIROS_PG_PROVIDER:mock}
+    toss:
+      secret-key: ${TOSS_SECRET_KEY:}

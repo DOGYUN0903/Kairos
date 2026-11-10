@@ -29,6 +29,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     @BeforeTest
     fun cleanUp() {
+        jdbcTemplate.update("delete from order_item")
+        jdbcTemplate.update("delete from seller_order")
+        jdbcTemplate.update("delete from orders")
+        jdbcTemplate.update("delete from idempotency_key")
+        jdbcTemplate.update("delete from payment")
+        jdbcTemplate.update("delete from cart_item")
         jdbcTemplate.update("delete from product_change_request")
         jdbcTemplate.update("delete from product_review_history")
         jdbcTemplate.update("delete from sku")
@@ -207,6 +213,72 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     protected fun sellerProductDetail(token: String, productId: Long): JsonNode =
         json(get("/api/v1/seller/products/$productId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 상품의 모든 SKU ID (DISCONTINUED 포함). */
+    protected fun skuIdsOf(sellerToken: String, productId: Long): List<Long> {
+        val skus = sellerProductDetail(sellerToken, productId).get("skus")
+        return (0 until skus.size()).map { skus.get(it).get("skuId").asLong() }
+    }
+
+    /** 장바구니에 담고 cartItemId 를 돌려준다. */
+    protected fun addToCart(token: String, skuId: Long, quantity: Int): Long {
+        val result = post("/api/v1/cart/items", token, mapOf("skuId" to skuId, "quantity" to quantity))
+            .andExpect { status { isOk() } }
+        return json(result).get("data").get("cartItemId").asLong()
+    }
+
+    protected fun address(): Map<String, Any?> = mapOf(
+        "receiverName" to "홍길동",
+        "phone" to "010-1234-5678",
+        "zipCode" to "06236",
+        "address1" to "서울 강남구 테헤란로 1",
+        "address2" to "101호",
+        "memo" to null,
+    )
+
+    /** `Idempotency-Key` 헤더를 붙여 POST 한다. */
+    protected fun postIdem(path: String, token: String?, body: Any?, idemKey: String = UUID.randomUUID().toString()): ResultActionsDsl =
+        mockMvc.post(path) {
+            prepare(token, body)
+            header("Idempotency-Key", idemKey)
+        }
+
+    /** items 는 (skuId, quantity) 쌍. 주문 생성 요청을 보낸다. */
+    protected fun placeOrder(
+        token: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+    ): ResultActionsDsl = postIdem(
+        "/api/v1/orders", token,
+        mapOf(
+            "items" to items.map { mapOf("skuId" to it.first, "quantity" to it.second) },
+            "expectedTotalAmount" to expectedTotal,
+            "shippingAddress" to address(),
+        ),
+        idemKey,
+    )
+
+    /** 결제 승인 요청을 보낸다. 승인 응답을 받으려면 paymentKey 에 접두사를 붙이지 않는다(`fail-`, `unknown-` 등은 Mock PG 가 해석한다). */
+    protected fun confirmPayment(
+        token: String,
+        orderNo: String,
+        paymentKey: String,
+        amount: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+    ): ResultActionsDsl = postIdem(
+        "/api/v1/payments/confirm", token,
+        mapOf("orderNo" to orderNo, "paymentKey" to paymentKey, "amount" to amount),
+        idemKey,
+    )
+
+    /** 주문을 만들고 승인해 PAID 로 만든 뒤 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data 를 돌려준다. */
+    protected fun paidOrder(token: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
+        val orderNo = json(placeOrder(token, items, expectedTotal).andExpect { status { isCreated() } }).get("data").get("orderNo").asString()
+        val confirmed = json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
+        val orderId = confirmed.get("orderId").asLong()
+        return json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
+    }
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))

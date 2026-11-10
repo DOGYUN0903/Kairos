@@ -60,6 +60,7 @@ class BrandServiceTest {
         }
 
         override fun findById(id: SellerId): Seller? = store[id.value]
+        override fun findAllByIds(ids: Collection<SellerId>): List<Seller> = ids.mapNotNull { store[it.value] }
         override fun findByMemberId(memberId: Long): Seller? = store.values.firstOrNull { it.memberId == memberId }
         override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean = false
         override fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller> =

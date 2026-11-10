@@ -1,8 +1,20 @@
 package com.dogyun.kairos.order.application
 
-import com.dogyun.kairos.order.domain.CancelReason
-import com.dogyun.kairos.order.domain.OrderStatus
+data class OrderItemCommand(val skuId: Long, val quantity: Int)
 
-data class PlaceOrderCommand(val memberId: Long, val dealId: Long, val quantity: Int)
+data class ShippingAddressCommand(
+    val receiverName: String,
+    val phone: String,
+    val zipCode: String,
+    val address1: String,
+    val address2: String,
+    val memo: String?,
+)
 
-data class PlaceOrderResult(val orderId: Long, val status: OrderStatus, val cancelReason: CancelReason?)
+data class PlaceOrderCommand(
+    val items: List<OrderItemCommand>,
+    val expectedTotalAmount: Long,
+    val shippingAddress: ShippingAddressCommand,
+)
+
+data class ConfirmPaymentCommand(val orderNo: String, val paymentKey: String, val amount: Long)

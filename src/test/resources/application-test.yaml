@@ -18,3 +18,5 @@ kairos:
   admin:
     email: admin@kairos.test
     password: test-admin-password
+  jobs:
+    enabled: false

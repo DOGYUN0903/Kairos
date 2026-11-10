@@ -4,6 +4,7 @@ import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.Seller
+import com.dogyun.kairos.seller.domain.SellerId
 import com.dogyun.kairos.seller.domain.SellerRepository
 import com.dogyun.kairos.seller.domain.SellerStatus
 import org.springframework.stereotype.Service
@@ -24,6 +25,12 @@ class SellerQueryService(private val sellerRepository: SellerRepository) {
                 canManage = it.canManage,
                 canView = it.canView,
             )
+        }
+
+    fun findSettlementSnapshots(sellerIds: Collection<Long>): Map<Long, SellerSettlementSnapshot> =
+        sellerRepository.findAllByIds(sellerIds.map(::SellerId)).associate {
+            val id = requireNotNull(it.id).value
+            id to SellerSettlementSnapshot(id, it.companyName, it.commissionRateBp, it.canManage)
         }
 
     fun listForAdmin(status: SellerStatus?, page: Int, size: Int): PageResult<SellerDetail> {

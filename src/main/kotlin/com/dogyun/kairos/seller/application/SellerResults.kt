@@ -23,3 +23,11 @@ data class SellerSnapshot(
     val canManage: Boolean,
     val canView: Boolean,
 )
+
+/** 주문 시점에 굳히는 정산 정보. 도메인 타입을 노출하지 않는다. */
+data class SellerSettlementSnapshot(
+    val sellerId: Long,
+    val companyName: String,
+    val commissionRateBp: Int,
+    val canManage: Boolean,
+)

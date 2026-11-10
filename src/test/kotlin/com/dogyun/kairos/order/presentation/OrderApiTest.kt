@@ -1,307 +1,212 @@
 package com.dogyun.kairos.order.presentation
 
-import com.dogyun.kairos.IntegrationTestSupport
-import com.dogyun.kairos.deal.FixedClockConfig
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Import
-import org.springframework.http.MediaType
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.TestPropertySource
-import org.springframework.test.web.servlet.MvcResult
-import org.springframework.test.web.servlet.get
-import org.springframework.test.web.servlet.post
-import tools.jackson.databind.ObjectMapper
+import com.dogyun.kairos.CommerceTestSupport
+import org.springframework.test.web.servlet.ResultActionsDsl
+import tools.jackson.databind.JsonNode
+import java.time.LocalDateTime
 import java.util.UUID
-import kotlin.test.BeforeTest
+import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
-/** 고정 시각: 2026-12-08T12:00. Mock PG 지연을 줄여 테스트를 빠르게 한다. */
-@Import(FixedClockConfig::class)
-@TestPropertySource(properties = ["kairos.mock-pg.delay=1ms"])
-abstract class OrderApiTestSupport : IntegrationTestSupport() {
+class OrderApiTest : CommerceTestSupport() {
 
-    @Autowired
-    protected lateinit var jdbcTemplate: JdbcTemplate
+    private class Shop(val sellerToken: String, val productId: Long, val skuIds: List<Long>)
 
-    @Autowired
-    protected lateinit var objectMapper: ObjectMapper
-
-    @BeforeTest
-    fun cleanUp() {
-        jdbcTemplate.update("delete from orders")
-        jdbcTemplate.update("delete from payment")
-        jdbcTemplate.update("delete from stock")
-        jdbcTemplate.update("delete from deal")
+    /** 판매자 한 명과 판매가 [salePrice], 모든 SKU 재고 [stock] 인 상품 하나. SKU ID 는 오름차순. */
+    private fun shop(salePrice: Long = 8_000, stock: Int = 5): Shop {
+        val token = newUserToken()
+        approvedSeller(token)
+        val productId = onSaleProduct(token, approvedBrand(token), leafCategory(), listOf(uploadImage(token)), salePrice = salePrice, stock = stock)
+        return Shop(token, productId, skuIdsOf(token, productId).sorted())
     }
 
-    protected fun json(result: MvcResult) = objectMapper.readTree(result.response.contentAsString)
+    private fun stockOf(shop: Shop, skuId: Long): Int =
+        sellerProductDetail(shop.sellerToken, shop.productId).get("skus").first { it.get("skuId").asLong() == skuId }.get("stock").asInt()
 
-    private fun login(email: String, password: String): String {
-        val result = mockMvc.post("/api/v1/auth/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to password))
-        }.andReturn()
-        return json(result).get("data").get("accessToken").asString()
-    }
+    private fun orderCount(): Int = jdbcTemplate.queryForObject("select count(*) from orders", Int::class.java)!!
 
-    protected fun adminToken() = login("admin@kairos.test", "test-admin-password")
-
-    protected fun userToken(): String {
-        val email = "user-${UUID.randomUUID()}@kairos.com"
-        mockMvc.post("/api/v1/auth/signup") {
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to "password1", "name" to "홍길동"))
-        }
-        return login(email, "password1")
-    }
-
-    /** 진행 중(2026-12-08T10:00 ~ 12-09T10:00) 딜. 인당 제한 2. */
-    protected fun createOngoingDeal(totalQuantity: Int = 10, perMemberLimit: Int = 2, openAt: String = "2026-12-08T10:00:00"): Long {
-        val result = mockMvc.post("/api/v1/admin/deals") {
-            header("Authorization", "Bearer ${adminToken()}")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                mapOf(
-                    "productName" to "진행딜",
-                    "originalPrice" to 10000,
-                    "dealPrice" to 5000,
-                    "totalQuantity" to totalQuantity,
-                    "perMemberLimit" to perMemberLimit,
-                    "openAt" to openAt,
-                    "closeAt" to "2026-12-09T10:00:00",
-                ),
-            )
-        }.andExpect { status { isCreated() } }.andReturn()
-        return json(result).get("data").get("dealId").asLong()
-    }
-
-    protected fun order(token: String?, dealId: Long, quantity: Int) = mockMvc.post("/api/v1/orders") {
-        token?.let { header("Authorization", "Bearer $it") }
-        contentType = MediaType.APPLICATION_JSON
-        content = objectMapper.writeValueAsString(mapOf("dealId" to dealId, "quantity" to quantity))
-    }
-
-    protected fun remaining(dealId: Long): Int =
-        json(mockMvc.get("/api/v1/deals/$dealId").andReturn()).get("data").get("remainingQuantity").asInt()
-}
-
-class OrderApiTest : OrderApiTestSupport() {
-
-    @Test
-    fun 주문하면_201_PAID_남은수량_감소() {
-        val dealId = createOngoingDeal(totalQuantity = 10)
-        val token = userToken()
-
-        val result = order(token, dealId, 2).andExpect {
-            status { isCreated() }
-            jsonPath("$.message") { isNotEmpty() }
-            jsonPath("$.data.orderId") { isNumber() }
-            jsonPath("$.data.status") { value("PAID") }
-            jsonPath("$.data.cancelReason") { value(null) }
-        }.andReturn()
-        val orderId = json(result).get("data").get("orderId").asLong()
-
-        assertEquals(8, remaining(dealId))
-        assertEquals("PAID", jdbcTemplate.queryForObject("select order_status from orders where id = ?", String::class.java, orderId))
-        assertEquals(10000L, jdbcTemplate.queryForObject("select amount from orders where id = ?", Long::class.java, orderId))
-        assertEquals("APPROVED", jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId))
-        // 감사 컬럼: 로그인 회원 id 가 기록된다.
-        val memberId = jdbcTemplate.queryForObject("select member_id from orders where id = ?", Long::class.java, orderId)
-        assertEquals(memberId, jdbcTemplate.queryForObject("select created_by from orders where id = ?", Long::class.java, orderId))
-    }
-
-    @Test
-    fun 제한_초과_주문은_409_ORDER_LIMIT_EXCEEDED() {
-        val dealId = createOngoingDeal(totalQuantity = 10, perMemberLimit = 2)
-        val token = userToken()
-        order(token, dealId, 1).andExpect { status { isCreated() } }
-
-        order(token, dealId, 2).andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("ORDER_LIMIT_EXCEEDED") }
-        }
-        assertEquals(9, remaining(dealId))
-    }
-
-    @Test
-    fun 재고_부족이면_409_STOCK_SOLD_OUT() {
-        val dealId = createOngoingDeal(totalQuantity = 1, perMemberLimit = 5)
-
-        order(userToken(), dealId, 2).andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("STOCK_SOLD_OUT") }
-        }
-        assertEquals(1, remaining(dealId))
-        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from orders", Int::class.java))
-    }
-
-    @Test
-    fun 진행중이_아닌_딜은_409_DEAL_NOT_ONGOING() {
-        val dealId = createOngoingDeal(openAt = "2026-12-09T09:00:00")
-
-        order(userToken(), dealId, 1).andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("DEAL_NOT_ONGOING") }
+    private fun ResultActionsDsl.expectCode(status: Int, code: String) {
+        andExpect {
+            status { isEqualTo(status) }
+            jsonPath("$.code") { value(code) }
         }
     }
 
     @Test
-    fun 없는_딜은_404() {
-        order(userToken(), 999999L, 1).andExpect {
-            status { isNotFound() }
-            jsonPath("$.code") { value("DEAL_NOT_FOUND") }
+    fun 두_판매자_상품을_주문하면_201과_주문번호_총액_만료시각을_받고_재고가_줄어든다() {
+        val a = shop()
+        val b = shop()
+        val user = newUserToken()
+
+        // 8000*2 + 8000*1 = 24000 (50000 미만이라 판매자별 배송비 3000*2)
+        val data = json(placeOrder(user, listOf(a.skuIds[0] to 2, b.skuIds[0] to 1), 30_000).andExpect { status { isCreated() } }).get("data")
+
+        assertTrue(data.get("orderId").asLong() > 0)
+        val orderNo = data.get("orderNo").asString()
+        assertEquals(21, orderNo.length)
+        assertTrue(orderNo.startsWith("K"))
+        assertEquals(30_000L, data.get("totalAmount").asLong())
+        val expiresAt = LocalDateTime.parse(data.get("expiresAt").asString())
+        assertTrue(expiresAt.isAfter(LocalDateTime.now().plusMinutes(14)) && expiresAt.isBefore(LocalDateTime.now().plusMinutes(16)))
+        assertEquals(3, stockOf(a, a.skuIds[0]))
+        assertEquals(4, stockOf(b, b.skuIds[0]))
+        assertEquals("PENDING_PAYMENT", jdbcTemplate.queryForObject("select order_status from orders", String::class.java))
+        assertEquals("READY", jdbcTemplate.queryForObject("select payment_status from payment", String::class.java))
+    }
+
+    @Test
+    fun 예상_총액이_다르면_409_ORDER_PRICE_CHANGED() {
+        val a = shop()
+        val user = newUserToken()
+
+        placeOrder(user, listOf(a.skuIds[0] to 1), 1).expectCode(409, "ORDER_PRICE_CHANGED")
+
+        assertEquals(5, stockOf(a, a.skuIds[0]))
+        assertEquals(0, orderCount())
+    }
+
+    @Test
+    fun 구매할_수_없는_SKU는_409_SKU_NOT_ORDERABLE() {
+        val a = shop()
+        val user = newUserToken()
+        patch(
+            "/api/v1/seller/products/${a.productId}/skus/${a.skuIds[0]}", a.sellerToken,
+            mapOf("extraPrice" to 0, "stock" to 5, "onSale" to false),
+        ).andExpect { status { isOk() } }
+
+        placeOrder(user, listOf(a.skuIds[0] to 1), 11_000).expectCode(409, "SKU_NOT_ORDERABLE")
+    }
+
+    @Test
+    fun 로그인하지_않으면_401() {
+        placeOrder("invalid", listOf(1L to 1), 11_000).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun Idempotency_Key가_없으면_400() {
+        val a = shop()
+        val user = newUserToken()
+        val body = mapOf(
+            "items" to listOf(mapOf("skuId" to a.skuIds[0], "quantity" to 1)),
+            "expectedTotalAmount" to 11_000,
+            "shippingAddress" to address(),
+        )
+
+        post("/api/v1/orders", user, body).expectCode(400, "IDEMPOTENCY_KEY_REQUIRED")
+
+        assertEquals(0, orderCount())
+    }
+
+    @Test
+    fun 같은_키_재요청은_같은_orderId를_돌려주고_주문은_하나다() {
+        val a = shop()
+        val user = newUserToken()
+        val key = UUID.randomUUID().toString()
+
+        val first = json(placeOrder(user, listOf(a.skuIds[0] to 1), 11_000, key).andExpect { status { isCreated() } })
+        val second = json(placeOrder(user, listOf(a.skuIds[0] to 1), 11_000, key).andExpect { status { isCreated() } })
+
+        assertEquals(first.get("data").get("orderId").asLong(), second.get("data").get("orderId").asLong())
+        assertEquals(first.get("data").get("orderNo").asString(), second.get("data").get("orderNo").asString())
+        assertEquals(1, orderCount())
+        assertEquals(4, stockOf(a, a.skuIds[0]))
+    }
+
+    @Test
+    fun 같은_키_다른_본문은_422() {
+        val a = shop()
+        val user = newUserToken()
+        val key = UUID.randomUUID().toString()
+        placeOrder(user, listOf(a.skuIds[0] to 1), 11_000, key).andExpect { status { isCreated() } }
+
+        placeOrder(user, listOf(a.skuIds[0] to 2), 19_000, key).expectCode(422, "IDEMPOTENCY_KEY_REUSED")
+
+        assertEquals(1, orderCount())
+    }
+
+    @Test
+    fun 여러_SKU_중_뒤_SKU가_재고_부족이면_앞_SKU_재고도_그대로다() {
+        val a = shop()
+        val user = newUserToken()
+        patch(
+            "/api/v1/seller/products/${a.productId}/skus/${a.skuIds[1]}", a.sellerToken,
+            mapOf("extraPrice" to 0, "stock" to 2, "onSale" to true),
+        ).andExpect { status { isOk() } }
+
+        // 8000 * 4 = 32000 + 3000. 첫 SKU 는 차감되지만 둘째(재고 2, 수량 3)에서 실패해 전부 롤백된다.
+        placeOrder(user, listOf(a.skuIds[0] to 1, a.skuIds[1] to 3), 35_000).expectCode(409, "STOCK_SOLD_OUT")
+
+        assertEquals(5, stockOf(a, a.skuIds[0]))
+        assertEquals(2, stockOf(a, a.skuIds[1]))
+        assertEquals(0, orderCount())
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from payment", Int::class.java))
+    }
+
+    @Test
+    fun 같은_키_동시_요청_10개는_주문_하나만_만든다() {
+        val a = shop()
+        val user = newUserToken()
+        val key = UUID.randomUUID().toString()
+
+        val results = runConcurrently(10) {
+            val result = placeOrder(user, listOf(a.skuIds[0] to 1), 11_000, key).andReturn().response
+            result.status to result.contentAsString
         }
-    }
 
-    @Test
-    fun 수량_0은_400() {
-        val dealId = createOngoingDeal()
-        order(userToken(), dealId, 0).andExpect {
-            status { isBadRequest() }
-            jsonPath("$.code") { value("INVALID_REQUEST") }
+        val created = results.filter { it.first == 201 }
+        assertTrue(created.isNotEmpty())
+        assertEquals(1, created.map { json(it.second).get("data").get("orderId").asLong() }.toSet().size)
+        results.filter { it.first != 201 }.forEach {
+            assertEquals(409, it.first)
+            assertEquals("IDEMPOTENCY_IN_PROGRESS", json(it.second).get("code").asString())
         }
+        assertEquals(1, orderCount())
+        assertEquals(4, stockOf(a, a.skuIds[0]))
     }
 
     @Test
-    fun 비로그인_주문은_401() {
-        val dealId = createOngoingDeal()
-        order(null, dealId, 1).andExpect {
-            status { isUnauthorized() }
-            jsonPath("$.code") { value("UNAUTHORIZED") }
-        }
-    }
-}
+    fun 재고_3인_SKU를_10명이_동시에_1개씩_주문하면_3건만_201이고_재고는_0이다() {
+        val a = shop(stock = 3)
+        val users = List(10) { newUserToken() }
 
-class OrderCancelAndQueryApiTest : OrderApiTestSupport() {
-
-    private fun cancel(token: String?, orderId: Long) = mockMvc.post("/api/v1/orders/$orderId/cancel") {
-        token?.let { header("Authorization", "Bearer $it") }
-    }
-
-    private fun orderId(dealId: Long, token: String, quantity: Int = 2) =
-        json(order(token, dealId, quantity).andReturn()).get("data").get("orderId").asLong()
-
-    @Test
-    fun 취소하면_200_환불_재고복구() {
-        val dealId = createOngoingDeal(totalQuantity = 10)
-        val token = userToken()
-        val orderId = orderId(dealId, token)
-        assertEquals(8, remaining(dealId))
-
-        cancel(token, orderId).andExpect {
-            status { isOk() }
-            jsonPath("$.message") { isNotEmpty() }
-            jsonPath("$.data") { value(null) }
+        val statuses = runConcurrently(10) { index ->
+            val result = placeOrder(users[index], listOf(a.skuIds[0] to 1), 11_000).andReturn().response
+            result.status to (if (result.status == 201) "" else json(result).get("code").asString())
         }
 
-        assertEquals(10, remaining(dealId))
-        assertEquals("CANCELLED", jdbcTemplate.queryForObject("select order_status from orders where id = ?", String::class.java, orderId))
-        assertEquals("USER_REQUESTED", jdbcTemplate.queryForObject("select cancel_reason from orders where id = ?", String::class.java, orderId))
-        assertEquals("REFUNDED", jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId))
+        assertEquals(3, statuses.count { it.first == 201 })
+        statuses.filter { it.first != 201 }.forEach { assertEquals(409 to "STOCK_SOLD_OUT", it) }
+        assertEquals(0, stockOf(a, a.skuIds[0]))
+        assertEquals(3, orderCount())
     }
 
-    @Test
-    fun 재취소는_409이고_재고는_한번만_복구() {
-        val dealId = createOngoingDeal(totalQuantity = 10)
-        val token = userToken()
-        val orderId = orderId(dealId, token)
-        cancel(token, orderId).andExpect { status { isOk() } }
+    private fun json(result: org.springframework.mock.web.MockHttpServletResponse): JsonNode =
+        objectMapper.readTree(result.contentAsString)
 
-        cancel(token, orderId).andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("ORDER_ALREADY_CANCELLED") }
+    private fun json(body: String): JsonNode = objectMapper.readTree(body)
+
+    /** [count] 개 작업을 동시에 출발시켜 결과를 모은다. */
+    private fun <T> runConcurrently(count: Int, task: (Int) -> T): List<T> {
+        val pool = Executors.newFixedThreadPool(count)
+        try {
+            val ready = CountDownLatch(count)
+            val go = CountDownLatch(1)
+            val futures = (0 until count).map { index ->
+                pool.submit(Callable {
+                    ready.countDown()
+                    go.await()
+                    task(index)
+                })
+            }
+            ready.await()
+            go.countDown()
+            return futures.map { it.get() }
+        } finally {
+            pool.shutdown()
         }
-        assertEquals(10, remaining(dealId))
-    }
-
-    @Test
-    fun 남의_주문_취소는_404() {
-        val dealId = createOngoingDeal(totalQuantity = 10)
-        val orderId = orderId(dealId, userToken())
-
-        cancel(userToken(), orderId).andExpect {
-            status { isNotFound() }
-            jsonPath("$.code") { value("ORDER_NOT_FOUND") }
-        }
-        assertEquals(8, remaining(dealId))
-    }
-
-    @Test
-    fun 비로그인_취소는_401() {
-        cancel(null, 1L).andExpect { status { isUnauthorized() } }
-    }
-
-    @Test
-    fun 내_주문_목록은_최신순_페이징() {
-        val dealId = createOngoingDeal(totalQuantity = 10, perMemberLimit = 5)
-        val token = userToken()
-        val first = orderId(dealId, token, 1)
-        val second = orderId(dealId, token, 2)
-        orderId(dealId, userToken(), 1)
-
-        mockMvc.get("/api/v1/orders/me") {
-            header("Authorization", "Bearer $token")
-            param("page", "0")
-            param("size", "1")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.data.content.length()") { value(1) }
-            jsonPath("$.data.content[0].orderId") { value(second) }
-            jsonPath("$.data.content[0].dealId") { value(dealId) }
-            jsonPath("$.data.content[0].productName") { value("진행딜") }
-            jsonPath("$.data.content[0].quantity") { value(2) }
-            jsonPath("$.data.content[0].totalAmount") { value(10000) }
-            jsonPath("$.data.content[0].status") { value("PAID") }
-            jsonPath("$.data.content[0].cancelReason") { value(null) }
-            jsonPath("$.data.content[0].createdAt") { isNotEmpty() }
-            jsonPath("$.data.totalElements") { value(2) }
-            jsonPath("$.data.hasNext") { value(true) }
-        }
-        mockMvc.get("/api/v1/orders/me") {
-            header("Authorization", "Bearer $token")
-            param("page", "1")
-            param("size", "1")
-        }.andExpect {
-            jsonPath("$.data.content[0].orderId") { value(first) }
-            jsonPath("$.data.hasNext") { value(false) }
-        }
-    }
-
-    @Test
-    fun 내_주문_목록_잘못된_size는_400() {
-        mockMvc.get("/api/v1/orders/me") {
-            header("Authorization", "Bearer ${userToken()}")
-            param("size", "101")
-        }.andExpect {
-            status { isBadRequest() }
-            jsonPath("$.code") { value("INVALID_REQUEST") }
-        }
-    }
-
-    @Test
-    fun 비로그인_조회는_401() {
-        mockMvc.get("/api/v1/orders/me").andExpect { status { isUnauthorized() } }
-    }
-}
-
-@TestPropertySource(properties = ["kairos.mock-pg.failure-rate=1"])
-class OrderApiPaymentFailureTest : OrderApiTestSupport() {
-
-    @Test
-    fun 실패율_1이면_201_CANCELLED_남은수량_원복() {
-        val dealId = createOngoingDeal(totalQuantity = 10)
-
-        val result = order(userToken(), dealId, 2).andExpect {
-            status { isCreated() }
-            jsonPath("$.data.status") { value("CANCELLED") }
-            jsonPath("$.data.cancelReason") { value("PAYMENT_FAILED") }
-        }.andReturn()
-        val orderId = json(result).get("data").get("orderId").asLong()
-
-        assertEquals(10, remaining(dealId))
-        assertEquals("CANCELLED", jdbcTemplate.queryForObject("select order_status from orders where id = ?", String::class.java, orderId))
-        assertEquals("PAYMENT_FAILED", jdbcTemplate.queryForObject("select cancel_reason from orders where id = ?", String::class.java, orderId))
-        assertEquals("FAILED", jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId))
     }
 }

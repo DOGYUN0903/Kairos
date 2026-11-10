@@ -54,6 +54,12 @@ class ProductRepositoryImpl(
         return findPage(listOfNotNull(status?.let { product.productStatus.eq(it) }), page, size)
     }
 
+    override fun findAllBySkuIds(skuIds: Collection<Long>): List<Product> {
+        if (skuIds.isEmpty()) return emptyList()
+        val productIds = skuJpaRepository.findAllByIdIn(skuIds).map { it.product.id }.distinct()
+        return toDomains(productJpaRepository.findAllById(productIds))
+    }
+
     override fun existsByCategoryId(categoryId: Long): Boolean = productJpaRepository.existsByCategoryId(categoryId)
 
     private fun findPage(where: List<Predicate>, page: Int, size: Int): PageResult<Product> {

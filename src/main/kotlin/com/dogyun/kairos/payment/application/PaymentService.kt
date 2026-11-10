@@ -1,41 +1,76 @@
 package com.dogyun.kairos.payment.application
 
+import com.dogyun.kairos.common.domain.DomainException
+import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.payment.domain.Payment
 import com.dogyun.kairos.payment.domain.PaymentRepository
+import com.dogyun.kairos.payment.domain.PaymentStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.LocalDateTime
 
-/** 주문 트랜잭션 안에서 동기 호출된다(참여). PG 대기 동안 호출 스레드는 블로킹된다. */
 @Service
 class PaymentService(
-    private val pgClient: PgClient,
     private val paymentRepository: PaymentRepository,
-    private val paymentMetrics: PaymentMetrics,
+    private val clock: Clock,
 ) {
 
     @Transactional
-    fun pay(orderId: Long, amount: Long): PayResult {
-        val started = System.nanoTime()
-        val response = pgClient.approve(orderId, amount)
-        paymentMetrics.recordDuration(response.name, System.nanoTime() - started)
-        val reason = when (response) {
-            PgResponse.APPROVED -> null
-            PgResponse.FAILED -> FailReason.PAYMENT_FAILED
-            PgResponse.TIMEOUT -> FailReason.PAYMENT_TIMEOUT
-        }
-        if (reason == null) {
-            val saved = paymentRepository.save(Payment.approved(orderId, amount))
-            return PayResult.Approved(checkNotNull(saved.id))
-        }
-        paymentRepository.save(Payment.failed(orderId, amount, reason.name))
-        return PayResult.Failed(reason)
+    fun prepare(orderId: Long, orderNo: String, amount: Long): Long =
+        requireNotNull(paymentRepository.save(Payment.ready(orderId, orderNo, amount)).id)
+
+    @Transactional
+    fun start(orderId: Long, paymentKey: String): PaymentSnapshot {
+        val other = paymentRepository.findByPaymentKey(paymentKey)
+        if (other != null && other.orderId != orderId) throw DomainException(ErrorCode.PAYMENT_KEY_DUPLICATED)
+        return change(orderId) { it.start(paymentKey, LocalDateTime.now(clock)) }
     }
 
-    /** 승인된 결제가 없으면 IllegalStateException(호출 측 오류). */
     @Transactional
-    fun refund(orderId: Long) {
-        val payment = checkNotNull(paymentRepository.findLatestByOrderId(orderId)) { "결제 내역이 없습니다: orderId=$orderId" }
-        payment.refund()
-        paymentRepository.save(payment)
+    fun approve(orderId: Long): PaymentSnapshot = change(orderId) { it.approve(LocalDateTime.now(clock)) }
+
+    @Transactional
+    fun fail(orderId: Long, reason: String): PaymentSnapshot = change(orderId) { it.fail(reason) }
+
+    @Transactional
+    fun markUnknown(orderId: Long): PaymentSnapshot = change(orderId) { it.markUnknown() }
+
+    @Transactional
+    fun voidAfterApproval(orderId: Long): PaymentSnapshot = change(orderId) { it.voidAfterApproval() }
+
+    @Transactional
+    fun recordRefund(orderId: Long, amount: Long): PaymentSnapshot = change(orderId) { it.refund(amount) }
+
+    @Transactional
+    fun get(orderId: Long): PaymentSnapshot = load(orderId).toSnapshot()
+
+    /** `IN_PROGRESS` 로 [inProgressBefore] 이전부터 정체된 결제와 `UNKNOWN` 전부. */
+    @Transactional
+    fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentSnapshot> =
+        (
+            paymentRepository.findStaleInProgress(inProgressBefore, limit) +
+                paymentRepository.findAllByStatus(PaymentStatus.UNKNOWN, limit)
+            ).take(limit).map { it.toSnapshot() }
+
+    /** 재취소 후보: `payment_key` 가 있고 `FAILED`/`UNKNOWN` 인 결제. id 오름차순 keyset([afterId] 보다 큰 것부터). */
+    @Transactional
+    fun findVoidCandidates(afterId: Long, limit: Int): List<PaymentSnapshot> =
+        paymentRepository.findVoidCandidates(afterId, limit).map { it.toSnapshot() }
+
+    /** PG 에 남은 잔액이 없음이 확인된 `FAILED`/`UNKNOWN` 결제를 `CANCELED` 로 닫는다. */
+    @Transactional
+    fun markVoided(orderId: Long): PaymentSnapshot = change(orderId) { it.markVoided() }
+
+    private fun load(orderId: Long): Payment =
+        paymentRepository.findByOrderId(orderId) ?: throw DomainException(ErrorCode.PAYMENT_NOT_FOUND)
+
+    private fun change(orderId: Long, action: (Payment) -> Unit): PaymentSnapshot {
+        val payment = load(orderId)
+        action(payment)
+        return paymentRepository.save(payment).toSnapshot()
     }
+
+    private fun Payment.toSnapshot() =
+        PaymentSnapshot(requireNotNull(id), orderId, orderNo, paymentKey, amount, refundedAmount, status.name, failReason)
 }

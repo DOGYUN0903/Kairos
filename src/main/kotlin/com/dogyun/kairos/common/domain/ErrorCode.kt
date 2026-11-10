@@ -17,10 +17,8 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     DEAL_ALREADY_OPENED(409, "이미 오픈된 딜은 수정하거나 삭제할 수 없습니다."),
     DEAL_NOT_ONGOING(409, "진행 중인 딜이 아닙니다."),
 
-    ORDER_LIMIT_EXCEEDED(409, "인당 구매 수량 한도를 초과했습니다."),
     STOCK_SOLD_OUT(409, "재고가 모두 소진되었습니다."),
     ORDER_NOT_FOUND(404, "주문을 찾을 수 없습니다."),
-    ORDER_ALREADY_CANCELLED(409, "이미 취소된 주문입니다."),
 
     SELLER_NOT_ACTIVE(409, "판매자 상태 때문에 처리할 수 없습니다."),
     SELLER_INVALID(400, "판매자 정보가 올바르지 않습니다."),
@@ -50,4 +48,28 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     CHANGE_REQUEST_NOT_FOUND(404, "변경 요청을 찾을 수 없습니다."),
     CHANGE_REQUEST_ALREADY_PENDING(409, "이미 대기 중인 변경 요청이 있습니다."),
     CHANGE_REQUEST_INVALID_STATE_TRANSITION(409, "허용되지 않는 변경 요청 상태 전이입니다."),
+
+    CART_INVALID(400, "장바구니 정보가 올바르지 않습니다."),
+    CART_ITEM_NOT_FOUND(404, "장바구니 항목을 찾을 수 없습니다."),
+    SKU_NOT_ORDERABLE(409, "지금 구매할 수 없는 상품입니다."),
+
+    ORDER_INVALID(400, "주문 정보가 올바르지 않습니다."),
+    ORDER_PRICE_CHANGED(409, "상품 가격이 바뀌었습니다. 다시 확인해 주세요."),
+    ORDER_INVALID_STATE_TRANSITION(409, "허용되지 않는 주문 상태 전이입니다."),
+    ORDER_ITEM_NOT_FOUND(404, "주문 항목을 찾을 수 없습니다."),
+    ORDER_ITEM_NOT_CANCELABLE(409, "배송이 시작되었거나 이미 취소된 항목입니다."),
+    SELLER_ORDER_NOT_FOUND(404, "판매자 주문을 찾을 수 없습니다."),
+    SELLER_ORDER_INVALID_STATE_TRANSITION(409, "허용되지 않는 판매자 주문 상태 전이입니다."),
+
+    PAYMENT_NOT_FOUND(404, "결제를 찾을 수 없습니다."),
+    PAYMENT_AMOUNT_MISMATCH(400, "결제 금액이 주문 금액과 다릅니다."),
+    PAYMENT_KEY_DUPLICATED(409, "이미 사용된 결제 키입니다."),
+    PAYMENT_IN_PROGRESS(409, "결제 승인이 진행 중입니다."),
+    PAYMENT_INVALID_STATE_TRANSITION(409, "허용되지 않는 결제 상태 전이입니다."),
+    PAYMENT_REJECTED(402, "결제가 승인되지 않았습니다."),
+    PAYMENT_CANCEL_FAILED(409, "결제 취소에 실패했습니다."),
+
+    IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
+    IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
+    IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),
 }
