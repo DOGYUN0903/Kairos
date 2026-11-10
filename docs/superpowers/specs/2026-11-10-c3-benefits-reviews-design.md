@@ -19,7 +19,7 @@ C2 구매 위에 **쿠폰, 포인트, 후기, 상품 좋아요**를 얹는다. �
 - 새 모듈 `review`: 후기와 판매자 답글.
 - 좋아요는 `catalog`에 둔다(`product_like` + `product.like_count`). 좋아요는 상품 집계의 일부이고 별도 서비스로 뗄 만큼 규칙이 없다. 후기 집계(`review_count`, `rating_sum`)도 product 컬럼이며 review 모듈이 catalog application 포트로 갱신한다.
 - `order`는 `benefit`을 **포트(인터페이스)** 로만 부른다: `BenefitApplier`(주문 생성 시 쿠폰·포인트 확정), `BenefitReverter`(취소·만료 시 되돌림), `PointEarner`(구매 확정 시 적립). 구현은 `order.infrastructure`가 `benefit.application` 서비스를 호출한다(CLAUDE.md 모듈 규칙).
-- 주문 생성 트랜잭션이 order·catalog(재고)에 더해 benefit(쿠폰 상태, 포인트 잔액)까지 바꾼다. ADR 0003의 "한 DB 트랜잭션" 결정의 연장이며 **ADR 0004**로 남긴다(Phase 4 Saga에서 분리).
+- 주문 생성 트랜잭션이 order·catalog(재고)에 더해 benefit(쿠폰 상태, 포인트 잔액)까지 바꾼다. ADR 0003의 "한 DB 트랜잭션" 결정의 연장이며 **ADR 0004**로 남긴다(Phase 4 Saga에서 분리). ADR 0004에는 락 순서도 적는다: 주문 생성 `member_point → coupon → sku`(주문 행은 INSERT라 잠그지 않음) → 커밋 → 0원 주문이면 별도 트랜잭션에서 `orders(FOR UPDATE)`를 잡고 승인 확정; 취소·만료·확정은 `orders(FOR UPDATE) → member_point → coupon`.
 
 ## 4. 쿠폰 (사용자 결정)
 
@@ -33,7 +33,7 @@ C2 구매 위에 **쿠폰, 포인트, 후기, 상품 좋아요**를 얹는다. �
 
 ### 4-1. 쿠폰 정책과 발급 (Claude 결정)
 
-- `coupon_policy`(정책)는 관리자(플랫폼 쿠폰: 상품·장바구니)와 판매자(판매자 상품 쿠폰)가 만든다. 판매자 정책은 승인 없이 바로 쓴다(자기 돈이므로). 정책은 만든 뒤 할인 조건을 바꿀 수 없고 **종료**만 할 수 있다(이미 발급된 쿠폰의 계산이 바뀌면 안 되므로).
+- `coupon_policy`(정책)는 관리자(플랫폼 쿠폰: 상품·장바구니)와 판매자(판매자 상품 쿠폰)가 만든다. 판매자 정책은 승인 없이 바로 쓴다(자기 돈이므로). 정책은 만든 뒤 할인 조건을 바꿀 수 없고 **종료**(`ENDED`)만 할 수 있다(이미 발급된 쿠폰의 계산이 바뀌면 안 되므로). 종료는 **새 발급(claim)만 막는다**. 이미 발급된 쿠폰은 자기 `expires_at`까지 그대로 쓸 수 있다(Claude 결정, 빌더 체크 반영. 틀렸을 때 비용: 판매자가 실수로 만든 정책을 끝내도 이미 받은 사용자는 쓸 수 있어 판매자 부담이 남는다. 반대로 사용까지 막으면 사용자가 받은 혜택이 사라져 CS 비용이 더 크다).
 - 적용 대상(`target_type`): 플랫폼 상품 쿠폰은 `ALL_PRODUCTS` 또는 `PRODUCT`(상품 하나), 판매자 상품 쿠폰은 `SELLER`(자기 상품 전부) 또는 `PRODUCT`(자기 상품 하나). 장바구니 쿠폰은 대상이 없다.
 - 발급은 **사용자가 다운로드(claim)** 한다. 1인 1장 고정(`UNIQUE(policy_id, member_id)`). 총 수량은 정책의 `total_quantity`(NULL이면 무제한)이고, 발급은 조건부 UPDATE `issued_count = issued_count + 1 WHERE issued_count < total_quantity`가 1행일 때만 쿠폰 행을 만든다. 0행이면 `COUPON_SOLD_OUT`. 선착순 쿠폰의 경합 측정은 C6로 미룬다(로드맵).
 - 발급 쿠폰의 만료일 = `min(정책 valid_until, 발급 시각 + 정책 validity_days)`. 만료 쿠폰은 조회에서 `EXPIRED`로 보여 주고(계산값), 별도 만료 작업은 두지 않는다.
@@ -65,14 +65,14 @@ C2의 무료배송 기준(5만 원, 구매자 기준)은 **할인 전 상품 금
 ### 5-1. 적립 세부 (Claude 결정)
 
 - "결제 금액의 1%"의 결제 금액 = 확정되는 **판매자 주문**의 `ORDERED` 항목 `paidAmount` 합계(쿠폰·포인트 차감 후 PG로 낸 금액, 배송비 제외). 포인트로 낸 부분은 적립 대상이 아니다(포인트로 포인트를 낳지 않는다). 적립액 = `floor(합계 × 1%)`, 1P 단위(10P 단위는 사용에만 적용). 0P면 적립 행을 만들지 않는다.
-- 적립은 `OrderShippingService.confirmPurchase`/`autoConfirm`의 **같은 트랜잭션**(주문 행 락 아래)에서 `PointEarner` 포트로 한다. 멱등성은 `point_transaction`의 `UNIQUE(ref_type, ref_id)` = `(PURCHASE_CONFIRM, sellerOrderId)`가 보장한다.
+- 적립은 `OrderShippingService.confirmPurchase`/`autoConfirm`의 **같은 트랜잭션**(주문 행 락 아래)에서 `PointEarner` 포트로 한다. 멱등성은 `point_transaction`의 `UNIQUE(transaction_type, ref_type, ref_id)` = `(EARN_PURCHASE, PURCHASE_CONFIRM, sellerOrderId)`가 보장한다.
 - 구매 확정 뒤에는 취소가 불가능하므로(C2: 배송 전까지만 취소) 적립 회수 규칙은 필요 없다. 반품(로드맵 5장)이 들어오면 그때 정한다.
 
 ### 5-2. 잔액·로트·원장 (Claude 결정)
 
 - `member_point`(회원당 1행, `UNIQUE(member_id)`): `balance`. **포인트를 바꾸는 모든 트랜잭션은 이 행을 `SELECT ... FOR UPDATE`로 먼저 잠근다**(주문 행 락과 같은 원칙). 잔액 검사는 락 뒤에 한다.
 - `point_lot`(적립 단위): `amount`, `remaining_amount`, `expires_at`, 출처. 잔액 = Σ 만료되지 않은 로트의 `remaining_amount`이며 `member_point.balance`와 같아야 한다(테스트로 증명).
-- `point_transaction`(원장): 유형 `EARN_PURCHASE`, `EARN_REVIEW`, `USE`, `REFUND`, `EXPIRE`, 부호 있는 `amount`, `balance_after`, `ref_type`/`ref_id`(`UNIQUE`). 사용 시 어느 로트에서 얼마를 뺐는지 `point_lot_usage`(transaction_id, lot_id, amount)에 남긴다.
+- `point_transaction`(원장): 유형 `EARN_PURCHASE`, `EARN_REVIEW`, `USE`, `REFUND`, `EXPIRE`, 부호 있는 `amount`, `balance_after`, `ref_type`/`ref_id`. **`UNIQUE(transaction_type, ref_type, ref_id)`**(Claude 결정, 빌더 체크 반영: `ref` 둘만으로는 생성 시 `USE (ORDER, orderId)`와 결제 전 되돌림 `REFUND (ORDER, orderId)`가 충돌한다). 원장 키 전체 목록 — `EARN_PURCHASE/PURCHASE_CONFIRM/sellerOrderId`, `EARN_REVIEW/REVIEW/reviewId`, `USE/ORDER/orderId`, `REFUND/ORDER/orderId`(결제 전 닫힘), `REFUND/ORDER_ITEM/orderItemId`(항목 취소), `EXPIRE/POINT_LOT/lotId`. 유형이 다르면 같은 ref라도 충돌하지 않고, 같은 유형 안에서는 ref가 사건마다 다르다. 사용 시 어느 로트에서 얼마를 뺐는지 `point_lot_usage`(transaction_id, lot_id, amount)에 남긴다.
 - 사용(FIFO): 락 → 만료 안 된 로트를 `expires_at, id` 오름차순으로 `remaining_amount`에서 차감 → 원장 `USE`(ref = `ORDER`, orderId) → `balance` 감소.
 - 되돌림(취소·만료·결제 실패): 되돌릴 금액을 그 `USE`의 `point_lot_usage`를 **역순**으로 되감는다. 로트가 아직 만료 전이면 `remaining_amount`를 되돌리고, 이미 만료된 로트 몫은 새 로트(`REFUND` 출처, 만료 = 되돌린 날 + 30일, 설정값)로 만든다. 원장 `REFUND`(ref = `ORDER_ITEM`, itemId / 결제 전 닫힘은 `ORDER`, orderId). 틀렸을 때 비용: 만료 직전 로트를 쓰고 취소한 사용자에게 30일을 더 주는 소액 관대함. 반대로 "새 로트 1년"은 만료 우회가 되고, "원 로트만 되돌림"은 만료된 몫이 증발한다.
 - 만료 작업: 하루 한 번, `expires_at < now AND remaining_amount > 0`인 로트를 id keyset으로 훑어 회원별로 락 → 원장 `EXPIRE`(ref = `POINT_LOT`, lotId) → `remaining_amount = 0`, `balance` 감소. ADR 0003대로 작업 메서드에 `@Transactional`을 붙이지 않고 건별 트랜잭션.
@@ -118,16 +118,18 @@ C2의 무료배송 기준(5만 원, 구매자 기준)은 **할인 전 상품 금
 3. 쿠폰 검증(benefit): 본인 소유·`AVAILABLE`·만료 전·대상 일치·최소 금액 충족. 한 항목에 상품 쿠폰 1장, 주문에 장바구니 쿠폰 1장. 같은 쿠폰 ID 중복 지정은 `ORDER_INVALID`.
 4. `DiscountAllocator`로 항목별 할인·포인트 배분·`paidAmount`·`totalAmount` 계산 → `Order.create`.
 5. benefit이 쿠폰을 `USED`로, 포인트를 FIFO로 차감(원장 `USE`). 어느 하나라도 실패하면 전부 롤백(재고 포함).
-6. `Payment` `READY`(금액 = `totalAmount`). PG 승인 금액 검증은 C2 그대로 `totalAmount`와 비교한다. `totalAmount`가 0원이면(쿠폰·포인트로 전액) **PG 없이 즉시 승인**한다(Claude 결정: `Payment`를 `paymentKey` 없이 `APPROVED`로 만들고 `markPaid`. 승인 API는 `PAYMENT_AMOUNT_MISMATCH` 대신 즉시 결과 반환. 틀렸을 때 비용: 0원 결제 경로가 PG 경로와 분기되어 테스트 하나가 더 필요하다. 반대로 PG에 0원을 보내면 토스가 거절한다).
+6. `Payment` `READY`(금액 = `totalAmount`). PG 승인 금액 검증은 C2 그대로 `totalAmount`와 비교한다. `totalAmount`가 0원이면(쿠폰·포인트로 전액) **PG 없이 즉시 승인**한다(Claude 결정: `Payment`를 `paymentKey` 없이 `APPROVED`로 만들고 `markPaid`. 빌더 체크 반영: 승인 뒤 처리(`PAID`·`paidAt`·`increaseSales`·장바구니 항목 삭제)는 PG 승인과 **같은 경로**인 `OrderPaymentService`의 승인 확정 단계(`finishApproval`에 해당하는 내부 approve 단계)를 재사용한다. `place`의 트랜잭션이 커밋된 뒤 `OrderService`가 이 단계를 호출하고, 그 단계가 주문 행을 `findByIdForUpdate`로 잠근 채 PG 호출 없이 `APPROVE` 판정으로 처리한다. 클라이언트 승인 API(`/payments/confirm`)는 이미 `PAID`면 그 결과를 돌려준다. 틀렸을 때 비용: `place` 커밋과 승인 확정 사이에 크래시가 나면 `READY` 결제·`PENDING_PAYMENT` 주문이 남는데, 만료 작업이 15분 뒤 닫고 쿠폰·포인트를 되돌리므로 돈이 새지는 않고 사용자가 다시 주문하면 된다. 반대로 PG에 0원을 보내면 토스가 거절한다).
 
 ### 7-2. 결제 실패·만료 (C2 7장, `OrderExpiryService`·`closeUnpaid`·`voidClosedOrder`)
 
-주문이 `PENDING_PAYMENT`에서 `CANCELED`로 닫히는 모든 경로(만료 작업, 승인 거절, 금액 불일치 void)에서 재고 복구와 **같은 트랜잭션**에 `BenefitReverter.revertAll(orderId)`를 넣는다: 쿠폰 전부 `AVAILABLE`(만료 전이면), 포인트 `pointsUsed` 전액 되돌림(원장 `REFUND`, ref `(ORDER, orderId)` — UNIQUE라 두 번 실행돼도 한 번만). 결제 전이므로 쿠폰 만료 여부와 무관하게 돌려주는 것이 맞지만, 규칙을 하나로 두기 위해 "만료 전이면"을 그대로 둔다(15분 안에 만료될 쿠폰은 어차피 쓸 수 없었다).
+주문이 `PENDING_PAYMENT`에서 `CANCELED`로 닫히는 모든 경로(만료 작업, 승인 거절, 금액 불일치 void)에서 재고 복구와 **같은 트랜잭션**에 `BenefitReverter.revertAll(orderId)`를 넣는다: 쿠폰 전부 `AVAILABLE`(만료 전이면), 포인트 `pointsUsed` 전액 되돌림(원장 `REFUND`, ref `(ORDER, orderId)` — `(REFUND, ORDER, orderId)` UNIQUE라 두 번 실행돼도 한 번만). 결제 전이므로 쿠폰 만료 여부와 무관하게 돌려주는 것이 맞지만, 규칙을 하나로 두기 위해 "만료 전이면"을 그대로 둔다(15분 안에 만료될 쿠폰은 어차피 쓸 수 없었다).
 
 ### 7-3. 항목 취소 (`OrderCancelService`, tx1 → PG → tx2)
 
 - `RefundPlan`에 `pointsRefund`(= 항목 `pointsAllocated`)와 `productCouponReturn`(쿠폰 ID 또는 null)을 더한다. `itemAmount` 자리에 **`paidAmount`** 를 쓴다(`refundAmount = paidAmount + shippingFeeRefund − shippingFeeDeducted + shippingFeeReturned`). PG 부분 취소 금액·멱등 키(`refund-{itemId}-{금액}`)는 이 `refundAmount`다.
-- tx2(`finishCancel`)에서 PG 환불이 확인되면 재고 복구·판매량 감소와 **같은 트랜잭션**에서 `BenefitReverter.revertItem(orderId, itemId, pointsRefund, productCouponId, lastItem)`을 호출한다. 마지막 항목(`remainingAfter == 0`)이면 장바구니 쿠폰도 되돌린다. 포인트 원장 ref `(ORDER_ITEM, itemId)` UNIQUE로 멱등.
+- tx2(`finishCancel`)에서 PG 환불이 확인되면 재고 복구·판매량 감소와 **같은 트랜잭션**에서 `BenefitReverter.revertItem(orderId, itemId, pointsRefund, productCouponId, lastItem)`을 호출한다. 마지막 항목(`remainingAfter == 0`)이면 장바구니 쿠폰도 되돌린다. 포인트 원장 `(REFUND, ORDER_ITEM, itemId)` UNIQUE로 멱등.
+- 되돌림은 **취소 주체(구매자·판매자·관리자)와 무관하게 같다**(Claude 결정, 빌더 체크 반영): 상품 쿠폰은 만료 전이면 반환, 배분 포인트는 전액 되돌림. 주체 차이는 C2대로 배송비 차감 여부에만 있다.
+- **PG를 부르지 않는 취소**(Claude 결정, 빌더 체크 반영): 항목의 현금 `refundAmount == 0`이거나 결제에 `paymentKey`가 없으면(0원 결제 주문) tx1 뒤 PG 호출을 건너뛰고 바로 tx2를 실행한다. tx2는 주문 행 락 아래에서 항목 `CANCELED` 확정·재고 복구·판매량 감소·benefit 되돌림을 한 트랜잭션으로 한다. 이 경우 항목은 `CANCEL_REQUESTED`로 커밋된 뒤 같은 요청 안에서 바로 닫히므로 대사(`PaymentReconciliationService`)의 대상이 되지 않는다. 대사는 `refund_amount > 0`이고 `paymentKey`가 있는 `CANCEL_REQUESTED` 항목만 PG에 조회한다; 그 밖의 `CANCEL_REQUESTED`(0원·키 없음)가 타임아웃을 넘겨 남아 있으면 PG 조회 없이 tx2 로직을 재실행해 닫는다.
 - `revertCancel`(PG 실패로 되돌림) 경로에서는 benefit을 건드리지 않는다(아직 아무것도 되돌리지 않았으므로).
 - `RefundPlan`의 환불 합계 불변식을 확장한다: (결제 금액 − 누적 환불액) = 남은 항목 `paidAmount` 합 + 남은 구매자 배송비 + 회수 배송비. 그리고 누적 되돌린 포인트 ≤ `pointsUsed`, 마지막 취소 뒤에는 정확히 같다.
 
@@ -170,7 +172,7 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 - `coupon`: `policy_id`, `member_id`, `coupon_status`, `used_order_id NULL`, `issued_at`, `expires_at`, `used_at NULL`. 정책 값(유형·할인) 스냅샷은 두지 않는다 — 정책이 불변이므로 조인(ID 조회)으로 읽는다. `UNIQUE(policy_id, member_id)`.
 - `member_point`: `member_id` `UNIQUE`, `balance`.
 - `point_lot`: `member_id`, `amount`, `remaining_amount`, `source_type`, `source_id`, `expires_at`.
-- `point_transaction`: `member_id`, `transaction_type`, `amount`(부호), `balance_after`, `ref_type`, `ref_id`, `UNIQUE(ref_type, ref_id)`.
+- `point_transaction`: `member_id`, `transaction_type`, `amount`(부호), `balance_after`, `ref_type`, `ref_id`, `UNIQUE(transaction_type, ref_type, ref_id)`.
 - `point_lot_usage`: `transaction_id`, `lot_id`, `amount`.
 - `orders` 추가: `product_coupon_discount`, `cart_coupon_id NULL`, `cart_coupon_discount`, `points_used`, `points_refunded`.
 - `order_item` 추가: `product_coupon_id NULL`, `product_coupon_discount`, `product_coupon_issuer NULL`(PLATFORM/SELLER — C4 정산이 판매자 부담분을 가르는 열), `cart_coupon_allocated`, `points_allocated`, `paid_amount`, `points_refunded`.
@@ -199,7 +201,7 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 
 ## 12. 동시성과 멱등성
 
-- POST(쿠폰 발급·정책 생성·후기 작성·주문 생성)는 C2 8장의 `Idempotency-Key` 필터를 그대로 탄다. 그 아래 마지막 방어선: 쿠폰 발급 `UNIQUE(policy_id, member_id)`, 후기 `UNIQUE(order_item_id)`, 포인트 원장 `UNIQUE(ref_type, ref_id)`.
+- POST(쿠폰 발급·정책 생성·후기 작성·주문 생성)는 C2 8장의 `Idempotency-Key` 필터를 그대로 탄다. 그 아래 마지막 방어선: 쿠폰 발급 `UNIQUE(policy_id, member_id)`, 후기 `UNIQUE(order_item_id)`, 포인트 원장 `UNIQUE(transaction_type, ref_type, ref_id)`.
 - PATCH(후기 수정·답글·정책 종료)와 PUT/DELETE(좋아요)는 멱등. 이미 목표 상태면 성공.
 - 락 순서 고정: 주문 생성 `member_point → coupon → sku`; 취소·만료·확정 `orders(FOR UPDATE) → member_point → coupon`. 주문 생성은 `orders` 행을 잠그지 않으므로 두 순서가 순환하지 않는다. 후기 적립은 `member_point`만, 좋아요는 `product_like → product`만 잠근다.
 - 쿠폰 수량·사용 상태·좋아요 플래그는 전부 **조건부 UPDATE의 영향 행 수**로 판정한다(재고와 같은 방식). 비관적 락·Redis는 쓰지 않는다(Phase 규율).
@@ -237,7 +239,10 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 - 총 수량 1인 정책에 동시 발급 10건 → 1건 성공, `issued_count = 1`.
 - 포인트 동시 사용(잔액 1,000P, 두 주문이 각 1,000P) → 하나만 성공, 잔액 0.
 - 결제 만료(15분)·승인 거절·금액 불일치 void 각각에서 쿠폰·포인트 되돌림. 같은 주문에 되돌림이 두 번 실행돼도 원장 한 건.
-- 0원 결제 주문 즉시 승인.
+- 0원 결제 주문: `place` 뒤 PG 없이 `PAID`·판매량 증가·장바구니 삭제가 PG 승인과 같은 결과. 그 주문의 항목 취소는 PG 호출 없이 닫히고 포인트·쿠폰이 돌아오며 대사 대상에 남지 않음.
+- 현금 환불 0원 항목(전액 포인트·쿠폰) 취소도 PG 없이 닫힘.
+- 판매자·관리자 취소에서도 상품 쿠폰 반환·포인트 되돌림이 구매자 취소와 같음.
+- 종료된 정책의 발급 쿠폰은 만료 전이면 주문에 사용 가능, 새 발급은 `COUPON_POLICY_ENDED`.
 - FIFO: 만료일이 다른 로트 셋에서 사용 후 가장 빠른 만료 로트부터 비고, 취소하면 그 로트로 돌아옴. 만료된 로트 몫은 새 30일 로트.
 - 구매 확정 중복(사용자 확정과 자동 확정 동시) → 적립 한 번.
 - 후기: 미확정 항목 거절, 같은 항목 두 번 거절(Idempotency-Key 없이도), 삭제 후 재작성 거절, 사진 후기 500P 한 번, 수정·삭제 후 `rating_sum`/`review_count`가 실제 행과 일치.
