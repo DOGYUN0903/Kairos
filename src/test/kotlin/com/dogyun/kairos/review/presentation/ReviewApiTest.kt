@@ -177,6 +177,33 @@ class ReviewApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 사진_2장을_다른_사진_1장으로_수정하면_이전_사진은_DELETED이고_적립은_그대로다() {
+        val shop = shop()
+        val user = newUserToken()
+        val item = confirmedItems(user, shop).single()
+        val (a, b, c) = listOf(uploadImage(user), uploadImage(user), uploadImage(user))
+        val reviewId = writeReview(user, item.orderId, item.orderItemId, rating = 5, imageFileIds = listOf(a, b))
+        val memberId = memberIdOf(user)
+        val balanceBefore = pointBalance(memberId)
+
+        val edited = json(
+            patch("/api/v1/reviews/$reviewId", user, mapOf("rating" to 5, "content" to "사진을 바꾼 열 글자 이상 본문", "imageFileIds" to listOf(c)))
+                .andExpect { status { isOk() }; jsonPath("$.data.rewardPoints") { value(500) } },
+        ).get("data")
+
+        assertEquals(1, edited.get("imageUrls").size())
+        val rows = jdbcTemplate.query(
+            "select file_id, status from review_image where review_id = ? order by id",
+            { rs, _ -> rs.getLong(1) to rs.getString(2) }, reviewId,
+        )
+        assertEquals(listOf(a to "DELETED", b to "DELETED", c to "ACTIVE"), rows)
+        assertEquals(1, productReviews(shop.productId).get(0).get("imageUrls").size())
+        assertEquals(balanceBefore, pointBalance(memberId))
+        assertEquals(500L, reviewLedgerSum(memberId))
+        assertEquals(1, pointTransactionCount(memberId, "EARN_REVIEW"))
+    }
+
+    @Test
     fun 작성자_이름은_마스킹된다() {
         val shop = shop()
         val user = newUserToken(name = "김철수")

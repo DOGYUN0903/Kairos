@@ -65,10 +65,10 @@ class ReviewEntity(
 
     /**
      * 사진은 같은 애그리거트(스펙 10장)라 양방향 `@OneToMany` 로 함께 저장·조회한다(후기 없이 사진만 다루는 경로가 없다).
-     * 물리 삭제 금지 규칙 때문에 컬렉션에서 빼지 않고 [ReviewImageEntity.softDelete] 로 지운다. 그래서 `orphanRemoval` 은
-     * 실제로 DELETE 를 내지 않는다. 조회 시 삭제된 사진은 [ReviewImageEntity] 의 `@SQLRestriction` 이 거른다.
+     * 물리 삭제 금지 규칙 때문에 컬렉션에서 빼지 않고 [ReviewImageEntity.softDelete] 로 지운다. 실수로 물리 DELETE 가 나가지 않도록
+     * `orphanRemoval` 은 쓰지 않는다. 조회 시 삭제된 사진은 [ReviewImageEntity] 의 `@SQLRestriction` 이 거른다.
      */
-    @OneToMany(mappedBy = "review", cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OneToMany(mappedBy = "review", cascade = [CascadeType.ALL])
     @OrderBy("displayOrder ASC")
     @BatchSize(size = 100)
     val images: MutableList<ReviewImageEntity> = mutableListOf()

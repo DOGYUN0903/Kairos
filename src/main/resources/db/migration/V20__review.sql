@@ -22,7 +22,7 @@ CREATE TABLE review (
     CONSTRAINT uk_review_order_item UNIQUE (order_item_id)
 );
 
--- 후기 사진(같은 애그리거트). 수정 시 이전 사진은 소프트 삭제한다.
+-- 후기 사진(같은 애그리거트). 수정 시 이전 사진은 소프트 삭제한다. FK·인덱스 없음(연관은 JPA 에만 둔다).
 CREATE TABLE review_image (
     id            BIGINT      NOT NULL AUTO_INCREMENT,
     review_id     BIGINT      NOT NULL,
@@ -33,6 +33,5 @@ CREATE TABLE review_image (
     modified_at   DATETIME(6) NOT NULL,
     modified_by   BIGINT      NOT NULL,
     status        VARCHAR(20) NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT fk_review_image_review FOREIGN KEY (review_id) REFERENCES review (id)
+    PRIMARY KEY (id)
 );
