@@ -53,8 +53,7 @@ class OrderRepositoryImpl(
     override fun findBySellerOrderId(sellerOrderId: Long): Order? =
         sellerOrderJpaRepository.findOrderIdById(sellerOrderId)?.let(::findById)
 
-    override fun findBySellerOrderIdForUpdate(sellerOrderId: Long): Order? =
-        sellerOrderJpaRepository.findOrderIdOutsideTransaction(sellerOrderId)?.let(::findByIdForUpdate)
+    override fun findOrderIdBySellerOrderId(sellerOrderId: Long): Long? = sellerOrderJpaRepository.findOrderIdById(sellerOrderId)
 
     override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> =
         findPageOfOrders(QOrderEntity.orderEntity.memberId.eq(memberId), page, size)

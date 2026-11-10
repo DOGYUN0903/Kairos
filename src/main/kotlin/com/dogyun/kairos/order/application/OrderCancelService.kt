@@ -48,8 +48,11 @@ class OrderCancelService(
 
     fun cancelBySeller(sellerId: Long, sellerOrderId: Long, orderItemId: Long, reason: String): CancelItemResult {
         validate(reason)
+        // 주문 id 는 트랜잭션 밖에서 찾는다(락 전에 스냅샷이 만들어지지 않게, OrderRepository.findOrderIdBySellerOrderId 참고).
+        val orderId = orderRepository.findOrderIdBySellerOrderId(sellerOrderId)
+            ?: throw DomainException(ErrorCode.SELLER_ORDER_NOT_FOUND)
         return cancel(CancelActor.SELLER, orderItemId, reason, lookup = {
-            val order = orderRepository.findBySellerOrderIdForUpdate(sellerOrderId)
+            val order = orderRepository.findByIdForUpdate(orderId)
                 ?: throw DomainException(ErrorCode.SELLER_ORDER_NOT_FOUND)
             val sellerOrder = order.findSellerOrder(sellerOrderId)
             // 결제 전 판매자 주문은 판매자에게 없는 것으로 친다(조회 API 와 같다).

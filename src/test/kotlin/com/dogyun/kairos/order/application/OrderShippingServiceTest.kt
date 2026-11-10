@@ -33,7 +33,7 @@ class OrderShippingServiceTest {
     private val paymentService = OrderPaymentService(
         orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock,
     )
-    private val service = OrderShippingService(orderRepository, clock)
+    private val service = OrderShippingService(orderRepository, InlineTransactionRunner(), clock)
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L
