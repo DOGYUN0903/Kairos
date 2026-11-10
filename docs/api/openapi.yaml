@@ -1934,6 +1934,64 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/payments/confirm:
+    post:
+      tags: [Payment]
+      operationId: confirmPayment
+      summary: 결제 승인
+      description: |
+        토스 결제창이 돌려준 `paymentKey`, `orderNo`, `amount` 로 PG 승인을 요청한다. 결제를 `IN_PROGRESS` 로 선점한 뒤
+        트랜잭션 밖에서 PG 를 호출한다. 같은 주문을 같은 `paymentKey` 로 다시 승인하면 이미 `APPROVED` 일 때는 PG 호출 없이
+        현재 상태를 200 으로, `UNKNOWN` 이면 200(`paymentStatus: UNKNOWN`)으로, 진행 중이면 409 `PAYMENT_IN_PROGRESS` 로 답한다.
+        PG 결과를 알 수 없으면 결제는 `UNKNOWN`, 주문은 `PENDING_PAYMENT` 로 남고 대사 작업이 확정한다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+      responses:
+        '200':
+          description: 승인 처리 결과(`paymentStatus` 가 `APPROVED` 또는 `UNKNOWN`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfirmPaymentResponse'
+        '400':
+          description: "`PAYMENT_AMOUNT_MISMATCH`(금액이 주문 총액과 다름), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: "`PAYMENT_REJECTED` PG 가 승인을 거절했다. 주문은 취소되고 재고가 돌아온다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: "`ORDER_NOT_FOUND` 없거나 내 주문이 아니다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`ORDER_INVALID_STATE_TRANSITION`, `PAYMENT_KEY_DUPLICATED`, `PAYMENT_IN_PROGRESS` 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
 components:
   securitySchemes:
     bearerAuth:
@@ -3199,6 +3257,33 @@ components:
           description: 클라이언트가 본 총액(상품 금액 + 구매자 부담 배송비)
         shippingAddress:
           $ref: '#/components/schemas/ShippingAddress'
+    ConfirmPaymentRequest:
+      type: object
+      required: [orderNo, paymentKey, amount]
+      properties:
+        orderNo:
+          type: string
+        paymentKey:
+          type: string
+        amount:
+          type: integer
+          format: int64
+          minimum: 0
+    ConfirmPaymentResponse:
+      type: object
+      required: [orderId, orderNo, orderStatus, paymentStatus]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        orderStatus:
+          type: string
+          enum: [PENDING_PAYMENT, PAID, COMPLETED, CANCELED]
+        paymentStatus:
+          type: string
+          enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     CreateOrderResponse:
       type: object
       required: [orderId, orderNo, totalAmount, expiresAt]

@@ -1,5 +1,7 @@
 package com.dogyun.kairos.order.presentation
 
+import com.dogyun.kairos.order.application.ConfirmPaymentCommand
+import com.dogyun.kairos.order.application.ConfirmPaymentResult
 import com.dogyun.kairos.order.application.OrderItemCommand
 import com.dogyun.kairos.order.application.PlaceOrderCommand
 import com.dogyun.kairos.order.application.PlaceOrderResult
@@ -48,5 +50,25 @@ data class CreateOrderResponse(
 ) {
     companion object {
         fun from(result: PlaceOrderResult) = CreateOrderResponse(result.orderId, result.orderNo, result.totalAmount, result.expiresAt)
+    }
+}
+
+data class ConfirmPaymentRequest(
+    @field:NotBlank val orderNo: String,
+    @field:NotBlank val paymentKey: String,
+    @field:Min(0) val amount: Long,
+) {
+    fun toCommand() = ConfirmPaymentCommand(orderNo, paymentKey, amount)
+}
+
+data class ConfirmPaymentResponse(
+    val orderId: Long,
+    val orderNo: String,
+    val orderStatus: String,
+    val paymentStatus: String,
+) {
+    companion object {
+        fun from(result: ConfirmPaymentResult) =
+            ConfirmPaymentResponse(result.orderId, result.orderNo, result.orderStatus, result.paymentStatus)
     }
 }

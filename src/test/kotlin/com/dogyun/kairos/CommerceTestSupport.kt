@@ -259,6 +259,28 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         idemKey,
     )
 
+    /** 결제 승인 요청을 보낸다. 승인 응답을 받으려면 paymentKey 에 접두사를 붙이지 않는다(`fail-`, `unknown-` 등은 Mock PG 가 해석한다). */
+    protected fun confirmPayment(
+        token: String,
+        orderNo: String,
+        paymentKey: String,
+        amount: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+    ): ResultActionsDsl = postIdem(
+        "/api/v1/payments/confirm", token,
+        mapOf("orderNo" to orderNo, "paymentKey" to paymentKey, "amount" to amount),
+        idemKey,
+    )
+
+    /**
+     * 주문을 만들고 승인해 PAID 로 만든 뒤 승인 응답의 data(orderId, orderNo, orderStatus, paymentStatus)를 돌려준다.
+     * 주문 상세 조회 API 가 생기면 상세 JSON 을 돌려주도록 바꾼다.
+     */
+    protected fun paidOrder(token: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
+        val orderNo = json(placeOrder(token, items, expectedTotal).andExpect { status { isCreated() } }).get("data").get("orderNo").asString()
+        return json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
+    }
+
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
             .andExpect { status { isOk() } }

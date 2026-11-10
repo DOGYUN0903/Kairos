@@ -16,3 +16,5 @@ data class PlaceOrderCommand(
     val expectedTotalAmount: Long,
     val shippingAddress: ShippingAddressCommand,
 )
+
+data class ConfirmPaymentCommand(val orderNo: String, val paymentKey: String, val amount: Long)

@@ -136,30 +136,80 @@ class FakeStockManager : StockManager {
     }
 
     override fun restore(items: List<SkuQuantity>) = items.forEach { stock.merge(it.skuId, it.quantity, Int::plus) }
-    override fun increaseSales(items: List<ProductQuantity>) = Unit
-    override fun decreaseSales(items: List<ProductQuantity>) = Unit
+    val sales = mutableMapOf<Long, Int>()
+
+    override fun increaseSales(items: List<ProductQuantity>) = items.forEach { sales.merge(it.productId, it.quantity, Int::plus) }
+    override fun decreaseSales(items: List<ProductQuantity>) = items.forEach { sales.merge(it.productId, -it.quantity, Int::plus) }
 }
 
+data class CancelCall(val paymentKey: String, val amount: Long, val reason: String, val idempotencyKey: String)
+
+/** 결제 상태 전이는 payment 도메인과 같은 규칙으로 흉내 낸다. 이후 Task 가 쓰는 조회·대사 메서드는 아직 비어 있다. */
 class FakePaymentGateway : PaymentGateway {
     val payments = mutableMapOf<Long, PaymentInfo>()
     private var seq = 0L
+
+    /** confirmWithPg 가 돌려줄 결과. */
+    var nextConfirm: PgOutcome = PgOutcome.Unknown
+    var nextCancel: PgOutcome = PgOutcome.Unknown
+    val confirmCalls = mutableListOf<Triple<String, String, Long>>()
+    val cancelCalls = mutableListOf<CancelCall>()
+    val voidedOrderIds = mutableListOf<Long>()
+
+    /** confirmWithPg 가 결과를 돌려주기 직전에 실행한다(PG 응답을 기다리는 사이 다른 흐름이 끼어드는 상황을 만든다). */
+    var duringConfirm: (() -> Unit)? = null
 
     override fun prepare(orderId: Long, orderNo: String, amount: Long) {
         payments[orderId] = PaymentInfo(++seq, orderId, orderNo, null, amount, 0, "READY", null)
     }
 
-    override fun get(orderId: Long): PaymentInfo = payments.getValue(orderId)
+    override fun get(orderId: Long): PaymentInfo = payments[orderId] ?: throw DomainException(ErrorCode.PAYMENT_NOT_FOUND)
 
-    override fun start(orderId: Long, paymentKey: String): PaymentInfo = unsupported()
-    override fun approve(orderId: Long) = unsupported()
-    override fun fail(orderId: Long, reason: String) = unsupported()
-    override fun markUnknown(orderId: Long) = unsupported()
-    override fun voidAfterApproval(orderId: Long) = unsupported()
+    override fun start(orderId: Long, paymentKey: String): PaymentInfo {
+        if (payments.values.any { it.paymentKey == paymentKey && it.orderId != orderId }) {
+            throw DomainException(ErrorCode.PAYMENT_KEY_DUPLICATED)
+        }
+        return change(orderId, setOf("READY")) { it.copy(paymentKey = paymentKey, status = "IN_PROGRESS") }
+    }
+
+    override fun approve(orderId: Long) {
+        change(orderId, setOf("IN_PROGRESS", "UNKNOWN")) { it.copy(status = "APPROVED") }
+    }
+
+    override fun fail(orderId: Long, reason: String) {
+        change(orderId, setOf("READY", "IN_PROGRESS", "UNKNOWN")) { it.copy(status = "FAILED", failReason = reason) }
+    }
+
+    override fun markUnknown(orderId: Long) {
+        change(orderId, setOf("IN_PROGRESS")) { it.copy(status = "UNKNOWN") }
+    }
+
+    override fun voidAfterApproval(orderId: Long) {
+        change(orderId, setOf("IN_PROGRESS", "UNKNOWN")) { it.copy(status = "CANCELED", refundedAmount = it.amount) }
+        voidedOrderIds += orderId
+    }
+
     override fun recordRefund(orderId: Long, amount: Long) = unsupported()
     override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> = unsupported()
-    override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome = unsupported()
-    override fun cancelWithPg(paymentKey: String, amount: Long, reason: String, idempotencyKey: String): PgOutcome = unsupported()
+
+    override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome {
+        confirmCalls += Triple(paymentKey, orderNo, amount)
+        duringConfirm?.invoke()
+        return nextConfirm
+    }
+
+    override fun cancelWithPg(paymentKey: String, amount: Long, reason: String, idempotencyKey: String): PgOutcome {
+        cancelCalls += CancelCall(paymentKey, amount, reason, idempotencyKey)
+        return nextCancel
+    }
+
     override fun findFromPg(paymentKey: String): PgOutcome = unsupported()
+
+    private fun change(orderId: Long, allowed: Set<String>, action: (PaymentInfo) -> PaymentInfo): PaymentInfo {
+        val current = get(orderId)
+        if (current.status !in allowed) throw DomainException(ErrorCode.PAYMENT_INVALID_STATE_TRANSITION)
+        return action(current).also { payments[orderId] = it }
+    }
 
     private fun unsupported(): Nothing = throw UnsupportedOperationException("이후 Task 에서 채운다")
 }
