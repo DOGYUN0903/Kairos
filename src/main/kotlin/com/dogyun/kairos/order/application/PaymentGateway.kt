@@ -47,6 +47,12 @@ interface PaymentGateway {
     fun recordRefund(orderId: Long, amount: Long)
     fun get(orderId: Long): PaymentInfo
     fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo>
+
+    /** 재취소 후보 결제(`payment_key` 있음, `FAILED`/`UNKNOWN`)를 결제 id 오름차순 keyset 으로 가져온다. 주문 상태는 order 쪽에서 거른다. */
+    fun findVoidCandidates(afterPaymentId: Long, limit: Int): List<PaymentInfo>
+
+    /** PG 잔액이 없음이 확인된 `FAILED`/`UNKNOWN` 결제를 닫아 더는 후보가 되지 않게 한다. */
+    fun markVoided(orderId: Long)
     fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome
     fun cancelWithPg(paymentKey: String, amount: Long, reason: String, idempotencyKey: String): PgOutcome
     fun findFromPg(paymentKey: String): PgOutcome

@@ -24,4 +24,18 @@ class PaymentRepositoryImplTest : CommerceTestSupport() {
         val e = org.junit.jupiter.api.assertThrows<DomainException> { repository.save(started(2L, "dup-key")) }
         assertEquals(ErrorCode.PAYMENT_KEY_DUPLICATED, e.errorCode)
     }
+
+    @Test
+    fun findVoidCandidates는_키가_있는_FAILED_UNKNOWN만_id_순_keyset으로_돌려준다() {
+        val failed = repository.save(started(901L, "vc-1").apply { fail("x") })
+        repository.save(Payment.ready(902L, "ORD-902", 10_000L).apply { fail("만료") }) // 키 없음
+        val unknown = repository.save(started(903L, "vc-3").apply { markUnknown() })
+        repository.save(started(904L, "vc-4")) // IN_PROGRESS
+
+        val mine = setOf(failed.id, unknown.id)
+        val first = repository.findVoidCandidates(failed.id!! - 1, 1)
+        assertEquals(listOf(failed.id), first.map { it.id })
+        val rest = repository.findVoidCandidates(first.last().id!!, 100).map { it.id }.filter { it in mine }
+        assertEquals(listOf(unknown.id), rest)
+    }
 }

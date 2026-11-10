@@ -4,7 +4,6 @@ import com.dogyun.kairos.order.domain.OrderRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock
-import java.time.Duration
 import java.time.LocalDateTime
 
 /**
@@ -53,36 +52,56 @@ class PaymentReconciliationService(
     }
 
     /**
-     * 닫힌(만료·승인 실패로 CANCELED 된, 결제 완료된 적 없는) 주문의 결제가 PG 에 남아 있으면 같은 멱등 키로 다시 전액 취소한다.
-     * void 호출이 유실되거나(결제 `UNKNOWN`) 금액 불일치 취소가 확인되지 않은 채 거절된(결제 `FAILED`) 경우를 로컬 결제 상태와 무관하게 본다.
-     * 다시 취소한 주문 수.
+     * 닫힌(CANCELED) 주문의 결제가 PG 에 남아 있으면 전액 다시 취소한다. 후보는 결제 쪽에서 고른다:
+     * `payment_key` 가 있고 `FAILED`/`UNKNOWN` 인 결제(void 호출이 유실됐거나 금액 불일치 취소가 확인되지 않은 채 거절된 경우)를
+     * 결제 id 순 keyset 으로 훑고, 그중 주문이 `CANCELED` 인 것만 본다. PG 가 남은 잔액이 없다고 확정해 답하면 결제를 닫아
+     * 더는 후보가 되지 않는다. 조회를 확정하지 못하면(일시 오류, 알 수 없는 상태) 후보로 남는다. 다시 취소한 주문 수.
      */
-    fun revoidClosedOrders(limit: Int = 100): Int {
-        val since = LocalDateTime.now(clock).minus(REVOID_WINDOW)
-        return orderRepository.findCanceledOrderIdsPaidWithin(since, limit).count { orderId ->
+    fun revoidClosedOrders(limit: Int = 100): Int =
+        sweepByKeyset(limit, { it.paymentId }, { after -> paymentGateway.findVoidCandidates(after, limit) }) { candidate ->
             try {
-                revoid(orderId)
+                revoid(candidate)
             } catch (e: RuntimeException) {
-                log.error("닫힌 주문 재취소에 실패했다: orderId={}", orderId, e)
+                log.error("닫힌 주문 재취소에 실패했다: orderId={}", candidate.orderId, e)
                 false
             }
         }
-    }
 
-    private fun revoid(orderId: Long): Boolean {
-        val payment = paymentGateway.get(orderId)
-        val paymentKey = payment.paymentKey ?: return false
-        val pg = (paymentGateway.findFromPg(paymentKey) as? PgOutcome.Done)?.payment ?: return false
-        if (pg.status != PgPaymentStatus.DONE && pg.status != PgPaymentStatus.PARTIAL_CANCELED) return false
-        if (pg.balanceAmount <= 0) return false
+    private fun revoid(candidate: PaymentInfo): Boolean {
+        val orderId = candidate.orderId
+        val paymentKey = candidate.paymentKey ?: return false
+        if (orderId !in orderRepository.findCanceledIdsAmong(listOf(orderId))) return false
+
+        val outcome = paymentGateway.findFromPg(paymentKey)
+        val pg = when (outcome) {
+            is PgOutcome.Done -> outcome.payment
+            is PgOutcome.Failed -> {
+                // NOT_FOUND 만 PG 에 결제가 없다는 확실한 답이다. 그 밖의 실패는 일시 오류일 수 있어 다음 주기에 다시 본다.
+                if (outcome.code == "NOT_FOUND") orderPaymentService.closeVoidedPayment(orderId, paymentKey)
+                return false
+            }
+            is PgOutcome.Unknown -> return false
+        }
+        when (pg.status) {
+            PgPaymentStatus.DONE, PgPaymentStatus.PARTIAL_CANCELED -> Unit
+            PgPaymentStatus.CANCELED, PgPaymentStatus.ABORTED, PgPaymentStatus.EXPIRED -> {
+                orderPaymentService.closeVoidedPayment(orderId, paymentKey)
+                return false
+            }
+            PgPaymentStatus.OTHER -> return false
+        }
+        if (pg.balanceAmount <= 0) {
+            orderPaymentService.closeVoidedPayment(orderId, paymentKey)
+            return false
+        }
 
         return orderPaymentService.voidClosedOrder(orderId, paymentKey, pg.balanceAmount)
     }
 
-    /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. */
+    /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. [limit] 은 keyset 페이지 크기다. */
     fun reconcileCancels(limit: Int = 100): Int {
-        val items = orderRepository.findCancelRequestedItems(LocalDateTime.now(clock).minus(properties.cancelRequestTimeout), limit)
-        return items.count { (orderId, itemId) ->
+        val before = LocalDateTime.now(clock).minus(properties.cancelRequestTimeout)
+        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findCancelRequestedItems(before, after, limit) }) { (orderId, itemId) ->
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
@@ -107,13 +126,12 @@ class PaymentReconciliationService(
         // 조회가 일시적으로 실패한 것일 수 있다(NOT_FOUND 만 PG 에 취소가 없다는 확실한 답이다). 취소를 다시 부르다 거절되면 환불이 되돌려지므로 이번 주기는 건너뛴다.
         if (found is PgOutcome.Unknown || (found is PgOutcome.Failed && found.code != "NOT_FOUND")) return null
         if (found is PgOutcome.Done && found.payment.cancels.any { it.reason == "orderItem:$itemId" }) return found
-        return paymentGateway.cancelWithPg(paymentKey, refundAmount, "orderItem:$itemId", "refund-$itemId")
+        return paymentGateway.cancelWithPg(paymentKey, refundAmount, "orderItem:$itemId", refundKey(itemId, refundAmount))
     }
 
     private companion object {
         val log = LoggerFactory.getLogger(PaymentReconciliationService::class.java)
         const val RECONCILED = "RECONCILED"
-        val REVOID_WINDOW: Duration = Duration.ofHours(24)
         val NO_REFUND: PgOutcome = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.CANCELED, 0, 0, emptyList()))
     }
 }

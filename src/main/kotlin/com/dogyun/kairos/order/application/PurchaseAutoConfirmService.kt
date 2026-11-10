@@ -18,7 +18,7 @@ class PurchaseAutoConfirmService(
     /** 확정 처리를 시도한 판매자 주문 수(이미 다른 흐름이 처리한 건은 no-op 이다). */
     fun confirmDelivered(limit: Int = 100): Int {
         val threshold = LocalDateTime.now(clock).minus(properties.autoConfirmAfter)
-        return orderRepository.findSellerOrderIdsDeliveredBefore(threshold, limit).count { sellerOrderId ->
+        return sweepByKeyset(limit, { it }, { after -> orderRepository.findSellerOrderIdsDeliveredBefore(threshold, after, limit) }) { sellerOrderId ->
             try {
                 orderShippingService.autoConfirm(sellerOrderId)
                 true

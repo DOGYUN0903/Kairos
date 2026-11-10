@@ -53,6 +53,13 @@ class PaymentGatewayImpl(
     override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> =
         paymentService.findStale(inProgressBefore, limit).map { it.toInfo() }
 
+    override fun findVoidCandidates(afterPaymentId: Long, limit: Int): List<PaymentInfo> =
+        paymentService.findVoidCandidates(afterPaymentId, limit).map { it.toInfo() }
+
+    override fun markVoided(orderId: Long) {
+        paymentService.markVoided(orderId)
+    }
+
     override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome =
         pgClient.confirm(paymentKey, orderNo, amount).toOutcome()
 

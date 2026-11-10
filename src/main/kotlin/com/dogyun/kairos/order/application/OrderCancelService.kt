@@ -88,7 +88,7 @@ class OrderCancelService(
         val outcome = if (started.refundAmount > 0) {
             paymentGateway.cancelWithPg(
                 requireNotNull(started.paymentKey) { "승인된 결제에 paymentKey 가 없다: order ${started.orderId}" },
-                started.refundAmount, "orderItem:$itemId", "refund-$itemId",
+                started.refundAmount, "orderItem:$itemId", refundKey(itemId, started.refundAmount),
             )
         } else NO_PG_CALL
 

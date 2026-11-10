@@ -14,8 +14,9 @@ class DeliveryTrackingService(
 ) {
 
     /** 배송 완료로 바꾼 판매자 주문 수. */
+    /** [limit] 은 keyset 페이지 크기다(배송 중인 주문을 id 순으로 끝까지 훑는다). */
     fun pollShipping(limit: Int = 100): Int =
-        orderRepository.findSellerOrderIdsByStatus(SellerOrderStatus.SHIPPING, limit).count { sellerOrderId ->
+        sweepByKeyset(limit, { it }, { after -> orderRepository.findSellerOrderIdsByStatus(SellerOrderStatus.SHIPPING, after, limit) }) { sellerOrderId ->
             try {
                 poll(sellerOrderId)
             } catch (e: RuntimeException) {

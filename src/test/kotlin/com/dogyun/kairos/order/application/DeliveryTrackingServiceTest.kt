@@ -29,4 +29,20 @@ class DeliveryTrackingServiceTest {
         assertEquals(0, service.pollShipping())
         assertEquals(SellerOrderStatus.SHIPPING, f.reload(order).findSellerOrder(soIds.getValue(2L)).status)
     }
+
+    @Test
+    fun 앞의_배송중_주문이_계속_남아도_뒤의_주문까지_조회한다() {
+        val orders = (1..3).map { f.paid() }
+        // 주문마다 판매자 주문 둘(판매자 1, 2). 송장 번호는 판매자 주문 순서대로 T0.. 로 붙인다.
+        val sellerOrders = orders.flatMap { o -> o.sellerOrders.map { it.sellerId to it.id!! } }
+        sellerOrders.forEachIndexed { i, (sellerId, soId) -> f.shippingService.ship(sellerId, soId, "04", "T$i") }
+        val lastIndex = sellerOrders.size - 1
+        tracker.results["T$lastIndex"] = TrackingResult.DELIVERED
+
+        assertEquals(1, service.pollShipping(limit = 2))
+
+        assertEquals(sellerOrders.size, tracker.calls.size)
+        val last = f.reload(orders.last()).findSellerOrder(sellerOrders[lastIndex].second)
+        assertEquals(SellerOrderStatus.DELIVERED, last.status)
+    }
 }

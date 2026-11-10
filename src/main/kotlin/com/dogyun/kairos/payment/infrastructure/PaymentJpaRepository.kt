@@ -14,5 +14,11 @@ interface PaymentJpaRepository : JpaRepository<PaymentEntity, Long> {
         pageable: Pageable,
     ): List<PaymentEntity>
 
+    fun findByPaymentKeyIsNotNullAndPaymentStatusInAndIdGreaterThanOrderById(
+        statuses: Collection<PaymentStatus>,
+        afterId: Long,
+        pageable: Pageable,
+    ): List<PaymentEntity>
+
     fun findByPaymentStatusOrderById(status: PaymentStatus, pageable: Pageable): List<PaymentEntity>
 }

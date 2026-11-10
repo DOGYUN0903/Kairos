@@ -101,7 +101,7 @@ class OrderCancelServiceTest {
         assertEquals("PARTIAL_CANCELED", paymentGateway.get(order.id).status)
         assertEquals(5, stockManager.stock[10L])
         assertEquals(0, stockManager.sales[110L])
-        assertEquals(listOf(CancelCall("pay-${order.id}", 18_000, "orderItem:${item.id}", "refund-${item.id}")), paymentGateway.cancelCalls)
+        assertEquals(listOf(CancelCall("pay-${order.id}", 18_000, "orderItem:${item.id}", "refund-${item.id}-18000")), paymentGateway.cancelCalls)
         assertEquals("단순 변심", saved.findItem(item.id).cancelReason)
     }
 

@@ -79,4 +79,19 @@ class PaymentTest {
         assertEquals(PaymentStatus.FAILED, f.status)
         assertEquals("PG 거절", f.failReason)
     }
+
+    @Test
+    fun markVoided는_키가_있는_FAILED_UNKNOWN_결제를_환불액_변경_없이_CANCELED로_닫는다() {
+        val failed = ready().apply { start("k", now); fail("x") }.apply { markVoided() }
+        assertEquals(PaymentStatus.CANCELED, failed.status)
+        assertEquals(0L, failed.refundedAmount)
+        assertEquals(PaymentStatus.CANCELED, ready().apply { start("k", now); markUnknown() }.apply { markVoided() }.status)
+    }
+
+    @Test
+    fun markVoided는_키가_없거나_다른_상태면_INVALID_STATE_TRANSITION() {
+        assertInvalid { ready().apply { fail("만료") }.markVoided() } // payment_key 없음
+        assertInvalid { approved().markVoided() }
+        assertInvalid { ready().apply { start("k", now) }.markVoided() }
+    }
 }

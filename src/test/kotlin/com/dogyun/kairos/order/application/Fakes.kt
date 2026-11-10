@@ -75,23 +75,25 @@ class FakeOrderRepository : OrderRepository {
                 (orderNo == null || it.orderNo == orderNo)
         }.sortedByDescending { it.id }.let { page(it, page, size) }
 
-    override fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long> =
-        rows.values.filter { it.status == OrderStatus.PENDING_PAYMENT && it.expiresAt.isBefore(now) }.take(limit).mapNotNull { it.id }
+    override fun findExpiredPendingIds(now: LocalDateTime, afterId: Long, limit: Int): List<Long> =
+        rows.values.filter { it.status == OrderStatus.PENDING_PAYMENT && it.expiresAt.isBefore(now) }
+            .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
 
-    override fun findSellerOrderIdsByStatus(status: SellerOrderStatus, limit: Int): List<Long> =
-        rows.values.flatMap { it.sellerOrders }.filter { it.status == status }.take(limit).mapNotNull { it.id }
+    override fun findSellerOrderIdsByStatus(status: SellerOrderStatus, afterId: Long, limit: Int): List<Long> =
+        rows.values.flatMap { it.sellerOrders }.filter { it.status == status }
+            .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
 
-    override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, limit: Int): List<Long> =
+    override fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long> =
         rows.values.flatMap { it.sellerOrders }
             .filter { it.status == SellerOrderStatus.DELIVERED && it.deliveredAt?.isBefore(threshold) == true }
-            .take(limit).mapNotNull { it.id }
+            .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
 
-    override fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>> =
+    override fun findCancelRequestedItems(before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>> =
         rows.values.flatMap { o -> o.allItems.filter { it.status == OrderItemStatus.CANCEL_REQUESTED }.map { requireNotNull(o.id) to requireNotNull(it.id) } }
-            .take(limit)
+            .filter { it.second > afterItemId }.sortedBy { it.second }.take(limit)
 
-    override fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long> =
-        rows.values.filter { it.status == OrderStatus.CANCELED && it.paidAt == null }.take(limit).mapNotNull { it.id }
+    override fun findCanceledIdsAmong(orderIds: Collection<Long>): Set<Long> =
+        rows.values.filter { it.id in orderIds && it.status == OrderStatus.CANCELED }.mapNotNull { it.id }.toSet()
 
     private fun page(list: List<Order>, page: Int, size: Int) =
         PageResult.of(list.drop(page * size).take(size), page, size, list.size.toLong())
@@ -217,6 +219,14 @@ class FakePaymentGateway : PaymentGateway {
     /** 시각은 따지지 않는다(IN_PROGRESS 와 UNKNOWN 전부). */
     override fun findStale(inProgressBefore: LocalDateTime, limit: Int): List<PaymentInfo> =
         payments.values.filter { it.status == "IN_PROGRESS" || it.status == "UNKNOWN" }.take(limit)
+
+    override fun findVoidCandidates(afterPaymentId: Long, limit: Int): List<PaymentInfo> =
+        payments.values.filter { it.paymentKey != null && (it.status == "FAILED" || it.status == "UNKNOWN") && it.paymentId > afterPaymentId }
+            .sortedBy { it.paymentId }.take(limit)
+
+    override fun markVoided(orderId: Long) {
+        change(orderId, setOf("FAILED", "UNKNOWN")) { it.copy(status = "CANCELED") }
+    }
 
     override fun confirmWithPg(paymentKey: String, orderNo: String, amount: Long): PgOutcome {
         confirmCalls += Triple(paymentKey, orderNo, amount)

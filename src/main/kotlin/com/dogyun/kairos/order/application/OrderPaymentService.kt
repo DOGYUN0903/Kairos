@@ -9,6 +9,13 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
 
+/**
+ * PG 멱등 키는 요청 본문이 같을 때만 같아야 하므로 금액을 넣는다(ADR 0003). 승인 흐름과 대사는 저장된 값으로 같은 키를 만든다.
+ */
+fun refundKey(orderItemId: Long, refundAmount: Long) = "refund-$orderItemId-$refundAmount"
+
+fun voidKey(orderId: Long, amount: Long) = "void-$orderId-$amount"
+
 /** PG 결과를 받은 뒤 결제·주문을 어떻게 마무리할지. 승인(confirm)과 대사(PG 조회)가 같은 판단을 쓴다. */
 enum class PgVerdict { APPROVE, REJECT, VOID_THEN_REJECT, HOLD }
 
@@ -89,7 +96,7 @@ class OrderPaymentService(
      * 확인되지 않으면 [PgVerdict.HOLD] 로 결제를 UNKNOWN 으로 남겨 대사가 다시 확인하게 한다. PG 호출이라 트랜잭션 밖이다.
      */
     fun voidMismatch(orderId: Long, paymentKey: String, pgTotal: Long): PgVerdict {
-        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId"))
+        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, pgTotal, "amount-mismatch:$orderId", voidKey(orderId, pgTotal)))
         return if (voided) PgVerdict.REJECT else PgVerdict.HOLD
     }
 
@@ -99,7 +106,7 @@ class OrderPaymentService(
      * 확인되지 않으면 `IN_PROGRESS` 결제를 UNKNOWN 으로 남긴다. 그 밖의 상태(FAILED, CANCELED 등)는 건드리지 않는다. 취소 확인 여부를 돌려준다.
      */
     fun voidClosedOrder(orderId: Long, paymentKey: String, amount: Long): Boolean {
-        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, amount, "order-closed:$orderId", "void-$orderId"))
+        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, amount, "order-closed:$orderId", voidKey(orderId, amount)))
         tx.run {
             orderRepository.findByIdForUpdate(orderId) ?: return@run
             val payment = paymentGateway.get(orderId)
@@ -109,6 +116,20 @@ class OrderPaymentService(
             } else if (payment.status == "IN_PROGRESS") paymentGateway.markUnknown(orderId)
         }
         return voided
+    }
+
+    /**
+     * 닫힌 주문의 `FAILED`/`UNKNOWN` 결제에 PG 잔액이 없음이 확인됐을 때 결제를 닫는다(재취소 후보에서 빠진다).
+     * 주문 행 락 아래에서 주문이 여전히 CANCELED 이고 결제 상태·키가 그대로일 때만 바꾼다.
+     */
+    fun closeVoidedPayment(orderId: Long, paymentKey: String) {
+        tx.run {
+            val order = orderRepository.findByIdForUpdate(orderId) ?: return@run
+            if (order.status != OrderStatus.CANCELED) return@run
+            val payment = paymentGateway.get(orderId)
+            if (payment.paymentKey != paymentKey || (payment.status != "FAILED" && payment.status != "UNKNOWN")) return@run
+            paymentGateway.markVoided(orderId)
+        }
     }
 
     /** tx1: 결제 상태를 먼저 보고(같은 키의 재시도는 멱등), 그다음 주문 상태·금액을 확인한 뒤 결제를 IN_PROGRESS 로 선점한다. */

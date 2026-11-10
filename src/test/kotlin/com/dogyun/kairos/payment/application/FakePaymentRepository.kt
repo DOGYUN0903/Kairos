@@ -36,6 +36,10 @@ class FakePaymentRepository : PaymentRepository {
     override fun findAllByStatus(status: PaymentStatus, limit: Int): List<Payment> =
         rows.values.filter { it.status == status }.take(limit).map(::copyOf)
 
+    override fun findVoidCandidates(afterId: Long, limit: Int): List<Payment> =
+        rows.values.filter { it.paymentKey != null && (it.status == PaymentStatus.FAILED || it.status == PaymentStatus.UNKNOWN) && it.id!! > afterId }
+            .sortedBy { it.id }.take(limit).map(::copyOf)
+
     private fun copyOf(p: Payment) = Payment(
         p.id, p.orderId, p.orderNo, p.paymentKey, p.amount, p.refundedAmount, p.status, p.failReason, p.inProgressAt, p.approvedAt,
     )

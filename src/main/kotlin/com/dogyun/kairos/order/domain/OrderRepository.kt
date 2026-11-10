@@ -23,11 +23,14 @@ interface OrderRepository {
     /** 결제 전(PENDING_PAYMENT) 판매자 주문은 제외한다. 돌려주는 주문에는 다른 판매자의 판매자 주문도 담겨 있다. */
     fun findPageBySellerId(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<Order>
     fun findPageForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<Order>
-    fun findExpiredPendingIds(now: LocalDateTime, limit: Int): List<Long>
-    fun findSellerOrderIdsByStatus(status: SellerOrderStatus, limit: Int): List<Long>
-    fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, limit: Int): List<Long>
+    /** 정리 작업용 조회는 모두 id 오름차순 keyset(`id > afterId`)이다. 처리하지 못해 집합에 남는 항목이 뒤의 항목을 막지 않게 한다. */
+    fun findExpiredPendingIds(now: LocalDateTime, afterId: Long, limit: Int): List<Long>
+    fun findSellerOrderIdsByStatus(status: SellerOrderStatus, afterId: Long, limit: Int): List<Long>
+    fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long>
 
-    /** orderId to itemId */
-    fun findCancelRequestedItems(before: LocalDateTime, limit: Int): List<Pair<Long, Long>>
-    fun findCanceledOrderIdsPaidWithin(since: LocalDateTime, limit: Int): List<Long>
+    /** orderId to itemId. 항목 id 오름차순, [afterItemId] 보다 큰 것부터. */
+    fun findCancelRequestedItems(before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>>
+
+    /** [orderIds] 중 `CANCELED` 인 주문 id. */
+    fun findCanceledIdsAmong(orderIds: Collection<Long>): Set<Long>
 }

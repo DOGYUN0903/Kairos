@@ -53,6 +53,15 @@ class PaymentService(
                 paymentRepository.findAllByStatus(PaymentStatus.UNKNOWN, limit)
             ).take(limit).map { it.toSnapshot() }
 
+    /** 재취소 후보: `payment_key` 가 있고 `FAILED`/`UNKNOWN` 인 결제. id 오름차순 keyset([afterId] 보다 큰 것부터). */
+    @Transactional
+    fun findVoidCandidates(afterId: Long, limit: Int): List<PaymentSnapshot> =
+        paymentRepository.findVoidCandidates(afterId, limit).map { it.toSnapshot() }
+
+    /** PG 에 남은 잔액이 없음이 확인된 `FAILED`/`UNKNOWN` 결제를 `CANCELED` 로 닫는다. */
+    @Transactional
+    fun markVoided(orderId: Long): PaymentSnapshot = change(orderId) { it.markVoided() }
+
     private fun load(orderId: Long): Payment =
         paymentRepository.findByOrderId(orderId) ?: throw DomainException(ErrorCode.PAYMENT_NOT_FOUND)
 

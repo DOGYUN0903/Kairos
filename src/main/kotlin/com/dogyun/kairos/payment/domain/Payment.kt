@@ -63,6 +63,15 @@ class Payment(
         status = PaymentStatus.CANCELED
     }
 
+    /**
+     * 닫힌 주문의 결제에 PG 잔액이 남아 있지 않음이 PG 조회로 확인됐다(취소가 확인됐거나 처음부터 승인되지 않았다).
+     * 결제를 `CANCELED` 로 닫아 더는 재취소 후보가 되지 않게 한다. 환불액은 바꾸지 않는다.
+     */
+    fun markVoided() {
+        ensure(paymentKey != null && (status == PaymentStatus.FAILED || status == PaymentStatus.UNKNOWN))
+        status = PaymentStatus.CANCELED
+    }
+
     fun refund(amount: Long) {
         ensure(status == PaymentStatus.APPROVED || status == PaymentStatus.PARTIAL_CANCELED)
         ensure(amount > 0 && refundedAmount + amount <= this.amount)

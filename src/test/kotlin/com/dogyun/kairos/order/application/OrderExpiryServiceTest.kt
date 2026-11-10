@@ -52,4 +52,15 @@ class OrderExpiryServiceTest {
         assertEquals("APPROVED", f.paymentGateway.get(order.id!!).status)
         assertEquals(9, f.stockManager.stock[10L])
     }
+
+    @Test
+    fun 앞의_주문이_계속_남아도_뒤의_READY_주문까지_만료한다() {
+        val stuck = (1..3).map { f.place().also { o -> f.startPayment(o, "pay-${o.id}") } }
+        val ready = f.place()
+
+        assertEquals(1, service.expirePendingOrders(limit = 2))
+
+        stuck.forEach { assertEquals(OrderStatus.PENDING_PAYMENT, f.reload(it).status) }
+        assertEquals(OrderStatus.CANCELED, f.reload(ready).status)
+    }
 }

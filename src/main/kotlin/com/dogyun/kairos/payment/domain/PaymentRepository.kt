@@ -9,4 +9,7 @@ interface PaymentRepository {
     fun findByPaymentKey(key: String): Payment?
     fun findStaleInProgress(before: LocalDateTime, limit: Int): List<Payment>
     fun findAllByStatus(status: PaymentStatus, limit: Int): List<Payment>
+
+    /** `payment_key` 가 있고 `FAILED`/`UNKNOWN` 인 결제를 id 오름차순으로, [afterId] 보다 큰 것부터 [limit] 건. */
+    fun findVoidCandidates(afterId: Long, limit: Int): List<Payment>
 }

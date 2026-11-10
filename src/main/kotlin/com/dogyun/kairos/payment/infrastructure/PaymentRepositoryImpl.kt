@@ -48,6 +48,11 @@ class PaymentRepositoryImpl(private val jpaRepository: PaymentJpaRepository) : P
     override fun findAllByStatus(status: PaymentStatus, limit: Int): List<Payment> =
         jpaRepository.findByPaymentStatusOrderById(status, PageRequest.ofSize(limit)).map(::toDomain)
 
+    override fun findVoidCandidates(afterId: Long, limit: Int): List<Payment> =
+        jpaRepository.findByPaymentKeyIsNotNullAndPaymentStatusInAndIdGreaterThanOrderById(
+            listOf(PaymentStatus.FAILED, PaymentStatus.UNKNOWN), afterId, PageRequest.ofSize(limit),
+        ).map(::toDomain)
+
     private fun toDomain(e: PaymentEntity) = Payment(
         e.id, e.orderId, e.orderNo, e.paymentKey, e.amount, e.refundedAmount, e.paymentStatus, e.failReason,
         e.inProgressAt, e.approvedAt,

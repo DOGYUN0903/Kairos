@@ -46,6 +46,21 @@ class PaymentServiceTest {
     }
 
     @Test
+    fun findVoidCandidates는_키가_있는_FAILED_UNKNOWN만_id_순_keyset으로_돌려주고_markVoided하면_빠진다() {
+        service.prepare(1L, "ORD-1", 1_000L); service.start(1L, "k1"); service.fail(1L, "x")
+        service.prepare(2L, "ORD-2", 1_000L); service.fail(2L, "만료") // 키 없음
+        service.prepare(3L, "ORD-3", 1_000L); service.start(3L, "k3"); service.markUnknown(3L)
+        service.prepare(4L, "ORD-4", 1_000L); service.start(4L, "k4") // IN_PROGRESS
+
+        val first = service.findVoidCandidates(0, 1)
+        assertEquals(listOf(1L), first.map { it.orderId })
+        assertEquals(listOf(3L), service.findVoidCandidates(first.last().paymentId, 10).map { it.orderId })
+
+        service.markVoided(1L)
+        assertEquals(listOf(3L), service.findVoidCandidates(0, 10).map { it.orderId })
+    }
+
+    @Test
     fun 없는_주문의_결제는_PAYMENT_NOT_FOUND() {
         assertEquals(ErrorCode.PAYMENT_NOT_FOUND, assertFailsWith<DomainException> { service.get(9L) }.errorCode)
     }

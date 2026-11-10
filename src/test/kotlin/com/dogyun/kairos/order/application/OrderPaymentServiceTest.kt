@@ -190,7 +190,7 @@ class OrderPaymentServiceTest {
         assertError(ErrorCode.ORDER_INVALID_STATE_TRANSITION) { confirm(order) }
 
         assertEquals(
-            listOf(CancelCall("pay-1", 21_000, "order-closed:${order.orderId}", "void-${order.orderId}")),
+            listOf(CancelCall("pay-1", 21_000, "order-closed:${order.orderId}", "void-${order.orderId}-21000")),
             paymentGateway.cancelCalls,
         )
         val payment = paymentGateway.get(order.orderId)
@@ -224,7 +224,7 @@ class OrderPaymentServiceTest {
         assertError(ErrorCode.PAYMENT_REJECTED) { confirm(order) }
 
         assertEquals(
-            listOf(CancelCall("pay-1", 1_000, "amount-mismatch:${order.orderId}", "void-${order.orderId}")),
+            listOf(CancelCall("pay-1", 1_000, "amount-mismatch:${order.orderId}", "void-${order.orderId}-1000")),
             paymentGateway.cancelCalls,
         )
         assertEquals("FAILED", paymentGateway.get(order.orderId).status)

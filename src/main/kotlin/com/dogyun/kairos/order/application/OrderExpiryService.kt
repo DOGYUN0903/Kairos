@@ -21,9 +21,10 @@ class OrderExpiryService(
     private val clock: Clock,
 ) {
 
-    /** 만료시킨 주문 수. */
-    fun expirePendingOrders(limit: Int = 100): Int =
-        orderRepository.findExpiredPendingIds(LocalDateTime.now(clock), limit).count { orderId ->
+    /** 만료시킨 주문 수. [limit] 은 keyset 페이지 크기다. */
+    fun expirePendingOrders(limit: Int = 100): Int {
+        val now = LocalDateTime.now(clock)
+        return sweepByKeyset(limit, { it }, { after -> orderRepository.findExpiredPendingIds(now, after, limit) }) { orderId ->
             try {
                 expire(orderId)
             } catch (e: RuntimeException) {
@@ -31,6 +32,7 @@ class OrderExpiryService(
                 false
             }
         }
+    }
 
     private fun expire(orderId: Long): Boolean = tx.run {
         val order = orderRepository.findByIdForUpdate(orderId) ?: return@run false
