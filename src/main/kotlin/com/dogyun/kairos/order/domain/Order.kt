@@ -114,6 +114,9 @@ class Order(
         findReturn(returnId).second.startReturnRefund(plan, now)
     }
 
+    fun planReturnRefund(returnId: Long, fees: ReturnFeePolicy): ReturnRefundPlan =
+        ReturnRefundCalculator.plan(this, returnId, fees)
+
     fun revertReturnRefund(returnId: Long) = findReturn(returnId).second.revertReturnRefund()
 
     fun markPaid(now: LocalDateTime) {

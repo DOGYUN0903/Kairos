@@ -292,4 +292,50 @@ class RefundCalculatorTest {
         assertEquals(0, o.buyerShippingFee)
         assertEquals(40_000, o.totalAmount)
     }
+
+    @Test
+    fun 예시C_역순_변심_반품_6000_회수_뒤_다른_판매자_주문_취소는_차감이_없다() {
+        // 스펙 §5-1 예시 C의 반대 순서. 셋째 판매자 주문을 두어, 반품 뒤에도 남은 금액이 기준 이상에서 아래로 떨어지는 취소를 만든다.
+        val o = paidOrder(line(2, 30_000), line(3, 30_000), line(4, 30_000))
+        val so2 = o.sellerOrders.first { it.sellerId == 2L }.id!!
+        o.ship(so2, "04", "T2", NOW)
+        o.deliver(so2, NOW)
+        val b = o.itemIdOf(2)
+        o.withReturn(b, ReturnReason.CHANGE_OF_MIND, ReturnStatus.COMPLETED)
+        assertEquals(6_000, o.findItem(b).returnRequest!!.let { it.returnFee + it.outboundFeeRecovered })
+        assertEquals(3_000, o.outboundFeeRecoveredEver)
+
+        val plan = o.planCancel(o.itemIdOf(3), CancelActor.BUYER, POLICY)
+
+        assertEquals(0, plan.shippingFeeDeducted)
+        assertEquals(0, plan.shippingFeeReturned)
+        assertEquals(30_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 열린_반품_항목은_남은_항목으로_세어_다른_항목_마지막_취소에_차감_반환이_없다() {
+        val o = paidOrder(line(1, 30_000), line(2, 20_000), line(3, 10_000))
+        assertEquals(3_000, o.cancel(o.itemIdOf(2)).shippingFeeDeducted)
+        val so1 = o.sellerOrders.first { it.sellerId == 1L }.id!!
+        o.ship(so1, "04", "T1", NOW)
+        o.deliver(so1, NOW)
+        o.withReturn(o.itemIdOf(1), ReturnReason.CHANGE_OF_MIND, ReturnStatus.REQUESTED)
+
+        val plan = o.planCancel(o.itemIdOf(3), CancelActor.BUYER, POLICY)
+
+        assertEquals(0, plan.shippingFeeReturned)
+        assertEquals(0, plan.shippingFeeDeducted)
+        assertEquals(10_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 다른_항목이_RETURN_REFUNDING이면_ORDER_ITEM_NOT_CANCELABLE() {
+        val o = paidOrder(line(1, 30_000), line(2, 30_000))
+        val so1 = o.sellerOrders.first { it.sellerId == 1L }.id!!
+        o.ship(so1, "04", "T1", NOW)
+        o.deliver(so1, NOW)
+        o.withReturn(o.itemIdOf(1), ReturnReason.DEFECTIVE, ReturnStatus.REFUNDING)
+
+        assertCode(ErrorCode.ORDER_ITEM_NOT_CANCELABLE) { o.planCancel(o.itemIdOf(2), CancelActor.BUYER, POLICY) }
+    }
 }
