@@ -53,6 +53,9 @@ class TossPgClient(private val restClient: RestClient) : PgClient {
         val error = runCatching { JSON.readTree(body) }.getOrNull()
         val code = error?.path("code")?.asString("").orEmpty()
         val message = error?.path("message")?.asString("").orEmpty()
+        if (operation == "confirm" && code in CONFIRM_UNCERTAIN_CODES) {
+            return PgResult.Unknown("토스 승인 응답 $code")
+        }
         if (operation == "find" && (httpStatus == NOT_FOUND || code == "NOT_FOUND_PAYMENT")) {
             return PgResult.Failed("NOT_FOUND", message.ifBlank { "존재하지 않는 결제입니다." })
         }
@@ -79,6 +82,17 @@ class TossPgClient(private val restClient: RestClient) : PgClient {
 
     private companion object {
         const val NOT_FOUND = 404
+
+        /**
+         * 승인(confirm)이 4xx 로 와도 결제가 실제로 승인됐거나 아직 모르는 경우의 코드.
+         * `ALREADY_PROCESSED_PAYMENT` 는 이미 승인된 결제, 나머지는 토스·카드사 일시 오류다.
+         * Failed 로 두면 고객은 결제됐는데 주문이 거절되므로 Unknown 으로 보고 대사가 find 로 확정한다.
+         */
+        val CONFIRM_UNCERTAIN_CODES = setOf(
+            "ALREADY_PROCESSED_PAYMENT",
+            "FAILED_INTERNAL_SYSTEM_PROCESSING",
+            "PROVIDER_ERROR",
+        )
         val log = LoggerFactory.getLogger(TossPgClient::class.java)
         val JSON = tools.jackson.databind.json.JsonMapper.builder().build()
     }

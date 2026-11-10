@@ -70,6 +70,32 @@ class TossPgClientTest {
         assertEquals(PgResult.Failed("REJECT_CARD_COMPANY", "카드사 거절"), client.confirm("pk-1", "ORD-1", 10000))
     }
 
+    private fun confirmError(code: String) = server.expect(method(HttpMethod.POST)).andRespond(
+        withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+            .body("""{"code":"$code","message":"m"}"""),
+    )
+
+    @Test
+    fun `승인이 400 ALREADY_PROCESSED_PAYMENT면 Unknown이다`() {
+        confirmError("ALREADY_PROCESSED_PAYMENT")
+        assertIs<PgResult.Unknown>(client.confirm("pk-1", "ORD-1", 10000))
+    }
+
+    @Test
+    fun `승인이 일시 오류 코드면 Unknown이다`() {
+        confirmError("FAILED_INTERNAL_SYSTEM_PROCESSING")
+        assertIs<PgResult.Unknown>(client.confirm("pk-1", "ORD-1", 10000))
+        server.reset()
+        confirmError("PROVIDER_ERROR")
+        assertIs<PgResult.Unknown>(client.confirm("pk-1", "ORD-1", 10000))
+    }
+
+    @Test
+    fun `승인이 일반 거절 코드면 여전히 Failed다`() {
+        confirmError("REJECT_CARD_PAYMENT")
+        assertEquals(PgResult.Failed("REJECT_CARD_PAYMENT", "m"), client.confirm("pk-1", "ORD-1", 10000))
+    }
+
     @Test
     fun `5xx는 Unknown이다`() {
         server.expect(method(HttpMethod.POST)).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR))
