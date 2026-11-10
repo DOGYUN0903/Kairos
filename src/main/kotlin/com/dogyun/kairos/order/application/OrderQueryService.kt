@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 class OrderQueryService(
     private val orderRepository: OrderRepository,
     private val paymentGateway: PaymentGateway,
+    private val properties: OrderProperties,
 ) {
 
     fun getMine(memberId: Long, orderId: Long): OrderDetail {
@@ -71,6 +72,9 @@ class OrderQueryService(
             shippedAt = sellerOrder.shippedAt,
             deliveredAt = sellerOrder.deliveredAt,
             confirmedAt = sellerOrder.confirmedAt,
+            returnableUntil = sellerOrder.returnableUntil(properties.returnWindow),
+            allItemsReturned = sellerOrder.allItemsReturned,
+            hasOpenReturn = sellerOrder.hasOpenReturn,
             shippingAddress = order.shippingAddress.toResult(),
             items = sellerOrder.items.map { it.toResult() },
             orderedAt = requireNotNull(order.createdAt),
@@ -117,6 +121,8 @@ class OrderQueryService(
             freeShippingApplied = order.freeShippingApplied,
             shippingFeeRecovered = order.shippingFeeRecovered,
             refundedAmount = order.refundedAmount,
+            remainingPaidAmount = order.remainingPaidAmount,
+            remainingBuyerShippingFee = order.remainingBuyerShippingFee,
             productCouponDiscount = order.productCouponDiscount,
             cartCouponId = order.cartCouponId,
             cartCouponDiscount = order.cartCouponDiscount,
@@ -159,6 +165,9 @@ class OrderQueryService(
         shippedAt = shippedAt,
         deliveredAt = deliveredAt,
         confirmedAt = confirmedAt,
+        returnableUntil = returnableUntil(properties.returnWindow),
+        allItemsReturned = allItemsReturned,
+        hasOpenReturn = hasOpenReturn,
         items = items.map { it.toResult() },
     )
 
@@ -184,6 +193,7 @@ class OrderQueryService(
         pointsAllocated = pointsAllocated,
         paidAmount = paidAmount,
         pointsRefunded = pointsRefunded,
+        returnRequest = returnRequest?.toSummary(),
     )
 
     private fun ShippingAddress.toResult() = ShippingAddressResult(receiverName, phone, zipCode, address1, address2, memo)

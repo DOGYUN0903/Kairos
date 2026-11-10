@@ -431,6 +431,59 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         return orderDetail(buyerToken, orderId)
     }
 
+    /** 결제 → 판매자 주문마다 배송 시작(`-D` 송장) → 배송 완료까지 마치고 내 주문 상세의 data 를 돌려준다. */
+    protected fun deliveredOrder(
+        buyerToken: String,
+        sellerToken: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
+    ): JsonNode {
+        val order = paidOrder(buyerToken, items, expectedTotal, productCoupons = productCoupons, cartCouponId = cartCouponId, pointsToUse = pointsToUse)
+        val orderId = order.get("orderId").asLong()
+        val sellerOrders = order.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val soId = sellerOrders.get(i).get("sellerOrderId").asLong()
+            patch("/api/v1/seller/orders/$soId/ship", sellerToken, mapOf("carrierCode" to "04", "trackingNumber" to "T-$soId-D"))
+                .andExpect { status { isOk() } }
+            patch("/api/v1/seller/orders/$soId/deliver", sellerToken).andExpect { status { isOk() } }
+        }
+        return orderDetail(buyerToken, orderId)
+    }
+
+    /** 반품을 요청하고(201) returnId 를 돌려준다. */
+    protected fun requestReturn(token: String, orderId: Long, itemId: Long, reason: String = "CHANGE_OF_MIND", detail: String? = null): Long =
+        json(
+            postIdem("/api/v1/orders/$orderId/items/$itemId/returns", token, mapOf("reason" to reason, "detail" to detail))
+                .andExpect { status { isCreated() } },
+        ).get("data").get("returnId").asLong()
+
+    /** 내 반품 상세의 data. */
+    protected fun returnDetail(token: String, returnId: Long): JsonNode =
+        json(get("/api/v1/returns/$returnId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 주문 상세에서 항목이 속한 판매자 주문 ID. */
+    protected fun sellerOrderIdOf(orderDetail: JsonNode, itemId: Long): Long {
+        val sellerOrders = orderDetail.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val so = sellerOrders.get(i)
+            val items = so.get("items")
+            if ((0 until items.size()).any { items.get(it).get("orderItemId").asLong() == itemId }) return so.get("sellerOrderId").asLong()
+        }
+        error("항목 $itemId 가 주문에 없다")
+    }
+
+    protected fun stockOf(skuId: Long): Long =
+        jdbcTemplate.queryForObject("select stock from sku where id = ?", Long::class.java, skuId)!!
+
+    protected fun salesCountOf(productId: Long): Long =
+        jdbcTemplate.queryForObject("select sales_count from product where id = ?", Long::class.java, productId)!!
+
+    protected fun paymentStatusOf(orderId: Long): String =
+        jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId)!!
+
     /** 후기를 쓰고(201) reviewId 를 돌려준다. */
     protected fun writeReview(
         token: String,

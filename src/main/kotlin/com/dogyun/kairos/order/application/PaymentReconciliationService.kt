@@ -19,6 +19,7 @@ class PaymentReconciliationService(
     private val paymentGateway: PaymentGateway,
     private val orderPaymentService: OrderPaymentService,
     private val orderCancelService: OrderCancelService,
+    private val orderReturnService: OrderReturnService,
     private val properties: OrderProperties,
     private val clock: Clock,
 ) {
@@ -100,10 +101,13 @@ class PaymentReconciliationService(
         return orderPaymentService.voidClosedOrder(orderId, paymentKey, pg.balanceAmount)
     }
 
-    /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. [limit] 은 keyset 페이지 크기다. */
+    /**
+     * `CANCEL_REQUESTED`·`RETURN_REFUNDING` 으로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED·RETURNED)한 항목 수.
+     * [limit] 은 keyset 페이지 크기다.
+     */
     fun reconcileCancels(limit: Int = 100): Int {
         val before = LocalDateTime.now(clock).minus(properties.cancelRequestTimeout)
-        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findItemsInStatusBefore(setOf(OrderItemStatus.CANCEL_REQUESTED), before, after, limit) }) { (orderId, itemId) ->
+        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findItemsInStatusBefore(setOf(OrderItemStatus.CANCEL_REQUESTED, OrderItemStatus.RETURN_REFUNDING), before, after, limit) }) { (orderId, itemId) ->
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
@@ -115,6 +119,12 @@ class PaymentReconciliationService(
 
     private fun reconcileCancel(orderId: Long, itemId: Long): Boolean {
         val item = orderRepository.findById(orderId)?.findItem(itemId) ?: return false
+        if (item.status == OrderItemStatus.RETURN_REFUNDING) {
+            val request = item.returnRequest ?: return false
+            val returnId = request.id ?: return false
+            val outcome = if (request.refundAmount == 0L) NO_REFUND else refundOutcome(orderId, itemId, request.refundAmount) ?: return false
+            return orderReturnService.finishReturn(orderId, returnId, outcome) == ReturnFinish.RETURNED
+        }
         // 환불 0원이면 PG 를 볼 필요가 없다(finishCancel 이 환불 0 을 먼저 확정한다).
         val outcome = if (item.refundAmount == 0L) NO_REFUND else refundOutcome(orderId, itemId, item.refundAmount) ?: return false
         // REVERTED(항목이 이미 ORDERED 로 돌아가 있음)와 PENDING 은 할 일이 없다.

@@ -18,5 +18,6 @@ data class IdempotencyProperties(
         "/api/v1/seller/coupons/policies",
         "/api/v1/admin/coupons/policies",
         "/api/v1/orders/*/items/*/reviews",
+        "/api/v1/orders/*/items/*/returns",
     ),
 )

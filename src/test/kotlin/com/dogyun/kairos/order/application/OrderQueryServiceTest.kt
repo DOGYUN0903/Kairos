@@ -29,7 +29,7 @@ class OrderQueryServiceTest {
         OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
-    private val service = OrderQueryService(orderRepository, paymentGateway)
+    private val service = OrderQueryService(orderRepository, paymentGateway, OrderProperties())
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L

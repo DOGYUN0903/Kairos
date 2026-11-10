@@ -119,6 +119,25 @@ class Order(
 
     fun revertReturnRefund(returnId: Long) = findReturn(returnId).second.revertReturnRefund()
 
+    /**
+     * PG 환불 확인 뒤 반품을 확정한다(tx2). 누적 환불·포인트·발송 구간 회수를 반영하고, 판매자 주문에 남은 항목
+     * (`ORDERED`·열린 반품)이 없으면 그 판매자 주문을 `CONFIRMED` 로 닫는다(스펙 §4-1). 닫았으면 true.
+     */
+    fun completeReturn(returnId: Long, plan: ReturnRefundPlan, now: LocalDateTime): Boolean {
+        if (status != OrderStatus.PAID) throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
+        val (sellerOrder, item) = findReturn(returnId)
+        if (item.status != OrderItemStatus.RETURN_REFUNDING) throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
+        if (plan != item.toReturnRefundPlan()) throw DomainException(ErrorCode.RETURN_INVALID)
+        item.completeReturn(now, plan.pointsRefund)
+        refundedAmount += plan.refundAmount
+        pointsRefunded += plan.pointsRefund
+        shippingFeeRecovered += plan.outboundFeeRecovered
+        val closed = sellerOrder.items.none { it.status.isRemaining }
+        if (closed) sellerOrder.confirm(now)
+        settle()
+        return closed
+    }
+
     fun markPaid(now: LocalDateTime) {
         transit(setOf(OrderStatus.PENDING_PAYMENT), OrderStatus.PAID)
         paidAt = now

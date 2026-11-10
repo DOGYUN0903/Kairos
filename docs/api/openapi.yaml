@@ -2715,6 +2715,148 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/orders/{orderId}/items/{orderItemId}/returns:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - $ref: '#/components/parameters/OrderItemId'
+    post:
+      tags: [Return]
+      operationId: requestReturn
+      summary: 반품 요청 (구매자)
+      description: |
+        `DELIVERED` 판매자 주문의 `ORDERED` 항목에, 배송 완료 후 `kairos.order.return-window`(7일) 안에 요청한다.
+        철회(`WITHDRAWN`)한 반품은 같은 행(같은 returnId)을 `REQUESTED` 로 되살린다. 거절된 항목은 다시 요청할 수 없다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestReturnRequest'
+      responses:
+        '201':
+          description: 요청된 반품
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          description: "`RETURN_INVALID`(사유·상세 길이), `INVALID_REQUEST` 또는 `IDEMPOTENCY_KEY_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_NOT_ELIGIBLE`(배송 완료 전·구매 확정 뒤·취소 항목), `RETURN_WINDOW_EXPIRED`, `RETURN_ALREADY_REQUESTED` 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/returns/me:
+    get:
+      tags: [Return]
+      operationId: listMyReturns
+      summary: 내 반품 목록 (최신 요청순)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 반품 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Return]
+      operationId: getMyReturn
+      summary: 내 반품 상세
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Return]
+      operationId: withdrawMyReturn
+      summary: 반품 철회 (구매자)
+      description: "`REQUESTED` 일 때만 철회한다. 이미 `WITHDRAWN` 이면 200 으로 현재 상태를 돌려준다. 항목은 `ORDERED` 로 돌아간다."
+      responses:
+        '200':
+          description: 철회된 반품
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 승인·거절 뒤"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/reviews/me:
     get:
       tags: [Review]
@@ -3358,6 +3500,13 @@ components:
         format: int64
     ReviewId:
       name: reviewId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ReturnId:
+      name: returnId
       in: path
       required: true
       schema:
@@ -5023,6 +5172,92 @@ components:
             - $ref: '#/components/schemas/ReturnRequestSummary'
           nullable: true
           description: 이 항목의 반품 요청(없으면 null)
+    RequestReturnRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        detail:
+          type: string
+          maxLength: 500
+          nullable: true
+    ReturnRequestResponse:
+      type: object
+      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt]
+      properties:
+        returnId:
+          type: integer
+          format: int64
+        orderId:
+          type: integer
+          format: int64
+        sellerOrderId:
+          type: integer
+          format: int64
+        orderItemId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        feeBearer:
+          type: string
+          enum: [BUYER, SELLER]
+        status:
+          type: string
+          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
+        returnFee:
+          type: integer
+          format: int64
+          description: 구매자 부담 회수 구간 반품비(수거 확인 때 확정)
+        outboundFeeRecovered:
+          type: integer
+          format: int64
+          description: 무료배송 주문의 발송 구간 회수액(주문당 한 번)
+        shippingFeeRefund:
+          type: integer
+          format: int64
+          description: 판매자 귀책으로 돌려준 구매자 부담 배송비
+        sellerBorneFee:
+          type: integer
+          format: int64
+          description: 판매자 정산에서 빼는 반품비
+        refundAmount:
+          type: integer
+          format: int64
+          description: paidAmount - returnFee - outboundFeeRecovered + shippingFeeRefund (수거 확인 전에는 0)
+        pointsRefund:
+          type: integer
+          format: int64
+        rejectReason:
+          type: string
+          nullable: true
+        requestedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+          nullable: true
+        decidedBy:
+          type: string
+          enum: [SELLER, SYSTEM, ADMIN]
+          nullable: true
+        receivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
     ReturnRequestSummary:
       type: object
       required: [returnId, reason, status, feeBearer, refundAmount, requestedAt]
@@ -5035,7 +5270,7 @@ components:
           enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
         status:
           type: string
-          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED]
+          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
         feeBearer:
           type: string
           enum: [BUYER, SELLER]
@@ -5064,7 +5299,7 @@ components:
           nullable: true
     SellerOrderResult:
       type: object
-      required: [sellerOrderId, sellerId, sellerName, status, shippingFee, shippingFeePayer, items]
+      required: [sellerOrderId, sellerId, sellerName, status, shippingFee, shippingFeePayer, allItemsReturned, hasOpenReturn, items]
       properties:
         sellerOrderId:
           type: integer
@@ -5133,7 +5368,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     OrderDetail:
       type: object
-      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
       properties:
         orderId:
           type: integer
@@ -5227,7 +5462,7 @@ components:
           format: date-time
     SellerOrderDetail:
       type: object
-      required: [sellerOrderId, orderId, orderNo, status, shippingFee, shippingFeePayer, shippingAddress, items, orderedAt]
+      required: [sellerOrderId, orderId, orderNo, status, shippingFee, shippingFeePayer, allItemsReturned, hasOpenReturn, shippingAddress, items, orderedAt]
       properties:
         sellerOrderId:
           type: integer

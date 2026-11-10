@@ -10,7 +10,7 @@ class PaymentReconciliationServiceTest {
 
     private val f = OrderFlowFixture()
     private val service = PaymentReconciliationService(
-        f.orderRepository, f.paymentGateway, f.paymentService, f.cancelService, f.properties, f.clock,
+        f.orderRepository, f.paymentGateway, f.paymentService, f.cancelService, f.returnService, f.properties, f.clock,
     )
 
     @Test
@@ -230,5 +230,48 @@ class PaymentReconciliationServiceTest {
 
         assertTrue(f.paymentGateway.cancelCalls.isEmpty())
         assertEquals(OrderItemStatus.CANCEL_REQUESTED, f.reload(order).findItem(itemId).status)
+    }
+
+    /** 판매자 1 항목(30,000, 무료배송)을 변심 반품하고 수거 확인에서 PG 가 불확실해 RETURN_REFUNDING 으로 남긴다. 환불 24,000. */
+    private fun returnRefunding(): Triple<com.dogyun.kairos.order.domain.Order, Long, Long> {
+        val order = f.paid()
+        val so = order.sellerOrders.first { it.sellerId == 1L }
+        val itemId = so.items.single().id!!
+        f.shippingService.ship(1L, so.id!!, "04", "T-1")
+        f.shippingService.deliver(1L, so.id!!)
+        val returnId = f.returnService.request(f.memberId, order.id!!, itemId, RequestReturnCommand("CHANGE_OF_MIND", null)).returnId
+        f.returnService.approveBySeller(1L, returnId)
+        f.paymentGateway.nextCancel = PgOutcome.Unknown
+        f.returnService.receiveBySeller(1L, returnId)
+        val item = f.reload(order).findItem(itemId)
+        assertEquals(OrderItemStatus.RETURN_REFUNDING, item.status)
+        f.paymentGateway.cancelCalls.clear()
+        return Triple(order, itemId, item.returnRequest!!.refundAmount)
+    }
+
+    @Test
+    fun RETURN_REFUNDING_정체_항목은_PG_조회로_RETURNED가_된다() {
+        val (order, itemId, refund) = returnRefunding()
+        assertEquals(24_000, refund)
+        f.pgDone("pay-${order.id}", PgPaymentStatus.PARTIAL_CANCELED, balance = 60_000 - refund, cancels = listOf(PgCancelInfo(refund, "orderItem:$itemId")))
+
+        assertEquals(1, service.reconcileCancels())
+
+        assertEquals(OrderItemStatus.RETURNED, f.reload(order).findItem(itemId).status)
+        assertEquals(refund, f.paymentGateway.get(order.id!!).refundedAmount)
+        assertEquals(10, f.stockManager.stock[10L])
+        assertTrue(f.paymentGateway.cancelCalls.isEmpty())
+    }
+
+    @Test
+    fun PG에_취소가_없으면_같은_멱등_키로_다시_취소한다() {
+        val (order, itemId, refund) = returnRefunding()
+        f.pgDone("pay-${order.id}")
+        f.pgCancelDone(refund, balance = 60_000 - refund)
+
+        assertEquals(1, service.reconcileCancels())
+
+        assertEquals(listOf(CancelCall("pay-${order.id}", refund, "orderItem:$itemId", "refund-$itemId-$refund")), f.paymentGateway.cancelCalls)
+        assertEquals(OrderItemStatus.RETURNED, f.reload(order).findItem(itemId).status)
     }
 }
