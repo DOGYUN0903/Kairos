@@ -68,7 +68,7 @@ com.dogyun.kairos.{module}/
 - 주문 상태를 바꾸는 트랜잭션은 주문 행을 `findByIdForUpdate`/`findByOrderNoForUpdate`로 먼저 잠근다(ADR 0003). 판매자 주문 엔드포인트는 주문 ID를 트랜잭션 밖에서 일반 조회(`findOrderIdBySellerOrderId`)로 찾고 잠금은 트랜잭션 안에서 건다. 락 전에 읽으면 REPEATABLE READ에서 낡은 스냅샷이 생기기 때문이다. 스케줄러 작업은 이 서비스들을 감싸는 `@Transactional`을 붙이지 않는다.
 - PG 결제 되돌리기(`voidMismatch`, `voidClosedOrder`)는 `OrderPaymentService` 한 곳에만 둔다. PG 취소 결과가 불확실하면 결제는 `UNKNOWN`, 항목은 `CANCEL_REQUESTED`로 두고 대사 작업이 맞춘다.
 - 쿠폰 수량·사용 상태·좋아요·상품 집계(별점·후기 수·좋아요 수)는 조건부 UPDATE의 영향 행 수로 판정한다. 집계·좋아요 카운터는 native 증감 쿼리로만 바꾼다(해당 컬럼은 `updatable=false`). 행 락은 `member_point`(FOR UPDATE)와 주문 행뿐이다.
-- 쓰기를 결정하는 포인트 조회(잔액·로트)는 `member_point` 락을 잡은 뒤 FOR UPDATE 현재 읽기로 한다(스냅샷 읽기 금지). 락 순서는 주문 생성 `member_point → coupon → sku`, 취소·만료·확정 `orders → member_point → coupon → sku`(benefit 되돌림이 재고 복구보다 먼저), 후기 `member_point(적립) → product(별점 집계)`(ADR 0004).
+- 쓰기를 결정하는 포인트 조회(잔액·로트)는 `member_point` 락을 잡은 뒤 FOR UPDATE 현재 읽기로 한다(스냅샷 읽기 금지). 락 순서는 주문 생성 `member_point → coupon → sku`, 취소·만료·확정·결제 실패·승인 거절 `orders → member_point → coupon → sku`(benefit 되돌림이 재고 복구보다 먼저), 후기 `member_point(적립) → product(별점 집계)`(ADR 0004).
 - 최적화, Kafka, Gateway, Resilience4j는 해당 Phase 전에 미리 넣지 않는다.
 
 ## 코드 스타일

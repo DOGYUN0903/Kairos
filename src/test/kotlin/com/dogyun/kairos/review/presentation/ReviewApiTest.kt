@@ -150,6 +150,29 @@ class ReviewApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 삭제된_후기에_작성자_PATCH_두번째_DELETE_판매자_답글_PATCH는_모두_404_REVIEW_NOT_FOUND이고_집계는_두_번_줄지_않는다() {
+        val shop = shop()
+        val user = newUserToken()
+        val other = newUserToken()
+        val first = confirmedItems(user, shop).single()
+        val second = confirmedItems(other, shop).single()
+        val deletedId = writeReview(user, first.orderId, first.orderItemId, rating = 4)
+        writeReview(other, second.orderId, second.orderItemId, rating = 5)
+        assertEquals(Pair(2L, 9L), productStats(shop.productId).let { it.first to it.second })
+
+        delete("/api/v1/reviews/$deletedId", user).andExpect { status { isNoContent() } }
+        val afterDelete = productStats(shop.productId)
+        assertEquals(1L, afterDelete.first)
+        assertEquals(5L, afterDelete.second)
+
+        patch("/api/v1/reviews/$deletedId", user, mapOf("rating" to 1, "content" to "고쳐 쓴 열 글자 이상 본문")).expectCode(404, "REVIEW_NOT_FOUND")
+        delete("/api/v1/reviews/$deletedId", user).expectCode(404, "REVIEW_NOT_FOUND")
+        patch("/api/v1/seller/reviews/$deletedId/reply", shop.sellerToken, mapOf("content" to "감사합니다")).expectCode(404, "REVIEW_NOT_FOUND")
+
+        assertEquals(afterDelete, productStats(shop.productId))
+    }
+
+    @Test
     fun 수정_삭제_뒤_rating_sum과_review_count가_실제_행과_같다() {
         val shop = shop()
         val user = newUserToken()

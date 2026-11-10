@@ -135,8 +135,25 @@ class ProductLikeServiceTest {
     }
 
     @Test
-    fun 없는_상품은_PRODUCT_NOT_FOUND() {
+    fun 없는_상품에_좋아요는_PRODUCT_NOT_FOUND다() {
         assertFailsWith<DomainException> { service.like(7L, 999L) }.also { assertEquals(ErrorCode.PRODUCT_NOT_FOUND, it.errorCode) }
-        assertFailsWith<DomainException> { service.unlike(7L, 999L) }.also { assertEquals(ErrorCode.PRODUCT_NOT_FOUND, it.errorCode) }
+    }
+
+    @Test
+    fun 없거나_좋아요한_적_없는_상품의_취소는_예외없이_집계도_그대로다() {
+        service.unlike(7L, 999L)
+
+        assertEquals(null, stats.likeCounts[999L])
+    }
+
+    @Test
+    fun 조회되지_않는_삭제된_상품도_좋아요_행이_있으면_취소되고_1_내린다() {
+        // 소프트 딜리트된 상품은 ProductRepository 로 조회되지 않는다(저장소에 없는 상태로 흉내).
+        likes.liked[999L to 7L] = true
+
+        service.unlike(7L, 999L)
+
+        assertEquals(false, likes.liked[999L to 7L])
+        assertEquals(-1L, stats.likeCounts[999L])
     }
 }

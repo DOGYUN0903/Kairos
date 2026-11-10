@@ -103,7 +103,6 @@ class ProductLikeApiTest : CommerceTestSupport() {
     fun 없는_상품은_404_PRODUCT_NOT_FOUND이고_비로그인은_401이다() {
         val member = newUserToken()
         put("/api/v1/products/999999/like", member).andExpect { status { isNotFound() } }.andExpect { jsonPath("$.code") { value("PRODUCT_NOT_FOUND") } }
-        delete("/api/v1/products/999999/like", member).andExpect { status { isNotFound() } }
         put("/api/v1/products/999999/like").andExpect { status { isUnauthorized() } }
         get("/api/v1/products/me/likes").andExpect { status { isUnauthorized() } }
     }
@@ -168,5 +167,32 @@ class ProductLikeApiTest : CommerceTestSupport() {
         assertEquals(1, content.size())
         assertEquals(productId, content.get(0).get("productId").asLong())
         assertEquals("DELETED", content.get(0).get("productStatus").asString())
+    }
+
+    @Test
+    fun 삭제된_상품도_DELETE로_좋아요를_취소하면_204이고_내_좋아요_목록에서_사라진다() {
+        val productId = onSale()
+        val member = newUserToken()
+        likeProduct(member, productId)
+        jdbcTemplate.update("update product set status = 'DELETED' where id = ?", productId)
+
+        delete("/api/v1/products/$productId/like", member).andExpect { status { isNoContent() } }
+
+        val content = json(get("/api/v1/products/me/likes", member).andExpect { status { isOk() } }).get("data").get("content")
+        assertEquals(0, content.size())
+        assertEquals(0L, likeCountOf(productId))
+    }
+
+    @Test
+    fun 좋아요한_적_없거나_없는_상품의_DELETE는_204이고_like_count는_그대로다() {
+        val productId = onSale()
+        val other = newUserToken()
+        likeProduct(other, productId)
+        val member = newUserToken()
+
+        delete("/api/v1/products/$productId/like", member).andExpect { status { isNoContent() } }
+        delete("/api/v1/products/999999/like", member).andExpect { status { isNoContent() } }
+
+        assertEquals(1L, likeCountOf(productId))
     }
 }

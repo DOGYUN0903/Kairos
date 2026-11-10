@@ -44,8 +44,8 @@ class ProductLikeService(
 
     @Transactional
     fun unlike(memberId: Long, productId: Long) {
-        // 취소는 판매 종료·중지된 상품에도 허용한다(내 좋아요 목록에서 지울 수 있어야 함). 소프트 딜리트된 상품만 없는 것으로 본다.
-        requireProduct(productId)
+        // 취소는 상품 존재·노출과 무관하다. 소프트 딜리트된 상품도 내 좋아요 목록(DELETED)에 남으므로 지울 수 있어야 하고,
+        // 행이 없으면 아무 일도 하지 않는다(204). like_count 는 행이 실제로 바뀐 경우에만 내린다.
         if (likeRepository.unlike(productId, memberId)) statsRepository.addLikeCount(productId, -1)
     }
 
@@ -65,10 +65,6 @@ class ProductLikeService(
             totalPages = result.totalPages,
             hasNext = result.hasNext,
         )
-    }
-
-    private fun requireProduct(productId: Long) {
-        productRepository.findById(ProductId(productId)) ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
     }
 
     private companion object {

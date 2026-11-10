@@ -1100,13 +1100,14 @@ paths:
       tags: [Product]
       operationId: unlikeProduct
       summary: 상품 좋아요 취소 (USER, 멱등 - 좋아요가 아니어도 204이고 like_count는 좋아요였을 때만 줄어든다)
+      description: |
+        상품의 존재·노출 여부와 무관하다. 삭제된 상품이나 없는 상품에도 404 없이 204를 돌려주며,
+        삭제된 상품의 좋아요도 이 호출로 내 좋아요 목록에서 지울 수 있다.
       responses:
         '204':
           description: 취소 완료 (본문 없음)
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/ProductNotFound'
   /api/v1/products/{productId}:
     parameters:
       - $ref: '#/components/parameters/ProductId'
@@ -2027,7 +2028,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/CreateOrderResponse'
         '400':
-          description: "`ORDER_INVALID`(항목 없음·수량 범위 밖·배송지 누락·쿠폰 ID 중복·한 SKU 에 상품 쿠폰 두 장·항목에 없는 SKU 지정), `COUPON_NOT_APPLICABLE`, `COUPON_MIN_AMOUNT_NOT_MET`, `POINT_INVALID_AMOUNT`, `POINT_EXCEEDS_LIMIT`, `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          description: "`ORDER_INVALID`(항목 없음·수량 범위 밖·배송지 누락·쿠폰 ID 중복·한 SKU 에 상품 쿠폰 두 장·항목에 없는 SKU 지정), `COUPON_NOT_APPLICABLE`, `COUPON_MIN_AMOUNT_NOT_MET`, `POINT_INVALID_AMOUNT`, `POINT_EXCEEDS_LIMIT`(동시에 같은 회원의 포인트를 쓰는 주문 경합에서 진 요청도 잔액이 최소 사용 단위 1,000P 밑으로 떨어져 이 코드를 받는다), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
           content:
             application/json:
               schema:
@@ -3230,6 +3231,7 @@ paths:
       tags: [Admin Point]
       operationId: getMemberPointsForAdmin
       summary: 회원 포인트 조회 (관리자)
+      description: 존재하지 않는 `memberId`도 404가 아니라 잔액 0·내역 빈 목록으로 응답한다.
       parameters:
         - name: memberId
           in: path
@@ -4281,6 +4283,7 @@ components:
       properties:
         content:
           type: string
+          maxLength: 500
           description: 답글 내용(공백 불가, 최대 500자)
     ReviewResult:
       type: object
@@ -4925,7 +4928,7 @@ components:
       enum: [PENDING_PAYMENT, PAID, SHIPPING, DELIVERED, CONFIRMED, CANCELED]
     OrderItemResult:
       type: object
-      required: [orderItemId, skuId, productId, productName, brandName, optionDisplayName, salePrice, extraPrice, quantity, lineAmount, status, refundAmount]
+      required: [orderItemId, skuId, productId, productName, brandName, optionDisplayName, salePrice, extraPrice, quantity, lineAmount, status, refundAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount, pointsRefunded]
       properties:
         orderItemId:
           type: integer
@@ -5074,7 +5077,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     OrderDetail:
       type: object
-      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, expiresAt, createdAt, shippingAddress, sellerOrders]
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
       properties:
         orderId:
           type: integer
