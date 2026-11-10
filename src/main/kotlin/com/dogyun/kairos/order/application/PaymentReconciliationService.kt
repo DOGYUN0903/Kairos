@@ -19,7 +19,6 @@ class PaymentReconciliationService(
     private val orderPaymentService: OrderPaymentService,
     private val orderCancelService: OrderCancelService,
     private val properties: OrderProperties,
-    private val tx: TransactionRunner,
     private val clock: Clock,
 ) {
 
@@ -42,20 +41,13 @@ class PaymentReconciliationService(
         val outcome = paymentGateway.findFromPg(paymentKey)
         var verdict = judge(outcome, payment.amount)
         if (verdict == PgVerdict.VOID_THEN_REJECT) {
-            val pgTotal = (outcome as PgOutcome.Done).payment.totalAmount
-            val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId"))
-            // 취소가 확인되지 않으면 거절하지 않고 UNKNOWN 으로 남겨 다음 대사가 다시 확인한다.
-            verdict = if (voided) PgVerdict.REJECT else PgVerdict.HOLD
+            verdict = orderPaymentService.voidMismatch(orderId, paymentKey, (outcome as PgOutcome.Done).payment.totalAmount)
         }
         if (verdict == PgVerdict.HOLD) return false
 
         val finish = orderPaymentService.finishApproval(orderId, paymentKey, verdict, RECONCILED)
         if (finish == ApprovalFinish.ORDER_ALREADY_CLOSED && verdict == PgVerdict.APPROVE) {
-            val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, payment.amount, "order-closed:$orderId", "void-$orderId"))
-            tx.run {
-                if (voided) paymentGateway.voidAfterApproval(orderId)
-                else if (paymentGateway.get(orderId).status == "IN_PROGRESS") paymentGateway.markUnknown(orderId)
-            }
+            orderPaymentService.voidClosedOrder(orderId, paymentKey, payment.amount)
         }
         return finish != ApprovalFinish.ALREADY_SETTLED
     }
@@ -84,15 +76,7 @@ class PaymentReconciliationService(
         if (pg.status != PgPaymentStatus.DONE && pg.status != PgPaymentStatus.PARTIAL_CANCELED) return false
         if (pg.balanceAmount <= 0) return false
 
-        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, pg.balanceAmount, "order-closed:$orderId", "void-$orderId"))
-        if (voided) {
-            // 로컬 결제가 아직 승인 확인 대기 중이면 취소로 닫는다. FAILED/CANCELED 는 그대로 둔다.
-            tx.run {
-                val status = paymentGateway.get(orderId).status
-                if (status == "IN_PROGRESS" || status == "UNKNOWN") paymentGateway.voidAfterApproval(orderId)
-            }
-        }
-        return voided
+        return orderPaymentService.voidClosedOrder(orderId, paymentKey, pg.balanceAmount)
     }
 
     /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. */
@@ -120,13 +104,11 @@ class PaymentReconciliationService(
     private fun refundOutcome(orderId: Long, itemId: Long, refundAmount: Long): PgOutcome? {
         val paymentKey = paymentGateway.get(orderId).paymentKey ?: return null
         val found = paymentGateway.findFromPg(paymentKey)
-        if (found is PgOutcome.Unknown) return null
+        // 조회가 일시적으로 실패한 것일 수 있다(NOT_FOUND 만 PG 에 취소가 없다는 확실한 답이다). 취소를 다시 부르다 거절되면 환불이 되돌려지므로 이번 주기는 건너뛴다.
+        if (found is PgOutcome.Unknown || (found is PgOutcome.Failed && found.code != "NOT_FOUND")) return null
         if (found is PgOutcome.Done && found.payment.cancels.any { it.reason == "orderItem:$itemId" }) return found
         return paymentGateway.cancelWithPg(paymentKey, refundAmount, "orderItem:$itemId", "refund-$itemId")
     }
-
-    private fun isCanceled(outcome: PgOutcome) =
-        outcome is PgOutcome.Done && outcome.payment.status == PgPaymentStatus.CANCELED
 
     private companion object {
         val log = LoggerFactory.getLogger(PaymentReconciliationService::class.java)

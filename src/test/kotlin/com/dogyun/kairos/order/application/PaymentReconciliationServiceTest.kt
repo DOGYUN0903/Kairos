@@ -10,7 +10,7 @@ class PaymentReconciliationServiceTest {
 
     private val f = OrderFlowFixture()
     private val service = PaymentReconciliationService(
-        f.orderRepository, f.paymentGateway, f.paymentService, f.cancelService, f.properties, f.tx, f.clock,
+        f.orderRepository, f.paymentGateway, f.paymentService, f.cancelService, f.properties, f.clock,
     )
 
     @Test
@@ -157,5 +157,16 @@ class PaymentReconciliationServiceTest {
 
         assertEquals(listOf(CancelCall("pay-${order.id}", refund, "orderItem:$itemId", "refund-$itemId")), f.paymentGateway.cancelCalls)
         assertEquals(OrderItemStatus.CANCELED, f.reload(order).findItem(itemId).status)
+    }
+
+    @Test
+    fun PG_조회가_NOT_FOUND가_아닌_Failed면_취소를_다시_부르지_않고_건너뛴다() {
+        val (order, itemId, _) = cancelRequested()
+        f.paymentGateway.pgPayments["pay-${order.id}"] = PgOutcome.Failed("PROVIDER_ERROR", "일시 오류")
+
+        assertEquals(0, service.reconcileCancels())
+
+        assertTrue(f.paymentGateway.cancelCalls.isEmpty())
+        assertEquals(OrderItemStatus.CANCEL_REQUESTED, f.reload(order).findItem(itemId).status)
     }
 }

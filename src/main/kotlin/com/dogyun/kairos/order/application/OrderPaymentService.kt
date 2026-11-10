@@ -65,9 +65,8 @@ class OrderPaymentService(
         var rejectedButUnvoided = false
         if (verdict == PgVerdict.VOID_THEN_REJECT) {
             val pgTotal = (outcome as PgOutcome.Done).payment.totalAmount
-            val voided = isCanceled(paymentGateway.cancelWithPg(cmd.paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId"))
-            verdict = if (voided) PgVerdict.REJECT else PgVerdict.HOLD
-            rejectedButUnvoided = !voided
+            verdict = voidMismatch(orderId, cmd.paymentKey, pgTotal)
+            rejectedButUnvoided = verdict == PgVerdict.HOLD
             failReason = "amount-mismatch"
         }
 
@@ -78,20 +77,38 @@ class OrderPaymentService(
                 throw DomainException(ErrorCode.PAYMENT_REJECTED)
             } else ConfirmPaymentResult(orderId, cmd.orderNo, OrderStatus.PENDING_PAYMENT.name, "UNKNOWN")
             ApprovalFinish.ORDER_ALREADY_CLOSED -> {
-                if (verdict == PgVerdict.APPROVE) {
-                    val voided = isCanceled(
-                        paymentGateway.cancelWithPg(cmd.paymentKey, cmd.amount, "order-closed:$orderId", "void-$orderId"),
-                    )
-                    // 취소가 확인된 때만 결제를 닫는다. 아니면 UNKNOWN 으로 남겨 대사가 PG 를 다시 조회하게 한다.
-                    tx.run {
-                        if (voided) paymentGateway.voidAfterApproval(orderId)
-                        else if (paymentGateway.get(orderId).status == "IN_PROGRESS") paymentGateway.markUnknown(orderId)
-                    }
-                }
+                if (verdict == PgVerdict.APPROVE) voidClosedOrder(orderId, cmd.paymentKey, cmd.amount)
                 throw DomainException(ErrorCode.ORDER_INVALID_STATE_TRANSITION)
             }
             ApprovalFinish.ALREADY_SETTLED -> settledResult(orderId)
         }
+    }
+
+    /**
+     * 금액이 다른 PG 승인을 전액 취소한다(승인 흐름과 대사가 함께 쓴다). 취소가 확인되면 [PgVerdict.REJECT],
+     * 확인되지 않으면 [PgVerdict.HOLD] 로 결제를 UNKNOWN 으로 남겨 대사가 다시 확인하게 한다. PG 호출이라 트랜잭션 밖이다.
+     */
+    fun voidMismatch(orderId: Long, paymentKey: String, pgTotal: Long): PgVerdict {
+        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, pgTotal, "amount-mismatch:$orderId", "void-$orderId"))
+        return if (voided) PgVerdict.REJECT else PgVerdict.HOLD
+    }
+
+    /**
+     * 이미 닫힌 주문의 PG 결제를 같은 멱등 키로 [amount] 만큼 취소한다(승인 흐름과 대사가 함께 쓴다). PG 호출은 트랜잭션 밖이고,
+     * 결제 상태는 주문 행 락 아래에서 다시 읽어 바꾼다. 취소가 확인되면 `IN_PROGRESS`/`UNKNOWN` 결제를 CANCELED 로 닫고,
+     * 확인되지 않으면 `IN_PROGRESS` 결제를 UNKNOWN 으로 남긴다. 그 밖의 상태(FAILED, CANCELED 등)는 건드리지 않는다. 취소 확인 여부를 돌려준다.
+     */
+    fun voidClosedOrder(orderId: Long, paymentKey: String, amount: Long): Boolean {
+        val voided = isCanceled(paymentGateway.cancelWithPg(paymentKey, amount, "order-closed:$orderId", "void-$orderId"))
+        tx.run {
+            orderRepository.findByIdForUpdate(orderId) ?: return@run
+            val payment = paymentGateway.get(orderId)
+            if (payment.paymentKey != paymentKey) return@run
+            if (voided) {
+                if (payment.status == "IN_PROGRESS" || payment.status == "UNKNOWN") paymentGateway.voidAfterApproval(orderId)
+            } else if (payment.status == "IN_PROGRESS") paymentGateway.markUnknown(orderId)
+        }
+        return voided
     }
 
     /** tx1: 결제 상태를 먼저 보고(같은 키의 재시도는 멱등), 그다음 주문 상태·금액을 확인한 뒤 결제를 IN_PROGRESS 로 선점한다. */
