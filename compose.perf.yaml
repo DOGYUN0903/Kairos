@@ -15,9 +15,6 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       JAVA_TOOL_OPTIONS: "-Xms1g -Xmx1g"
-      KAIROS_MOCK_PG_DELAY: ${PERF_MOCK_PG_DELAY:-100ms}
-      KAIROS_MOCK_PG_FAILURE_RATE: ${PERF_MOCK_PG_FAILURE_RATE:-0.0}
-      KAIROS_MOCK_PG_TIMEOUT: ${PERF_MOCK_PG_TIMEOUT:-3s}
     ports:
       - "8080:8080"
       - "8081:8081"

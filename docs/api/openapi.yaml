@@ -1927,7 +1927,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
-          description: "`ORDER_PRICE_CHANGED`, `STOCK_SOLD_OUT`, `SKU_NOT_ORDERABLE` 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          description: "`ORDER_PRICE_CHANGED`, `STOCK_SOLD_OUT`, `SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU, 또는 판매자가 없거나 활성이 아님) 또는 `IDEMPOTENCY_IN_PROGRESS`"
           content:
             application/json:
               schema:
@@ -2560,7 +2560,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: 같은 요청의 재시도를 식별하는 키(1~100자). 같은 회원·같은 키·같은 본문이면 저장된 응답을 다시 돌려준다.
+      description: 같은 요청의 재시도를 식별하는 키(1~100자). 같은 회원·같은 키·같은 본문이면 저장된 응답을 다시 돌려준다. 저장되는 응답에는 409 같은 오류도 포함되므로, 같은 키로 재시도하면 그 409 가 그대로 재생된다. 상태가 바뀐 뒤(재고 보충 등) 다시 시도하려면 새 키를 쓴다.
       schema:
         type: string
         minLength: 1
