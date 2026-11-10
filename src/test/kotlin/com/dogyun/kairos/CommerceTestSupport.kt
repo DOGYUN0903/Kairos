@@ -39,6 +39,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         // review_image, review, product_like, point_lot_usage, point_transaction, point_lot, member_point, coupon, coupon_policy
         // (order_item 이 쿠폰·후기를 참조하므로 review → coupon 계열은 order_item 삭제 전에 지운다)
         jdbcTemplate.update("delete from point_lot_usage")
+        jdbcTemplate.update("delete from product_like")
         jdbcTemplate.update("delete from point_transaction")
         jdbcTemplate.update("delete from point_lot")
         jdbcTemplate.update("delete from member_point")
@@ -375,6 +376,14 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             expiresAt,
         )
     }
+
+    /** `PUT /api/v1/products/{id}/like` 를 200 으로 확인한다. */
+    protected fun likeProduct(token: String, productId: Long) {
+        put("/api/v1/products/$productId/like", token).andExpect { status { isOk() } }
+    }
+
+    protected fun likeCountOf(productId: Long): Long =
+        jdbcTemplate.queryForObject("select like_count from product where id = ?", Long::class.java, productId)!!
 
     protected fun pointBalance(memberId: Long): Long =
         jdbcTemplate.queryForObject("select coalesce(sum(balance), 0) from member_point where member_id = ?", Long::class.java, memberId) ?: 0L

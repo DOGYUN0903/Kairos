@@ -1,6 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.ProductId
+import com.dogyun.kairos.catalog.domain.ProductLikeRepository
 import com.dogyun.kairos.catalog.domain.ProductListRow
 import com.dogyun.kairos.catalog.domain.ProductSearchCondition
 import com.dogyun.kairos.catalog.domain.ProductSearchRepository
@@ -11,7 +12,7 @@ import com.dogyun.kairos.common.domain.PageResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 비로그인 사용자 상품 목록·검색·상세. 노출 조건은 [ProductSearchRepository] 가 쿼리로 건다. */
+/** 상품 목록·검색·상세(공개, 로그인 선택: 로그인하면 `liked` 가 채워진다). 노출 조건은 [ProductSearchRepository] 가 쿼리로 건다. */
 @Service
 @Transactional(readOnly = true)
 class ProductSearchService(
@@ -19,6 +20,7 @@ class ProductSearchService(
     private val categoryQueryService: CategoryQueryService,
     private val sellerReader: SellerReader,
     private val imageFileReader: ImageFileReader,
+    private val likeRepository: ProductLikeRepository,
 ) {
 
     fun list(
@@ -30,6 +32,7 @@ class ProductSearchService(
         sort: ProductSort,
         page: Int,
         size: Int,
+        memberId: Long?,
     ): PageResult<ProductSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         if (minPrice != null && maxPrice != null && minPrice > maxPrice) throw DomainException(ErrorCode.INVALID_REQUEST)
@@ -47,7 +50,7 @@ class ProductSearchService(
         )
         val result = searchRepository.search(condition, page, size)
         return PageResult(
-            content = toSummaries(result.content),
+            content = toSummaries(result.content, memberId),
             page = result.page,
             size = result.size,
             totalElements = result.totalElements,
@@ -56,19 +59,22 @@ class ProductSearchService(
         )
     }
 
-    fun detail(productId: Long): ProductDetail {
+    fun detail(productId: Long, memberId: Long?): ProductDetail {
         val product = searchRepository.findExposedDetail(ProductId(productId))
             ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
-        return toProductDetail(product, brandName, urls)
+        val liked = memberId?.let { likeRepository.findLikedProductIds(it, listOf(productId)).contains(productId) }
+        return toProductDetail(product, brandName, urls, liked)
     }
 
     /** 대표 이미지 URL 을 페이지 단위로 한 번에 조회한다. */
-    private fun toSummaries(rows: List<ProductListRow>): List<ProductSummary> {
+    private fun toSummaries(rows: List<ProductListRow>, memberId: Long?): List<ProductSummary> {
         if (rows.isEmpty()) return emptyList()
         val urls = imageFileReader.findImages(rows.map { it.mainFileId }.toSet()).mapValues { it.value.url }
-        return rows.map { toProductSummary(it, urls[it.mainFileId].orEmpty()) }
+        // 로그인한 요청이면 페이지의 상품 ID 로 좋아요를 한 번에 조회한다(N+1 방지).
+        val likedIds = memberId?.let { likeRepository.findLikedProductIds(it, rows.map { r -> r.productId }) }
+        return rows.map { toProductSummary(it, urls[it.mainFileId].orEmpty(), likedIds?.contains(it.productId)) }
     }
 
     private companion object {

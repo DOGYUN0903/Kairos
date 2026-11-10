@@ -944,7 +944,8 @@ paths:
         - `categoryId`: 소분류면 그 소분류, 대분류면 아래 모든 소분류의 상품.
         - `minPrice`/`maxPrice`: 상품 판매가 기준(SKU 추가 금액 미반영). `minPrice > maxPrice` 면 `INVALID_REQUEST`.
         - `keyword`: 상품명 또는 브랜드명 부분 일치. `%`, `_` 는 문자로 취급한다. 공백만이면 무시.
-        - `sort`: `LATEST`(onSaleAt 내림차순), `PRICE_ASC`/`PRICE_DESC`(판매가), `POPULAR`(판매량 내림차순, 동률은 최신순).
+        - `sort`: `LATEST`(onSaleAt 내림차순), `PRICE_ASC`/`PRICE_DESC`(판매가), `POPULAR`(판매량 내림차순, 동률은 최신순), `LIKES`(좋아요 수 내림차순, 동률은 id 내림차순).
+        로그인한 요청(선택)에는 각 상품의 `liked`가 채워지고, 비로그인이면 `null`이다.
         품절(`soldOut`)은 ACTIVE SKU 중 판매 중이고 재고가 있는 것이 하나도 없을 때다. 재고 숫자는 노출하지 않는다.
       security: []
       parameters:
@@ -1011,6 +1012,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/products/me/likes:
+    get:
+      tags: [Product]
+      operationId: listMyLikedProducts
+      summary: 내 좋아요 상품 목록 (USER, 최근 좋아요순)
+      description: |
+        판매 종료·중지 등으로 더는 노출되지 않는 상품도 `productStatus`와 함께 남는다. 삭제된(소프트 딜리트) 상품만 빠진다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 좋아요 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/LikedProduct'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/products/{productId}/like:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    put:
+      tags: [Product]
+      operationId: likeProduct
+      summary: 상품 좋아요 (USER, 멱등 - 이미 좋아요여도 200이고 like_count는 한 번만 오른다)
+      responses:
+        '200':
+          description: 좋아요 상태 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+    delete:
+      tags: [Product]
+      operationId: unlikeProduct
+      summary: 상품 좋아요 취소 (USER, 멱등 - 좋아요가 아니어도 204이고 like_count는 좋아요였을 때만 줄어든다)
+      responses:
+        '204':
+          description: 취소 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
   /api/v1/products/{productId}:
     parameters:
       - $ref: '#/components/parameters/ProductId'
@@ -3923,6 +3986,30 @@ components:
           type: boolean
           nullable: true
           description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
+    LikedProduct:
+      type: object
+      required: [productId, name, brandName, thumbnailUrl, salePrice, productStatus, likedAt]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        brandName:
+          type: string
+        thumbnailUrl:
+          type: string
+          description: 대표 이미지 URL (이미지가 없으면 빈 문자열)
+        salePrice:
+          type: integer
+          format: int64
+        productStatus:
+          type: string
+          description: 상품 상태(ON_SALE, PAUSED, ENDED 등). ON_SALE 이 아니면 구매할 수 없다.
+        likedAt:
+          type: string
+          format: date-time
+          description: 마지막으로 좋아요한 시각(오프셋 없는 KST)
     PublicSku:
       type: object
       description: 재고 숫자는 노출하지 않는다.

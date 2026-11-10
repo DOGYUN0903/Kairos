@@ -21,6 +21,10 @@ class Product(
     onSaleAt: LocalDateTime?,
     val salesCount: Long,
     skus: List<Sku>,
+    /** 좋아요·후기 집계. 읽기 전용이며 [ProductStatsRepository] 의 증감 UPDATE 로만 바뀐다. */
+    val likeCount: Long = 0,
+    val reviewCount: Long = 0,
+    val ratingSum: Long = 0,
 ) {
     var content: ProductContent = content
         private set
@@ -44,6 +48,9 @@ class Product(
 
     /** ACTIVE SKU 중 판매 중이고 재고가 있는 것이 하나도 없으면 품절. */
     val soldOut: Boolean get() = activeSkus.none { it.available }
+
+    /** 평균 별점. 후기가 없으면 0.0, 있으면 소수 첫째 자리 반올림. */
+    val averageRating: Double get() = if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0
 
     /** 정수 나눗셈 = 내림. */
     val discountRate: Int get() = ((originalPrice - salePrice) * 100 / originalPrice).toInt()
@@ -176,7 +183,10 @@ class Product(
             onSaleAt: LocalDateTime?,
             salesCount: Long,
             skus: List<Sku>,
-        ) = Product(id, sellerId, brandId, content, originalPrice, salePrice, status, rejectReason, onSaleAt, salesCount, skus)
+            likeCount: Long = 0,
+            reviewCount: Long = 0,
+            ratingSum: Long = 0,
+        ) = Product(id, sellerId, brandId, content, originalPrice, salePrice, status, rejectReason, onSaleAt, salesCount, skus, likeCount, reviewCount, ratingSum)
 
         /** 0 < 판매가 ≤ 정가. */
         private fun validatePrice(originalPrice: Long, salePrice: Long) {

@@ -194,6 +194,9 @@ class ProductRepositoryImpl(
         rejectReason = entity.rejectReason,
         onSaleAt = entity.onSaleAt,
         salesCount = entity.salesCount,
+        likeCount = entity.likeCount,
+        reviewCount = entity.reviewCount,
+        ratingSum = entity.ratingSum,
         skus = skus.map {
             Sku(SkuId(it.id), parseValueIds(it.optionValueIds), it.extraPrice, it.stock, it.onSale, it.skuStatus)
         },

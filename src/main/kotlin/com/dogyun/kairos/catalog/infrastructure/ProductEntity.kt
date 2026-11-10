@@ -75,6 +75,22 @@ class ProductEntity(
     var salesCount: Long = salesCount
         protected set
 
+    /**
+     * 좋아요 수·후기 수·별점 합. `updatable = false` 라 엔티티 UPDATE 에 포함되지 않는다. 판매자 상품 수정 트랜잭션이
+     * 오래된 스냅샷으로 그 사이 늘어난 집계를 덮어쓰지 못하게 하려는 것이다. 증감은 native UPDATE([ProductJpaRepository])만 한다.
+     */
+    @Column(name = "like_count", nullable = false, insertable = false, updatable = false)
+    var likeCount: Long = 0
+        protected set
+
+    @Column(name = "review_count", nullable = false, insertable = false, updatable = false)
+    var reviewCount: Long = 0
+        protected set
+
+    @Column(name = "rating_sum", nullable = false, insertable = false, updatable = false)
+    var ratingSum: Long = 0
+        protected set
+
     /** salesCount 는 주문 쪽에서만 증가하므로 변경 대상이 아니다(오래된 스냅샷으로 덮어쓰지 않는다). */
     fun change(
         categoryId: Long,

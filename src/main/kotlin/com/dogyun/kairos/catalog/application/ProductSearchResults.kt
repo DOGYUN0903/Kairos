@@ -12,6 +12,12 @@ data class ProductSummary(
     val salePrice: Long,
     val discountRate: Int,
     val soldOut: Boolean,
+    val likeCount: Long,
+    val reviewCount: Long,
+    /** 소수 첫째 자리, 후기가 없으면 0.0. */
+    val averageRating: Double,
+    /** 로그인한 요청이면 내 좋아요 여부, 비로그인이면 null. */
+    val liked: Boolean?,
 )
 
 /** 사용자에게 보이는 SKU. 재고 숫자는 노출하지 않고 품절 여부만 준다. */
@@ -39,9 +45,16 @@ data class ProductDetail(
     val options: List<OptionResult>,
     /** ACTIVE SKU 만. */
     val skus: List<PublicSkuResult>,
+    val likeCount: Long,
+    val reviewCount: Long,
+    val averageRating: Double,
+    val liked: Boolean?,
 )
 
-internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String) = ProductSummary(
+internal fun averageRatingOf(reviewCount: Long, ratingSum: Long): Double =
+    if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0
+
+internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String, liked: Boolean?) = ProductSummary(
     productId = row.productId,
     thumbnailUrl = thumbnailUrl,
     brandName = row.brandName,
@@ -50,9 +63,13 @@ internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String) = Produ
     salePrice = row.salePrice,
     discountRate = ((row.originalPrice - row.salePrice) * 100 / row.originalPrice).toInt(),
     soldOut = row.soldOut,
+    likeCount = row.likeCount,
+    reviewCount = row.reviewCount,
+    averageRating = averageRatingOf(row.reviewCount, row.ratingSum),
+    liked = liked,
 )
 
-internal fun toProductDetail(product: Product, brandName: String, imageUrls: Map<Long, String>): ProductDetail {
+internal fun toProductDetail(product: Product, brandName: String, imageUrls: Map<Long, String>, liked: Boolean?): ProductDetail {
     val content = product.content
     val orderedValues = content.options.flatMap { it.values }
     val valueNames = orderedValues.associate { requireNotNull(it.id) to it.name }
@@ -81,5 +98,9 @@ internal fun toProductDetail(product: Product, brandName: String, imageUrls: Map
                 soldOut = !sku.available,
             )
         },
+        likeCount = product.likeCount,
+        reviewCount = product.reviewCount,
+        averageRating = product.averageRating,
+        liked = liked,
     )
 }

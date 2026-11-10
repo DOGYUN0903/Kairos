@@ -382,4 +382,17 @@ class ProductTest {
             )
         }
     }
+
+    @Test
+    fun 평균_별점은_후기가_없으면_0점이고_소수_첫째_자리로_반올림한다() {
+        fun avg(reviewCount: Long, ratingSum: Long) = Product.restore(
+            ProductId(1L), 1L, 2L, content(), 10000, 9000, ProductStatus.ON_SALE, null, now, 0, emptyList(),
+            likeCount = 0, reviewCount = reviewCount, ratingSum = ratingSum,
+        ).averageRating
+
+        assertEquals(0.0, avg(0, 0))
+        assertEquals(3.7, avg(3, 11))
+        assertEquals(4.5, avg(2, 9))
+        assertEquals(5.0, avg(1, 5))
+    }
 }
