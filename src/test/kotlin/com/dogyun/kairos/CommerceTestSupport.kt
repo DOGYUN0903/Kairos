@@ -17,6 +17,7 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.BeforeTest
+import kotlin.test.assertEquals
 
 /** 판매자·카탈로그 API 통합 테스트 공통 도구. 이후 Task 가 cleanUp 대상 테이블을 늘린다. */
 abstract class CommerceTestSupport : IntegrationTestSupport() {
@@ -459,6 +460,46 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             postIdem("/api/v1/orders/$orderId/items/$itemId/returns", token, mapOf("reason" to reason, "detail" to detail))
                 .andExpect { status { isCreated() } },
         ).get("data").get("returnId").asLong()
+
+    /** 판매자 반품 승인(200)의 data. */
+    protected fun approveReturn(sellerToken: String, returnId: Long): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/approve", sellerToken).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 반품 거절(200)의 data. */
+    protected fun rejectReturn(sellerToken: String, returnId: Long, reason: String = "불량 아님"): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/reject", sellerToken, mapOf("rejectReason" to reason)).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 수거 확인(200)의 data. 환불까지 한다. */
+    protected fun receiveReturn(sellerToken: String, returnId: Long): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/receive", sellerToken).andExpect { status { isOk() } }).get("data")
+
+    /** 반품 요청 → 판매자 승인 → 수거 확인까지 마친 반품 data. */
+    protected fun completedReturn(buyerToken: String, sellerToken: String, orderId: Long, itemId: Long, reason: String = "CHANGE_OF_MIND"): JsonNode {
+        val returnId = requestReturn(buyerToken, orderId, itemId, reason)
+        approveReturn(sellerToken, returnId)
+        return receiveReturn(sellerToken, returnId)
+    }
+
+    /**
+     * 돈 불변식(C4 스펙 5장): 총액 − 누적 환불 == 남은 결제 몫 + 남은 구매자 배송비 + 발송 구간 회수 + Σ 완료 반품의 회수 구간 반품비.
+     * [orderDetail] 은 내 주문 상세의 data 다.
+     */
+    protected fun assertMoneyInvariant(orderDetail: JsonNode, label: String = "") {
+        val returnFees = orderDetail.get("sellerOrders").sumOf { so ->
+            so.get("items").sumOf { item ->
+                val r = item.get("returnRequest")
+                if (r != null && !r.isNull && r.get("status").asString() == "COMPLETED") r.get("returnFee").asLong() else 0L
+            }
+        }
+        val left = orderDetail.get("totalAmount").asLong() - orderDetail.get("refundedAmount").asLong()
+        val remainingPaid = orderDetail.get("remainingPaidAmount").asLong()
+        val remainingFee = orderDetail.get("remainingBuyerShippingFee").asLong()
+        val recovered = orderDetail.get("shippingFeeRecovered").asLong()
+        assertEquals(
+            left, remainingPaid + remainingFee + recovered + returnFees,
+            "$label: total-refunded=$left, remainingPaid=$remainingPaid, remainingFee=$remainingFee, recovered=$recovered, returnFees=$returnFees",
+        )
+    }
 
     /** 내 반품 상세의 data. */
     protected fun returnDetail(token: String, returnId: Long): JsonNode =

@@ -10,3 +10,6 @@ data class RequestReturnRequest(
 ) {
     fun toCommand() = RequestReturnCommand(reason, detail)
 }
+
+/** 누락·공백은 서비스(도메인)가 `RETURN_INVALID` 로 막는다. */
+data class RejectReturnRequest(val rejectReason: String? = null)

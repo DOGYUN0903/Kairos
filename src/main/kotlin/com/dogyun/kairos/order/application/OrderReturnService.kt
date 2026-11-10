@@ -212,4 +212,4 @@ internal fun ReturnRequest.toResult(productName: String, quantity: Int) = Return
 )
 
 internal fun ReturnRequest.toSummary() =
-    ReturnRequestSummary(requireNotNull(id), reason.name, status.name, feeBearer.name, refundAmount, requestedAt)
+    ReturnRequestSummary(requireNotNull(id), reason.name, status.name, feeBearer.name, refundAmount, returnFee, requestedAt)

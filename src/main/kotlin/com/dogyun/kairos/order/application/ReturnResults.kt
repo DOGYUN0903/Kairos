@@ -36,5 +36,6 @@ data class ReturnRequestSummary(
     val status: String,
     val feeBearer: String,
     val refundAmount: Long,
+    val returnFee: Long,
     val requestedAt: LocalDateTime,
 )

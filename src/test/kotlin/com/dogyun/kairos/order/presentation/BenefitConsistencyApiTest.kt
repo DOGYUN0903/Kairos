@@ -33,17 +33,6 @@ class BenefitConsistencyApiTest : CommerceTestSupport() {
     private fun items(order: JsonNode): List<JsonNode> =
         order.get("sellerOrders").flatMap { so -> so.get("items").toList() }
 
-    /** 스펙 5장: 남은 결제 몫(Σ paidAmount) + 남은 구매자 배송비 + 회수한 배송비 == 총액 − 누적 환불. */
-    private fun assertInvariant(order: JsonNode, label: String) {
-        val remainingPaid = items(order).filter { it.get("status").asString() != "CANCELED" }.sumOf { it.get("paidAmount").asLong() }
-        val remainingFee = order.get("sellerOrders")
-            .filter { so -> so.get("items").any { it.get("status").asString() != "CANCELED" } && so.get("shippingFeePayer").asString() == "BUYER" }
-            .sumOf { it.get("shippingFee").asLong() }
-        val recovered = order.get("shippingFeeRecovered").asLong()
-        val left = order.get("totalAmount").asLong() - order.get("refundedAmount").asLong()
-        assertEquals(left, remainingPaid + remainingFee + recovered, "$label: total-refunded=$left, remainingPaid=$remainingPaid, remainingFee=$remainingFee, recovered=$recovered")
-    }
-
     private fun run(seed: Int, iterations: Int, checkEachStep: Boolean) {
         val random = Random(seed)
         val shops = listOf(shop(), shop())
@@ -121,17 +110,17 @@ class BenefitConsistencyApiTest : CommerceTestSupport() {
             assertEquals(total, order.get("totalAmount").asLong(), label)
             assertEquals(points, order.get("pointsUsed").asLong(), label)
             assertEquals(initialBalance - points, pointBalance(memberId), "$label: 주문 직후 잔액")
-            assertInvariant(order, "$label 주문 직후")
+            assertMoneyInvariant(order, "$label 주문 직후")
 
             val itemIds = items(order).map { it.get("orderItemId").asLong() }.shuffled(random)
             itemIds.forEachIndexed { step, itemId ->
                 cancelItem(user, orderId, itemId)
                 order = orderDetail(user, orderId)
                 assertEquals("CANCELED", statusOf(order, itemId), "$label: 취소 $step 항목 $itemId")
-                if (checkEachStep) assertInvariant(order, "$label 취소 순서=$itemIds step=$step")
+                if (checkEachStep) assertMoneyInvariant(order, "$label 취소 순서=$itemIds step=$step")
             }
 
-            assertInvariant(order, "$label 전부 취소 후 취소 순서=$itemIds")
+            assertMoneyInvariant(order, "$label 전부 취소 후 취소 순서=$itemIds")
             val payment = order.get("payment")
             assertEquals(total, order.get("refundedAmount").asLong(), "$label: 누적 환불 취소 순서=$itemIds")
             if (total > 0) {

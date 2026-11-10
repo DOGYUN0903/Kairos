@@ -2857,6 +2857,384 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns:
+    get:
+      tags: [Seller Return]
+      operationId: listSellerReturns
+      summary: 판매자 반품 목록 (APPROVED·SUSPENDED 판매자, 최신 요청순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReturnStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 반품 목록(최신 요청순)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Seller Return]
+      operationId: getSellerReturn
+      summary: 판매자 반품 상세
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/returns/{returnId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: approveSellerReturn
+      summary: 반품 승인 (판매자)
+      description: "`REQUESTED` 반품을 승인한다(`APPROVED`). 이미 승인됐으면 200 으로 현재 상태를 돌려준다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns/{returnId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: rejectSellerReturn
+      summary: 반품 거절 (판매자)
+      description: "`REQUESTED` 반품을 거절한다(`REJECTED`, 항목은 `ORDERED` 로 돌아간다). 거절된 항목은 구매자가 다시 요청할 수 없다. 이미 거절됐으면 200."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectReturnRequest'
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          description: "`RETURN_INVALID`(rejectReason 누락·길이) 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns/{returnId}/receive:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: receiveSellerReturn
+      summary: 반품 수거 확인과 환불 (판매자)
+      description: "`APPROVED` 반품의 수거를 확인하고 환불한다. PG 호출은 트랜잭션 밖이다. 응답 status 는 `COMPLETED` 또는 PG 결과가 불확실하면 `REFUNDING`(대사 작업이 맞춘다). 이미 `REFUNDING`/`COMPLETED` 면 현재 상태 그대로 200."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION`(승인 전), `PAYMENT_CANCEL_FAILED`(PG 가 거절해 승인 상태로 되돌림) 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns:
+    get:
+      tags: [Admin Return]
+      operationId: listAdminReturns
+      summary: 반품 목록 (관리자, 최신 요청순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReturnStatus'
+        - name: sellerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: memberId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 반품 목록(최신 요청순)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Admin Return]
+      operationId: getAdminReturn
+      summary: 반품 상세 (관리자)
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: approveAdminReturn
+      summary: 반품 승인 (관리자)
+      description: "`REQUESTED` 또는 거절(`REJECTED`)된 반품을 승인한다. 판매자 주문이 이미 `CONFIRMED` 면 거절 반품은 다시 승인할 수 없다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_NOT_ELIGIBLE`(구매 확정된 판매자 주문) 또는 `RETURN_INVALID_STATE_TRANSITION`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/receive:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: receiveAdminReturn
+      summary: 반품 수거 확인과 환불 (관리자)
+      description: "판매자 수거 확인과 같은 환불을 한다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `PAYMENT_CANCEL_FAILED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: cancelAdminReturn
+      summary: 반품 중단 (관리자)
+      description: "`APPROVED` 반품을 중단한다(`CANCELED_BY_ADMIN`, 항목은 `ORDERED`). 이미 중단됐으면 200."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION`(환불 시작 뒤 등)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/reviews/me:
     get:
       tags: [Review]
@@ -5172,6 +5550,17 @@ components:
             - $ref: '#/components/schemas/ReturnRequestSummary'
           nullable: true
           description: 이 항목의 반품 요청(없으면 null)
+    ReturnStatus:
+      type: string
+      enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
+    RejectReturnRequest:
+      type: object
+      required: [rejectReason]
+      properties:
+        rejectReason:
+          type: string
+          minLength: 1
+          maxLength: 500
     RequestReturnRequest:
       type: object
       required: [reason]
@@ -5260,7 +5649,7 @@ components:
           nullable: true
     ReturnRequestSummary:
       type: object
-      required: [returnId, reason, status, feeBearer, refundAmount, requestedAt]
+      required: [returnId, reason, status, feeBearer, refundAmount, returnFee, requestedAt]
       properties:
         returnId:
           type: integer
@@ -5277,6 +5666,10 @@ components:
         refundAmount:
           type: integer
           format: int64
+        returnFee:
+          type: integer
+          format: int64
+          description: 구매자 부담 회수 구간 반품비(수거 확인 때 확정, 돈 불변식에 쓴다)
         requestedAt:
           type: string
           format: date-time

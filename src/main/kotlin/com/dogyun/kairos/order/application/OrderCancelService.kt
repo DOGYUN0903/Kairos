@@ -138,11 +138,11 @@ class OrderCancelService(
                 order.confirmCancel(orderItemId, plan, LocalDateTime.now(clock))
                 orderRepository.save(order)
                 if (refundAmount > 0) paymentGateway.recordRefund(orderId, refundAmount)
-                // 구매자·판매자·관리자 모두 같다: 상품 쿠폰과 배분 포인트를 돌려준다. 장바구니 쿠폰은 마지막 항목 취소일 때만(스펙 7장).
+                // 구매자·판매자·관리자 모두 같다: 상품 쿠폰과 배분 포인트를 돌려준다. 장바구니 쿠폰은 마지막 항목이 닫힐 때만(취소·반품 합쳐 전부 닫힘, 스펙 7장).
                 // 쿠폰·포인트를 재고보다 먼저 되돌린다(락 순서: orders → member_point → coupon → sku).
                 benefitReverter.revertItem(
                     orderId, order.memberId, orderItemId, plan.pointsRefund, plan.productCouponReturn,
-                    if (order.allItemsCanceled) order.cartCouponId else null,
+                    if (order.allItemsClosed) order.cartCouponId else null,
                 )
                 stockManager.restore(listOf(SkuQuantity(item.skuId, item.quantity)))
                 stockManager.decreaseSales(listOf(ProductQuantity(item.productId, item.quantity)))
