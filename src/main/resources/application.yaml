@@ -77,6 +77,10 @@ kairos:
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s
+  delivery:
+    provider: ${KAIROS_DELIVERY_PROVIDER:mock}
+    sweet-tracker:
+      api-key: ${SWEETTRACKER_API_KEY:}
   pg:
     provider: ${KAIROS_PG_PROVIDER:mock}
     toss:

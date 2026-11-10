@@ -6,12 +6,14 @@ import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.order.application.OrderCancelService
 import com.dogyun.kairos.order.application.OrderDetail
 import com.dogyun.kairos.order.application.OrderQueryService
+import com.dogyun.kairos.order.application.OrderShippingService
 import com.dogyun.kairos.order.application.OrderService
 import com.dogyun.kairos.order.application.OrderSummary
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -25,6 +27,7 @@ class OrderController(
     private val orderService: OrderService,
     private val orderQueryService: OrderQueryService,
     private val orderCancelService: OrderCancelService,
+    private val orderShippingService: OrderShippingService,
 ) {
 
     /** `Idempotency-Key` 헤더는 필터가 검증·처리한다(IdempotencyProperties.paths). */
@@ -58,5 +61,14 @@ class OrderController(
         @Valid @RequestBody request: CancelItemRequest,
     ): ResponseEntity<ApiResponse<CancelItemResponse>> = ApiResponse.ok(
         CancelItemResponse.from(orderCancelService.cancelByBuyer(loginMember.id, orderId, orderItemId, request.reason)),
+    )
+
+    @PatchMapping("/{orderId}/seller-orders/{sellerOrderId}/confirm")
+    fun confirmPurchase(
+        @AuthenticationPrincipal loginMember: LoginMember,
+        @PathVariable orderId: Long,
+        @PathVariable sellerOrderId: Long,
+    ): ResponseEntity<ApiResponse<SellerOrderStateResponse>> = ApiResponse.ok(
+        SellerOrderStateResponse.from(orderShippingService.confirmPurchase(loginMember.id, orderId, sellerOrderId)),
     )
 }

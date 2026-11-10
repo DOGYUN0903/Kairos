@@ -6,6 +6,7 @@ import com.dogyun.kairos.order.application.ConfirmPaymentResult
 import com.dogyun.kairos.order.application.OrderItemCommand
 import com.dogyun.kairos.order.application.PlaceOrderCommand
 import com.dogyun.kairos.order.application.PlaceOrderResult
+import com.dogyun.kairos.order.application.SellerOrderState
 import com.dogyun.kairos.order.application.ShippingAddressCommand
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -87,5 +88,21 @@ data class CancelItemResponse(
     companion object {
         fun from(result: CancelItemResult) =
             CancelItemResponse(result.orderItemId, result.itemStatus, result.refundAmount, result.shippingFeeDeducted)
+    }
+}
+
+data class ShipRequest(
+    @field:NotBlank @field:Size(max = 20) val carrierCode: String,
+    @field:NotBlank @field:Size(max = 50) val trackingNumber: String,
+)
+
+data class SellerOrderStateResponse(
+    val sellerOrderId: Long,
+    val sellerOrderStatus: String,
+    val orderStatus: String,
+) {
+    companion object {
+        fun from(state: SellerOrderState) =
+            SellerOrderStateResponse(state.sellerOrderId, state.sellerOrderStatus.name, state.orderStatus.name)
     }
 }

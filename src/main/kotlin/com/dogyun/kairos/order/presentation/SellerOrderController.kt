@@ -6,12 +6,14 @@ import com.dogyun.kairos.common.security.AuthenticatedSeller
 import com.dogyun.kairos.common.security.SellerPrincipal
 import com.dogyun.kairos.order.application.OrderCancelService
 import com.dogyun.kairos.order.application.OrderQueryService
+import com.dogyun.kairos.order.application.OrderShippingService
 import com.dogyun.kairos.order.application.SellerOrderDetail
 import com.dogyun.kairos.order.application.SellerOrderSummary
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 class SellerOrderController(
     private val orderQueryService: OrderQueryService,
     private val orderCancelService: OrderCancelService,
+    private val orderShippingService: OrderShippingService,
 ) {
 
     @GetMapping
@@ -53,4 +56,22 @@ class SellerOrderController(
     ): ResponseEntity<ApiResponse<CancelItemResponse>> = ApiResponse.ok(
         CancelItemResponse.from(orderCancelService.cancelBySeller(seller.sellerId, sellerOrderId, orderItemId, request.reason)),
     )
+
+    @PatchMapping("/{sellerOrderId}/ship")
+    fun ship(
+        @AuthenticatedSeller seller: SellerPrincipal,
+        @PathVariable sellerOrderId: Long,
+        @Valid @RequestBody request: ShipRequest,
+    ): ResponseEntity<ApiResponse<SellerOrderStateResponse>> = ApiResponse.ok(
+        SellerOrderStateResponse.from(
+            orderShippingService.ship(seller.sellerId, sellerOrderId, request.carrierCode, request.trackingNumber),
+        ),
+    )
+
+    @PatchMapping("/{sellerOrderId}/deliver")
+    fun deliver(
+        @AuthenticatedSeller seller: SellerPrincipal,
+        @PathVariable sellerOrderId: Long,
+    ): ResponseEntity<ApiResponse<SellerOrderStateResponse>> =
+        ApiResponse.ok(SellerOrderStateResponse.from(orderShippingService.deliver(seller.sellerId, sellerOrderId)))
 }
