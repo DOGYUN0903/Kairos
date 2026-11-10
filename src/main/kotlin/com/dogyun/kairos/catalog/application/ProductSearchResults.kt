@@ -2,6 +2,7 @@ package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.Product
 import com.dogyun.kairos.catalog.domain.ProductListRow
+import com.dogyun.kairos.catalog.domain.averageRatingOf
 
 data class ProductSummary(
     val productId: Long,
@@ -50,9 +51,6 @@ data class ProductDetail(
     val averageRating: Double,
     val liked: Boolean?,
 )
-
-internal fun averageRatingOf(reviewCount: Long, ratingSum: Long): Double =
-    if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0
 
 internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String, liked: Boolean?) = ProductSummary(
     productId = row.productId,

@@ -138,4 +138,35 @@ class ProductLikeApiTest : CommerceTestSupport() {
         val content = json(get("/api/v1/products/me/likes", member).andExpect { status { isOk() } }).get("data").get("content")
         assertEquals(0, content.size())
     }
+
+    @Test
+    fun 노출되지_않는_상품에_PUT하면_404이고_like_count는_그대로다() {
+        val token = newUserToken()
+        val sellerId = approvedSeller(token)
+        val brandId = approvedBrand(token)
+        val pending = registerProduct(token, brandId, leafCategory(), listOf(uploadImage(token)))
+        val paused = onSaleProduct(token, brandId, leafCategory(), listOf(uploadImage(token)))
+            .also { post("/api/v1/seller/products/$it/pause", token).andExpect { status { isOk() } } }
+        val suspended = onSaleProduct(token, brandId, leafCategory(), listOf(uploadImage(token))).also { suspendSeller(sellerId) }
+        val member = newUserToken()
+
+        listOf(pending, paused, suspended).forEach {
+            put("/api/v1/products/$it/like", member).andExpect { status { isNotFound() } }.andExpect { jsonPath("$.code") { value("PRODUCT_NOT_FOUND") } }
+            assertEquals(0L, likeCountOf(it))
+        }
+    }
+
+    @Test
+    fun 삭제된_상품도_내_좋아요_목록에_DELETED로_남는다() {
+        val productId = onSale()
+        val member = newUserToken()
+        likeProduct(member, productId)
+        jdbcTemplate.update("update product set status = 'DELETED' where id = ?", productId)
+
+        val content = json(get("/api/v1/products/me/likes", member).andExpect { status { isOk() } }).get("data").get("content")
+
+        assertEquals(1, content.size())
+        assertEquals(productId, content.get(0).get("productId").asLong())
+        assertEquals("DELETED", content.get(0).get("productStatus").asString())
+    }
 }

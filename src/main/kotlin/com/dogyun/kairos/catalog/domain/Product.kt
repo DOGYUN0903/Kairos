@@ -50,7 +50,7 @@ class Product(
     val soldOut: Boolean get() = activeSkus.none { it.available }
 
     /** 평균 별점. 후기가 없으면 0.0, 있으면 소수 첫째 자리 반올림. */
-    val averageRating: Double get() = if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0
+    val averageRating: Double get() = averageRatingOf(reviewCount, ratingSum)
 
     /** 정수 나눗셈 = 내림. */
     val discountRate: Int get() = ((originalPrice - salePrice) * 100 / originalPrice).toInt()
@@ -194,3 +194,7 @@ class Product(
         }
     }
 }
+
+/** 평균 별점 단일 계산식. 후기가 없으면 0.0, 있으면 소수 첫째 자리 반올림. */
+fun averageRatingOf(reviewCount: Long, ratingSum: Long): Double =
+    if (reviewCount == 0L) 0.0 else Math.round(ratingSum * 10.0 / reviewCount) / 10.0

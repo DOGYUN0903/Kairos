@@ -3,8 +3,7 @@ package com.dogyun.kairos.catalog.infrastructure
 import com.dogyun.kairos.catalog.domain.LikedProductRow
 import com.dogyun.kairos.catalog.domain.ProductLikeRepository
 import com.dogyun.kairos.common.domain.PageResult
-import com.querydsl.jpa.JPAExpressions
-import com.querydsl.jpa.impl.JPAQueryFactory
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.time.Clock
 import java.time.LocalDateTime
@@ -12,14 +11,9 @@ import java.time.LocalDateTime
 @Repository
 class ProductLikeRepositoryImpl(
     private val jpaRepository: ProductLikeJpaRepository,
-    private val queryFactory: JPAQueryFactory,
+    private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,
 ) : ProductLikeRepository {
-
-    private val like = QProductLikeEntity.productLikeEntity
-    private val product = QProductEntity.productEntity
-    private val brand = QBrandView.brandView
-    private val image = QProductImageEntity.productImageEntity
 
     /** 행 확보(X 락) → 취소였으면 좋아요로. 영향 행 1 이 "내가 상태를 바꿨다"이므로 동시 요청이 몰려도 true 는 전이마다 정확히 한 번이다. */
     override fun like(productId: Long, memberId: Long): Boolean {
@@ -36,34 +30,40 @@ class ProductLikeRepositoryImpl(
         return jpaRepository.findAllByMemberIdAndProductIdInAndLikedTrue(memberId, productIds).map { it.productId }.toSet()
     }
 
-    /** 노출 조건을 걸지 않는다: 판매 종료·중지 상품도 상태와 함께 남는다. 소프트 딜리트된 상품·브랜드만 조인에서 빠진다. */
+    /**
+     * 노출 조건을 걸지 않고, 소프트 딜리트된 상품·브랜드도 남긴다(스펙 9장). `@SQLRestriction` 이 붙은 엔티티를 거치지 않으려고
+     * native SQL 로 읽는다. 삭제된 상품은 `productStatus = DELETED` 로 표시한다.
+     */
     override fun findPageLiked(memberId: Long, page: Int, size: Int): PageResult<LikedProductRow> {
-        val where = arrayOf(like.memberId.eq(memberId), like.liked.isTrue)
-        val mainFileId = JPAExpressions.select(image.fileId).from(image).where(image.product.id.eq(product.id), image.isMain.isTrue)
-        val rows = queryFactory.from(like)
-            .join(product).on(product.id.eq(like.productId))
-            .join(brand).on(brand.id.eq(product.brandId))
-            .select(product.id, product.name, brand.name, mainFileId, product.salePrice, product.productStatus, like.modifiedAt)
-            .where(*where)
-            .orderBy(like.modifiedAt.desc(), like.id.desc())
-            .offset(page.toLong() * size)
-            .limit(size.toLong())
-            .fetch()
-            .map {
+        val rows = jdbcTemplate.query(
+            """
+            SELECT p.id, p.name, COALESCE(b.name, ''),
+                   COALESCE((SELECT pi.file_id FROM product_image pi WHERE pi.product_id = p.id AND pi.is_main = 1 AND pi.status = 'ACTIVE' LIMIT 1), 0),
+                   p.sale_price, CASE WHEN p.status = 'DELETED' THEN 'DELETED' ELSE p.product_status END, l.modified_at
+            FROM product_like l
+            JOIN product p ON p.id = l.product_id
+            LEFT JOIN brand b ON b.id = p.brand_id
+            WHERE l.member_id = ? AND l.liked = 1 AND l.status = 'ACTIVE'
+            ORDER BY l.modified_at DESC, l.id DESC
+            LIMIT ? OFFSET ?
+            """.trimIndent(),
+            { rs, _ ->
                 LikedProductRow(
-                    productId = it.get(product.id)!!,
-                    name = it.get(product.name)!!,
-                    brandName = it.get(brand.name)!!,
-                    mainFileId = it.get(mainFileId) ?: 0L,
-                    salePrice = it.get(product.salePrice)!!,
-                    productStatus = it.get(product.productStatus)!!.name,
-                    likedAt = it.get(like.modifiedAt)!!,
+                    productId = rs.getLong(1),
+                    name = rs.getString(2),
+                    brandName = rs.getString(3),
+                    mainFileId = rs.getLong(4),
+                    salePrice = rs.getLong(5),
+                    productStatus = rs.getString(6),
+                    likedAt = rs.getObject(7, LocalDateTime::class.java),
                 )
-            }
-        val total = queryFactory.select(like.count()).from(like)
-            .join(product).on(product.id.eq(like.productId))
-            .join(brand).on(brand.id.eq(product.brandId))
-            .where(*where).fetchOne() ?: 0L
+            },
+            memberId, size, page.toLong() * size,
+        )
+        val total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM product_like l JOIN product p ON p.id = l.product_id WHERE l.member_id = ? AND l.liked = 1 AND l.status = 'ACTIVE'",
+            Long::class.java, memberId,
+        ) ?: 0L
         return PageResult.of(rows, page, size, total)
     }
 }

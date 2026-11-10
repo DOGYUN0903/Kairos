@@ -40,7 +40,7 @@ interface ProductLikeJpaRepository : JpaRepository<ProductLikeEntity, Long> {
     /** 좋아요였을 때만 1행. */
     @Modifying(flushAutomatically = true)
     @Query(
-        "UPDATE product_like SET liked = 0, modified_at = :now WHERE product_id = :productId AND member_id = :memberId AND liked = 1",
+        "UPDATE product_like SET liked = 0, modified_at = :now, modified_by = :memberId WHERE product_id = :productId AND member_id = :memberId AND liked = 1",
         nativeQuery = true,
     )
     fun unlike(@Param("productId") productId: Long, @Param("memberId") memberId: Long, @Param("now") now: LocalDateTime): Int

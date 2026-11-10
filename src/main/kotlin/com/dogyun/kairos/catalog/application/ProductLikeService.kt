@@ -3,6 +3,7 @@ package com.dogyun.kairos.catalog.application
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductLikeRepository
 import com.dogyun.kairos.catalog.domain.ProductRepository
+import com.dogyun.kairos.catalog.domain.ProductSearchRepository
 import com.dogyun.kairos.catalog.domain.ProductStatsRepository
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
@@ -30,17 +31,20 @@ class ProductLikeService(
     private val productRepository: ProductRepository,
     private val likeRepository: ProductLikeRepository,
     private val statsRepository: ProductStatsRepository,
+    private val searchRepository: ProductSearchRepository,
     private val imageFileReader: ImageFileReader,
 ) {
 
     @Transactional
     fun like(memberId: Long, productId: Long) {
-        requireProduct(productId)
+        // 좋아요는 노출 조건(ON_SALE + 브랜드·판매자 APPROVED)을 만족하는 상품에만 걸 수 있다(ID 추측으로 존재를 알아내거나 집계를 부풀리지 못하게).
+        searchRepository.findExposedDetail(ProductId(productId)) ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
         if (likeRepository.like(productId, memberId)) statsRepository.addLikeCount(productId, 1)
     }
 
     @Transactional
     fun unlike(memberId: Long, productId: Long) {
+        // 취소는 판매 종료·중지된 상품에도 허용한다(내 좋아요 목록에서 지울 수 있어야 함). 소프트 딜리트된 상품만 없는 것으로 본다.
         requireProduct(productId)
         if (likeRepository.unlike(productId, memberId)) statsRepository.addLikeCount(productId, -1)
     }

@@ -4,7 +4,12 @@ import com.dogyun.kairos.catalog.domain.LikedProductRow
 import com.dogyun.kairos.catalog.domain.Product
 import com.dogyun.kairos.catalog.domain.ProductContent
 import com.dogyun.kairos.catalog.domain.ProductLikeRepository
+import com.dogyun.kairos.catalog.domain.ProductId
+import com.dogyun.kairos.catalog.domain.ProductListRow
+import com.dogyun.kairos.catalog.domain.ProductSearchCondition
+import com.dogyun.kairos.catalog.domain.ProductSearchRepository
 import com.dogyun.kairos.catalog.domain.ProductStatsRepository
+import com.dogyun.kairos.catalog.domain.ProductStatus
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
@@ -55,11 +60,25 @@ class ProductLikeServiceTest {
     private val imageFileReader = object : ImageFileReader {
         override fun findImages(fileIds: Collection<Long>) = emptyMap<Long, ImageFileRef>()
     }
-    private val service = ProductLikeService(products, likes, stats, imageFileReader)
+    /** 노출 조건 = ON_SALE 만 흉내낸다(브랜드·판매자 조건은 쿼리 쪽 책임). */
+    private val search = object : ProductSearchRepository {
+        override fun search(condition: ProductSearchCondition, page: Int, size: Int): PageResult<ProductListRow> =
+            PageResult.of(emptyList(), page, size, 0)
+
+        override fun findExposedDetail(productId: ProductId): Product? =
+            products.findById(productId)?.takeIf { it.status == ProductStatus.ON_SALE }
+    }
+    private val service = ProductLikeService(products, likes, stats, search, imageFileReader)
+
+    private fun registered(): Product {
+        val content = ProductContent("티셔츠", "설명", 5L, listOf(10L), emptyList())
+        return products.save(Product.register(1L, 2L, content, 10000, 9000))
+    }
 
     private fun product(): Long {
-        val content = ProductContent("티셔츠", "설명", 5L, listOf(10L), emptyList())
-        return requireNotNull(products.save(Product.register(1L, 2L, content, 10000, 9000)).id).value
+        val saved = registered()
+        saved.approve(java.time.LocalDateTime.of(2026, 11, 10, 10, 0))
+        return requireNotNull(products.save(saved).id).value
     }
 
     @Test
@@ -90,6 +109,26 @@ class ProductLikeServiceTest {
 
         service.like(7L, productId)
         service.unlike(7L, productId)
+        service.unlike(7L, productId)
+
+        assertEquals(0L, stats.likeCounts[productId])
+    }
+
+    @Test
+    fun 노출되지_않는_상품에는_좋아요할_수_없고_집계도_그대로다() {
+        val pendingId = requireNotNull(registered().id).value
+
+        assertFailsWith<DomainException> { service.like(7L, pendingId) }.also { assertEquals(ErrorCode.PRODUCT_NOT_FOUND, it.errorCode) }
+
+        assertEquals(null, stats.likeCounts[pendingId])
+    }
+
+    @Test
+    fun 판매_종료된_상품도_좋아요_취소는_할_수_있다() {
+        val productId = product()
+        service.like(7L, productId)
+        products.findById(com.dogyun.kairos.catalog.domain.ProductId(productId))!!.also { it.end() }
+
         service.unlike(7L, productId)
 
         assertEquals(0L, stats.likeCounts[productId])
