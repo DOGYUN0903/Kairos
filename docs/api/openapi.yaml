@@ -55,6 +55,7 @@ tags:
   - name: Seller Return
   - name: Admin Return
   - name: Seller Settlement
+  - name: Seller Settlement
   - name: Admin Settlement
 security:
   - bearerAuth: []
@@ -3785,6 +3786,69 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/settlements:
+    get:
+      tags: [Seller Settlement]
+      operationId: listSellerSettlements
+      summary: 내 정산 목록 (APPROVED·SUSPENDED 판매자, 기간 시작 최신순)
+      description: 라인은 포함하지 않고 `lineCount` 만 준다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 정산 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/settlements/{settlementId}:
+    get:
+      tags: [Seller Settlement]
+      operationId: getSellerSettlement
+      summary: 내 정산 상세 (계산 내역·포함 판매자 주문·조정)
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 정산 상세(라인·조정 포함)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND` (남의 정산도 404)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/admin/settlements/generate:
     post:
       tags: [Admin Settlement]

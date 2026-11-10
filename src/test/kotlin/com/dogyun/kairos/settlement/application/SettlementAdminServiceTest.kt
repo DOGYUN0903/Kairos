@@ -23,7 +23,9 @@ class SettlementAdminServiceTest {
         override fun instant() = now.atZone(kst).toInstant()
     }
     private val service = SettlementAdminService(
-        settlements, FakeSettlementAdjustmentRepository { now }, FakeSettlementSellerReader(SettlementSellerInfo(7, "쌀롱", "APPROVED")), clock,
+        settlements,
+        SettlementQueryService(settlements, FakeSettlementAdjustmentRepository { now }, FakeSettlementSellerReader(SettlementSellerInfo(7, "쌀롱", "APPROVED"))),
+        clock,
     )
 
     private fun generated(): Long =

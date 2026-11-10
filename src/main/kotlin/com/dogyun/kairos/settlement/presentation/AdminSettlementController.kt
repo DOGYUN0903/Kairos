@@ -9,6 +9,7 @@ import com.dogyun.kairos.settlement.application.SettlementAdjustmentService
 import com.dogyun.kairos.settlement.application.SettlementAdminService
 import com.dogyun.kairos.settlement.application.SettlementDetail
 import com.dogyun.kairos.settlement.application.SettlementGenerationService
+import com.dogyun.kairos.settlement.application.SettlementQueryService
 import com.dogyun.kairos.settlement.application.SettlementSummary
 import com.dogyun.kairos.settlement.domain.SettlementStatus
 import jakarta.validation.Valid
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class AdminSettlementController(
     private val generationService: SettlementGenerationService,
     private val adminService: SettlementAdminService,
+    private val queryService: SettlementQueryService,
     private val adjustmentService: SettlementAdjustmentService,
 ) {
 
@@ -44,11 +46,11 @@ class AdminSettlementController(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ResponseEntity<ApiResponse<PageResponse<SettlementSummary>>> =
-        ApiResponse.ok(PageResponse.from(adminService.list(sellerId, status, page, size)))
+        ApiResponse.ok(PageResponse.from(queryService.listForAdmin(sellerId, status, page, size)))
 
     @GetMapping("/settlements/{settlementId}")
     fun get(@PathVariable settlementId: Long): ResponseEntity<ApiResponse<SettlementDetail>> =
-        ApiResponse.ok(adminService.get(settlementId))
+        ApiResponse.ok(queryService.getForAdmin(settlementId))
 
     @PatchMapping("/settlements/{settlementId}/confirm")
     fun confirm(@PathVariable settlementId: Long): ResponseEntity<ApiResponse<SettlementDetail>> =
