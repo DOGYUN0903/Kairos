@@ -394,6 +394,16 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             "select count(*) from point_transaction where member_id = ? and transaction_type = ?", Int::class.java, memberId, type,
         ) ?: 0
 
+    /** 항목 취소(구매자) 응답의 data. */
+    protected fun cancelItem(token: String, orderId: Long, itemId: Long, reason: String = "단순 변심"): JsonNode =
+        json(
+            postIdem("/api/v1/orders/$orderId/items/$itemId/cancel", token, mapOf("reason" to reason)).andExpect { status { isOk() } },
+        ).get("data")
+
+    /** 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data. */
+    protected fun orderDetail(token: String, orderId: Long): JsonNode =
+        json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
+
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
             .andExpect { status { isOk() } }

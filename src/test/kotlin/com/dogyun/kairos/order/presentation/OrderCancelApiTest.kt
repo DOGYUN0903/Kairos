@@ -45,9 +45,6 @@ class OrderCancelApiTest : CommerceTestSupport() {
         return orderDetail(user, orderId)
     }
 
-    private fun orderDetail(user: String, orderId: Long): JsonNode =
-        json(get("/api/v1/orders/$orderId", user).andExpect { status { isOk() } }).get("data")
-
     /** 판매자 주문 ID 와 그 안의 항목 ID. 판매자 주문은 판매자 ID 순이라 상점을 만든 순서와 같다. */
     private fun sellerOrderAndItem(order: JsonNode, index: Int): Pair<Long, Long> {
         val so = order.get("sellerOrders").get(index)
