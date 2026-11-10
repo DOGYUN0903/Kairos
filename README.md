@@ -26,7 +26,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - [x] Phase 2. 기준선 측정 (k6) — [측정 리포트](docs/perf/2026-11-08-phase2-baseline.md)
 - [x] C1. 판매자와 상품
 - [x] C2. 구매
-- [ ] C3. 혜택과 후기
+- [x] C3. 혜택과 후기
 - [ ] C4. 정산
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
@@ -41,6 +41,9 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
 - C2 스펙: `docs/superpowers/specs/2026-11-09-c2-purchase-design.md`
 - C2 구현 계획: `docs/superpowers/plans/2026-11-09-c2-purchase.md`
+- C3 스펙: `docs/superpowers/specs/2026-11-10-c3-benefits-reviews-design.md`
+- C3 구현 계획: `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`
+- ADR 0004(C3 혜택 트랜잭션과 락 순서): `docs/adr/0004-c3-benefit-transaction-and-lock-order.md`
 - ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`
 - ADR 0002(카탈로그 검색의 읽기 전용 조인): `docs/adr/0002-catalog-search-cross-module-read-join.md`
 - 업로드 파일은 로컬 `uploads/`에 저장된다(경로는 `.env`의 `KAIROS_FILE_DIR`).
