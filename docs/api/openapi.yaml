@@ -4425,7 +4425,7 @@ components:
           maxLength: 500
     CancelItemResponse:
       type: object
-      required: [orderItemId, itemStatus, refundAmount, shippingFeeDeducted]
+      required: [orderItemId, itemStatus, refundAmount, shippingFeeDeducted, pointsRefund]
       properties:
         orderItemId:
           type: integer

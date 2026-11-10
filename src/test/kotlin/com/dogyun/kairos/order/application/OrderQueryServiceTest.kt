@@ -26,7 +26,7 @@ class OrderQueryServiceTest {
     private val paymentGateway = FakePaymentGateway()
     private val orderService = OrderService(
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
-        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock),
+        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
     private val service = OrderQueryService(orderRepository, paymentGateway)

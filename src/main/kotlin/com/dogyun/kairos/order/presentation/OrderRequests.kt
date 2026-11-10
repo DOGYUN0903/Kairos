@@ -118,10 +118,11 @@ data class CancelItemResponse(
     val itemStatus: String,
     val refundAmount: Long,
     val shippingFeeDeducted: Long,
+    val pointsRefund: Long,
 ) {
     companion object {
         fun from(result: CancelItemResult) =
-            CancelItemResponse(result.orderItemId, result.itemStatus, result.refundAmount, result.shippingFeeDeducted)
+            CancelItemResponse(result.orderItemId, result.itemStatus, result.refundAmount, result.shippingFeeDeducted, result.pointsRefund)
     }
 }
 

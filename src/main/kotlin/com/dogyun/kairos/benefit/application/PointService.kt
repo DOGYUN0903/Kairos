@@ -155,6 +155,14 @@ class PointService(
         return true
     }
 
+    /** 결제 전에 닫힌 주문(만료·승인 거절·void)의 사용 포인트 전부를 되돌린다. 원장 키 REFUND/ORDER/orderId. */
+    fun refundForOrder(memberId: Long, orderId: Long, amount: Long): Boolean =
+        refund(memberId, orderId, PointRefType.ORDER, orderId, amount)
+
+    /** 취소된 주문 항목에 배분된 포인트를 되돌린다. 원장 키 REFUND/ORDER_ITEM/orderItemId. */
+    fun refundForOrderItem(memberId: Long, orderId: Long, orderItemId: Long, amount: Long): Boolean =
+        refund(memberId, orderId, PointRefType.ORDER_ITEM, orderItemId, amount)
+
     /** 만료된 로트의 남은 양을 없앤다. 회원 락을 먼저 잡은 뒤 로트를 잠근다(`use`/`refund` 와 같은 순서). */
     fun expireLot(memberId: Long, lotId: Long): Boolean {
         val point = pointRepository.lockOrCreate(memberId)

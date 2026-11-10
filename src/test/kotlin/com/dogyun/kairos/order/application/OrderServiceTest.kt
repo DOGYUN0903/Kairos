@@ -28,7 +28,7 @@ class OrderServiceTest {
     private val benefitApplier = FakeBenefitApplier()
     private val cartItemRemover = FakeCartItemRemover()
     private val paymentService = OrderPaymentService(
-        orderRepository, paymentGateway, stockManager, cartItemRemover, InlineTransactionRunner(), clock,
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), cartItemRemover, InlineTransactionRunner(), clock,
     )
     private val service = OrderService(
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, paymentService,

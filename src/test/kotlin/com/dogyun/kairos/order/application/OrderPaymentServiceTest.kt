@@ -31,11 +31,12 @@ class OrderPaymentServiceTest {
     private val productReader = FakeProductReader()
     private val sellerReader = FakeSellerReader()
     private val stockManager = FakeStockManager()
+    private val benefitReverter = FakeBenefitReverter(stockManager.events)
     private val paymentGateway = FakePaymentGateway()
     private val cartItemRemover = FakeCartItemRemover()
     private val benefitApplier = FakeBenefitApplier()
     private val service = OrderPaymentService(
-        orderRepository, paymentGateway, stockManager, cartItemRemover, InlineTransactionRunner(), clock,
+        orderRepository, paymentGateway, stockManager, benefitReverter, cartItemRemover, InlineTransactionRunner(), clock,
     )
     private val orderService = OrderService(
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, service,
@@ -381,5 +382,48 @@ class OrderPaymentServiceTest {
         service.approveWithoutPg(other.id!!)
         assertEquals(ApprovalFinish.ALREADY_SETTLED, service.approveWithoutPg(other.id!!))
         assertEquals(1, cartItemRemover.removed.size)
+    }
+
+    /** 상품 쿠폰 501(2,000원)과 포인트 1,000을 쓴 주문. 기대 금액은 미리보기로 구한다. */
+    private fun placeWithBenefits(): PlaceOrderResult {
+        benefitApplier.product(501L, value = 2_000)
+        benefitApplier.balance = 5_000
+        val items = listOf(OrderItemCommand(10L, 2))
+        val coupons = listOf(ProductCouponCommand(10L, 501L))
+        val quote = orderService.quote(memberId, QuoteOrderCommand(items, coupons, null, 1_000))
+        return orderService.place(memberId, PlaceOrderCommand(items, quote.totalAmount, address, coupons, null, 1_000))
+    }
+
+    @Test
+    fun PG가_거절하면_revertAll이_불린다() {
+        val order = placeWithBenefits()
+        paymentGateway.nextConfirm = PgOutcome.Failed("REJECT_CARD_COMPANY", "카드사가 승인을 거절했습니다.")
+
+        assertError(ErrorCode.PAYMENT_REJECTED) { confirm(order, "fail-1") }
+
+        assertEquals(listOf(FakeBenefitReverter.RevertAll(order.orderId, memberId, setOf(501L), 1_000)), benefitReverter.revertAllCalls)
+        assertEquals(listOf("revertAll", "restore"), stockManager.events)
+    }
+
+    @Test
+    fun 금액_불일치_void_뒤_거절에서도_revertAll이_불린다() {
+        val order = placeWithBenefits()
+        paymentGateway.nextConfirm = pgDone(1_000)
+        paymentGateway.nextCancel = pgDone(1_000, PgPaymentStatus.CANCELED)
+
+        assertError(ErrorCode.PAYMENT_REJECTED) { confirm(order) }
+
+        assertEquals(listOf(FakeBenefitReverter.RevertAll(order.orderId, memberId, setOf(501L), 1_000)), benefitReverter.revertAllCalls)
+        assertEquals(listOf("revertAll", "restore"), stockManager.events)
+    }
+
+    @Test
+    fun 승인이면_revertAll은_불리지_않는다() {
+        val order = placeWithBenefits()
+        paymentGateway.nextConfirm = pgDone(order.totalAmount)
+
+        confirm(order)
+
+        assertEquals(emptyList(), benefitReverter.revertAllCalls)
     }
 }

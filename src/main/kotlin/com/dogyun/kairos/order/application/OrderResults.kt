@@ -165,4 +165,6 @@ data class CancelItemResult(
     val itemStatus: String,
     val refundAmount: Long,
     val shippingFeeDeducted: Long,
+    /** 이 항목 취소로 되돌린 포인트(확정 전이면 0) */
+    val pointsRefund: Long,
 )

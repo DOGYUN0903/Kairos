@@ -26,6 +26,7 @@ class OrderCancelService(
     private val orderRepository: OrderRepository,
     private val paymentGateway: PaymentGateway,
     private val stockManager: StockManager,
+    private val benefitReverter: BenefitReverter,
     private val properties: OrderProperties,
     private val tx: TransactionRunner,
     private val clock: Clock,
@@ -130,9 +131,16 @@ class OrderCancelService(
         val refundAmount = item.refundAmount
         when {
             refundAmount == 0L || isRefunded(outcome) -> {
-                order.confirmCancel(orderItemId, item.toRefundPlan(), LocalDateTime.now(clock))
+                val plan = item.toRefundPlan()
+                order.confirmCancel(orderItemId, plan, LocalDateTime.now(clock))
                 orderRepository.save(order)
                 if (refundAmount > 0) paymentGateway.recordRefund(orderId, refundAmount)
+                // 구매자·판매자·관리자 모두 같다: 상품 쿠폰과 배분 포인트를 돌려준다. 장바구니 쿠폰은 마지막 항목 취소일 때만(스펙 7장).
+                // 쿠폰·포인트를 재고보다 먼저 되돌린다(락 순서: orders → member_point → coupon → sku).
+                benefitReverter.revertItem(
+                    orderId, order.memberId, orderItemId, plan.pointsRefund, plan.productCouponReturn,
+                    if (order.allItemsCanceled) order.cartCouponId else null,
+                )
                 stockManager.restore(listOf(SkuQuantity(item.skuId, item.quantity)))
                 stockManager.decreaseSales(listOf(ProductQuantity(item.productId, item.quantity)))
                 CancelFinish.CANCELED
@@ -151,7 +159,7 @@ class OrderCancelService(
         (outcome.payment.status == PgPaymentStatus.PARTIAL_CANCELED || outcome.payment.status == PgPaymentStatus.CANCELED)
 
     private fun resultOf(item: OrderItem) =
-        CancelItemResult(requireNotNull(item.id), item.status.name, item.refundAmount, item.shippingFeeDeducted)
+        CancelItemResult(requireNotNull(item.id), item.status.name, item.refundAmount, item.shippingFeeDeducted, item.pointsRefunded)
 
     companion object {
         private const val MAX_REASON = 500

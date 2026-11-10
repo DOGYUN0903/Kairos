@@ -1,6 +1,7 @@
 package com.dogyun.kairos.order.presentation
 
 import com.dogyun.kairos.CommerceTestSupport
+import com.dogyun.kairos.order.application.PaymentReconciliationService
 import com.dogyun.kairos.payment.application.PgClient
 import com.dogyun.kairos.payment.application.PgResult
 import org.springframework.beans.factory.annotation.Autowired
@@ -12,11 +13,15 @@ import java.util.concurrent.Executors
 import tools.jackson.databind.JsonNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class OrderCancelApiTest : CommerceTestSupport() {
 
     @Autowired
     private lateinit var pgClient: PgClient
+
+    @Autowired
+    private lateinit var reconciliationService: PaymentReconciliationService
 
     private class Shop(val sellerToken: String, val productId: Long, val skuId: Long)
 
@@ -318,6 +323,127 @@ class OrderCancelApiTest : CommerceTestSupport() {
         } finally {
             pool.shutdown()
         }
+    }
+
+    // ---- C3: 쿠폰·포인트 되돌림 ----
+
+    /** 스펙 6장: 판매자 B 30,000×1(플랫폼 2,000), 판매자 C 20,000×2(C 의 10%, 최대 5,000), 장바구니 10%(최대 5,000), 포인트 10,000 사용(잔액 20,000). 49,000 결제. */
+    private class Spec6(val user: String, val b: Shop, val c: Shop, val coupons: List<Long>, val order: JsonNode) {
+        val orderId: Long get() = order.get("orderId").asLong()
+        fun itemOf(shop: Shop): Long =
+            order.get("sellerOrders").flatMap { it.get("items") }.first { it.get("skuId").asLong() == shop.skuId }.get("orderItemId").asLong()
+        fun sellerOrderOf(shop: Shop): Long =
+            order.get("sellerOrders").first { so -> so.get("items").any { it.get("skuId").asLong() == shop.skuId } }.get("sellerOrderId").asLong()
+    }
+
+    private fun spec6(): Spec6 {
+        val b = shop(30_000)
+        val c = shop(20_000)
+        val user = newUserToken()
+        val platform = claimCoupon(user, adminCouponPolicy(couponPolicyBody()))
+        val seller = claimCoupon(
+            user, sellerCouponPolicy(c.sellerToken, couponPolicyBody(targetType = "SELLER", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000)),
+        )
+        val cart = claimCoupon(
+            user,
+            adminCouponPolicy(couponPolicyBody(couponType = "CART", targetType = "NONE", discountType = "RATE", discountValue = 1_000, maxDiscount = 5_000, minOrderAmount = 50_000)),
+        )
+        grantPoints(memberIdOf(user), 20_000)
+        val order = paidOrder(
+            user, listOf(b.skuId to 1, c.skuId to 2), 49_000,
+            productCoupons = listOf(b.skuId to platform, c.skuId to seller), cartCouponId = cart, pointsToUse = 10_000,
+        )
+        return Spec6(user, b, c, listOf(platform, seller, cart), order)
+    }
+
+    @Test
+    fun 스펙_6장_주문에서_c1_취소_b1_취소를_차례로_하면_환불_24562_24438_결제_CANCELED_포인트_누적_10000_쿠폰_전부_AVAILABLE이다() {
+        val f = spec6()
+        val memberId = memberIdOf(f.user)
+        assertEquals(10_000L, pointBalance(memberId))
+
+        val c1 = dataOf(cancel(f.user, f.orderId, f.itemOf(f.c)))
+        assertEquals(24_562L, c1.get("refundAmount").asLong())
+        assertEquals(5_625L, c1.get("pointsRefund").asLong())
+        assertEquals(15_625L, pointBalance(memberId))
+        // 부분 취소: 상품 쿠폰만 돌아오고 장바구니 쿠폰은 USED 로 남는다.
+        assertEquals(listOf("USED", "AVAILABLE", "USED"), f.coupons.map { myCouponStatuses(f.user).getValue(it) })
+
+        val b1 = dataOf(cancel(f.user, f.orderId, f.itemOf(f.b)))
+        assertEquals(24_438L, b1.get("refundAmount").asLong())
+        assertEquals(4_375L, b1.get("pointsRefund").asLong())
+
+        assertEquals(listOf(24_562L, 24_438L), pgCancelAmounts(payKeyOf(f.order)))
+        assertEquals("CANCELED", paymentStatus(f.orderId))
+        assertEquals(49_000L, paymentRefunded(f.orderId))
+        assertEquals(10_000L, orderDetail(f.user, f.orderId).get("pointsRefunded").asLong())
+        assertEquals(20_000L, pointBalance(memberId))
+        assertEquals(pointBalance(memberId), lotRemainingSum(memberId))
+        assertEquals(listOf("AVAILABLE", "AVAILABLE", "AVAILABLE"), f.coupons.map { myCouponStatuses(f.user).getValue(it) })
+    }
+
+    @Test
+    fun 판매자_취소도_상품_쿠폰이_돌아오고_포인트가_되돌아온다() {
+        val f = spec6()
+        val memberId = memberIdOf(f.user)
+
+        val data = dataOf(
+            postIdem("/api/v1/seller/orders/${f.sellerOrderOf(f.c)}/items/${f.itemOf(f.c)}/cancel", f.c.sellerToken, mapOf("reason" to "재고 착오")),
+        )
+
+        assertEquals("CANCELED", data.get("itemStatus").asString())
+        assertEquals(27_562L, data.get("refundAmount").asLong())
+        assertEquals(5_625L, data.get("pointsRefund").asLong())
+        assertEquals(15_625L, pointBalance(memberId))
+        assertEquals(pointBalance(memberId), lotRemainingSum(memberId))
+        assertEquals(listOf("USED", "AVAILABLE", "USED"), f.coupons.map { myCouponStatuses(f.user).getValue(it) })
+    }
+
+    @Test
+    fun 전액_포인트로_낸_항목_취소는_PG_호출_없이_CANCELED이고_포인트가_돌아온다() {
+        // 48,000 + 3,000 = 51,000(무료배송), 포인트 1,000. 3,000원 항목을 구매자가 취소하면 무료배송이 깨져
+        // 차감(최대 3,000)이 그 항목의 현금 몫 전부를 덮는다: 현금 환불 0, 배분 포인트는 돌아온다.
+        val a = shop(48_000)
+        val b = shop(3_000)
+        val user = newUserToken()
+        val memberId = memberIdOf(user)
+        grantPoints(memberId, 10_000)
+        val order = paidOrder(user, listOf(a.skuId to 1, b.skuId to 1), 50_000, pointsToUse = 1_000)
+        val orderId = order.get("orderId").asLong()
+        val item = order.get("sellerOrders").flatMap { it.get("items") }.first { it.get("skuId").asLong() == b.skuId }
+        val allocated = item.get("pointsAllocated").asLong()
+        assertTrue(allocated > 0)
+
+        val data = dataOf(cancel(user, orderId, item.get("orderItemId").asLong()))
+
+        assertEquals("CANCELED", data.get("itemStatus").asString())
+        assertEquals(0L, data.get("refundAmount").asLong())
+        assertEquals(allocated, data.get("pointsRefund").asLong())
+        assertEquals(emptyList(), pgCancelAmounts(payKeyOf(order)))
+        assertEquals(9_000L + allocated, pointBalance(memberId))
+        assertEquals(pointBalance(memberId), lotRemainingSum(memberId))
+    }
+
+    @Test
+    fun `0원_주문의_항목_취소는_대사_대상에_남지_않는다`() {
+        val a = shop(50_000)
+        val user = newUserToken()
+        val couponId = claimCoupon(user, adminCouponPolicy(couponPolicyBody(discountValue = 50_000)))
+        val placed = json(
+            placeOrder(user, listOf(a.skuId to 1), 0, productCoupons = listOf(a.skuId to couponId)).andExpect { status { isCreated() } },
+        ).get("data")
+        val orderId = placed.get("orderId").asLong()
+        val itemId = orderDetail(user, orderId).get("sellerOrders").get(0).get("items").get(0).get("orderItemId").asLong()
+
+        val data = dataOf(cancel(user, orderId, itemId))
+
+        assertEquals("CANCELED", data.get("itemStatus").asString())
+        assertEquals(0L, data.get("refundAmount").asLong())
+        assertEquals("CANCELED", itemStatus(itemId))
+        assertEquals("AVAILABLE", myCouponStatuses(user).getValue(couponId))
+        jdbcTemplate.update("update order_item set modified_at = ? where id = ?", java.time.LocalDateTime.now().minusHours(1), itemId)
+        assertEquals(0, reconciliationService.reconcileCancels())
+        assertEquals("CANCELED", itemStatus(itemId))
     }
 
     private fun json(body: String): JsonNode = objectMapper.readTree(body)

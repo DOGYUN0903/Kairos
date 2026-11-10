@@ -29,11 +29,11 @@ class OrderShippingServiceTest {
     private val paymentGateway = FakePaymentGateway()
     private val orderService = OrderService(
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
-        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock),
+        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
     private val paymentService = OrderPaymentService(
-        orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock,
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock,
     )
     private val service = OrderShippingService(orderRepository, InlineTransactionRunner(), clock)
 

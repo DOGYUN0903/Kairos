@@ -16,16 +16,17 @@ class OrderFlowFixture {
     val productReader = FakeProductReader()
     val sellerReader = FakeSellerReader()
     val stockManager = FakeStockManager()
+    val benefitReverter = FakeBenefitReverter(stockManager.events)
     val paymentGateway = FakePaymentGateway()
     val tx = InlineTransactionRunner()
     val properties = OrderProperties()
 
     val benefitApplier = FakeBenefitApplier()
-    val paymentService = OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), tx, clock)
+    val paymentService = OrderPaymentService(orderRepository, paymentGateway, stockManager, benefitReverter, FakeCartItemRemover(), tx, clock)
     val orderService = OrderService(
         orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, paymentService, properties, tx, clock, Random(7),
     )
-    val cancelService = OrderCancelService(orderRepository, paymentGateway, stockManager, properties, tx, clock)
+    val cancelService = OrderCancelService(orderRepository, paymentGateway, stockManager, benefitReverter, properties, tx, clock)
     val shippingService = OrderShippingService(orderRepository, tx, clock)
 
     val memberId = 7L

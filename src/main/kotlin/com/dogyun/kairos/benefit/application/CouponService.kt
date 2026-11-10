@@ -75,6 +75,16 @@ class CouponService(
         couponRepository.attachOrder(couponIds, orderId)
     }
 
+    /**
+     * 주문이 닫히거나 항목이 취소될 때 쿠폰을 `USED → AVAILABLE` 로 돌린다(조건부 UPDATE, 쿠폰 ID 오름차순). 만료된 쿠폰은 돌리지 않는다.
+     * 호출 트랜잭션(주문 행 락 → member_point 락 뒤)에 참여한다. 돌린 쿠폰 ID 를 돌려준다.
+     */
+    @Transactional
+    fun restoreCoupons(couponIds: Collection<Long>): List<Long> {
+        val now = LocalDateTime.now(clock)
+        return couponIds.toSortedSet().filter { couponRepository.restoreIfNotExpired(it, now) }
+    }
+
     private fun ownedCoupons(memberId: Long, couponIds: Collection<Long>): List<Coupon> {
         if (couponIds.isEmpty()) return emptyList()
         val coupons = couponRepository.findAllByIds(couponIds.toSet())

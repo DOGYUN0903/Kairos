@@ -382,6 +382,18 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun lotRemainingSum(memberId: Long): Long =
         jdbcTemplate.queryForObject("select coalesce(sum(remaining_amount), 0) from point_lot where member_id = ?", Long::class.java, memberId) ?: 0L
 
+    /** `GET /api/v1/coupons/me` 기준 쿠폰 ID → 상태(AVAILABLE/USED/EXPIRED). */
+    protected fun myCouponStatuses(token: String): Map<Long, String> {
+        val content = json(get("/api/v1/coupons/me?size=100", token).andExpect { status { isOk() } }).get("data").get("content")
+        return (0 until content.size()).associate { content.get(it).get("couponId").asLong() to content.get(it).get("status").asString() }
+    }
+
+    /** 회원의 원장 행 수(transaction_type 이 [type] 인 것). */
+    protected fun pointTransactionCount(memberId: Long, type: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from point_transaction where member_id = ? and transaction_type = ?", Int::class.java, memberId, type,
+        ) ?: 0
+
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))
             .andExpect { status { isOk() } }

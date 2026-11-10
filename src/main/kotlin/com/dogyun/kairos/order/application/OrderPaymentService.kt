@@ -49,6 +49,7 @@ class OrderPaymentService(
     private val orderRepository: OrderRepository,
     private val paymentGateway: PaymentGateway,
     private val stockManager: StockManager,
+    private val benefitReverter: BenefitReverter,
     private val cartItemRemover: CartItemRemover,
     private val tx: TransactionRunner,
     private val clock: Clock,
@@ -174,6 +175,8 @@ class OrderPaymentService(
                 paymentGateway.fail(orderId, failReason)
                 order.cancelForPaymentFailure()
                 orderRepository.save(order)
+                // 쿠폰·포인트를 재고보다 먼저 되돌린다(락 순서: orders → member_point → coupon → sku).
+                benefitReverter.revertAll(orderId, order.memberId, order.usedCouponIds(), order.pointsUsed)
                 stockManager.restore(order.skuQuantities.map { (skuId, quantity) -> SkuQuantity(skuId, quantity) })
                 ApprovalFinish.REJECTED
             }

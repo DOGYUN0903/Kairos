@@ -134,7 +134,8 @@ class FakeSellerReader : SellerReader {
         sellerIds.mapNotNull { sellers[it] }.associateBy { it.sellerId }
 }
 
-class FakeStockManager : StockManager {
+/** [events] 를 [FakeBenefitReverter] 와 공유하면 호출 순서("restore")를 확인할 수 있다. */
+class FakeStockManager(val events: MutableList<String> = mutableListOf()) : StockManager {
     val stock = mutableMapOf<Long, Int>()
 
     /** decrease 호출 때 받은 목록(순서 그대로). */
@@ -156,6 +157,7 @@ class FakeStockManager : StockManager {
 
     override fun restore(items: List<SkuQuantity>) {
         restoreCalls.addAll(items)
+        events += "restore"
         items.forEach { stock.merge(it.skuId, it.quantity, Int::plus) }
     }
 
@@ -332,5 +334,26 @@ class FakeBenefitApplier : BenefitApplier {
         if (balance < pointsToUse) throw DomainException(ErrorCode.POINT_INSUFFICIENT)
         balance -= pointsToUse
         committed += Commit(memberId, orderId, couponIds.toSet(), pointsToUse)
+    }
+}
+
+/** revertAll·revertItem 호출을 기록한다. [events] 를 [FakeStockManager] 와 공유하면 호출 순서를 확인할 수 있다. */
+class FakeBenefitReverter(val events: MutableList<String> = mutableListOf()) : BenefitReverter {
+    data class RevertAll(val orderId: Long, val memberId: Long, val couponIds: Set<Long>, val pointsUsed: Long)
+    data class RevertItem(
+        val orderId: Long, val memberId: Long, val orderItemId: Long, val pointsRefund: Long, val productCouponId: Long?, val cartCouponId: Long?,
+    )
+
+    val revertAllCalls = mutableListOf<RevertAll>()
+    val revertItemCalls = mutableListOf<RevertItem>()
+
+    override fun revertAll(orderId: Long, memberId: Long, couponIds: Collection<Long>, pointsUsed: Long) {
+        revertAllCalls += RevertAll(orderId, memberId, couponIds.toSet(), pointsUsed)
+        events += "revertAll"
+    }
+
+    override fun revertItem(orderId: Long, memberId: Long, orderItemId: Long, pointsRefund: Long, productCouponId: Long?, cartCouponId: Long?) {
+        revertItemCalls += RevertItem(orderId, memberId, orderItemId, pointsRefund, productCouponId, cartCouponId)
+        events += "revertItem"
     }
 }

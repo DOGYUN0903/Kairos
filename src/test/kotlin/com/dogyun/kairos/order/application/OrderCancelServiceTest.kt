@@ -25,17 +25,19 @@ class OrderCancelServiceTest {
     private val productReader = FakeProductReader()
     private val sellerReader = FakeSellerReader()
     private val stockManager = FakeStockManager()
+    private val benefitReverter = FakeBenefitReverter(stockManager.events)
+    private val benefitApplier = FakeBenefitApplier()
     private val paymentGateway = FakePaymentGateway()
     private val orderService = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
-        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock),
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier,
+        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock),
         OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
     private val paymentService = OrderPaymentService(
-        orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock,
+        orderRepository, paymentGateway, stockManager, benefitReverter, FakeCartItemRemover(), InlineTransactionRunner(), clock,
     )
     private val service = OrderCancelService(
-        orderRepository, paymentGateway, stockManager, OrderProperties(), InlineTransactionRunner(), clock,
+        orderRepository, paymentGateway, stockManager, benefitReverter, OrderProperties(), InlineTransactionRunner(), clock,
     )
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
@@ -94,7 +96,7 @@ class OrderCancelServiceTest {
 
         val result = service.cancelByBuyer(memberId, order.id!!, item.id!!, "단순 변심")
 
-        assertEquals(CancelItemResult(item.id, "CANCELED", 18_000, 0), result)
+        assertEquals(CancelItemResult(item.id, "CANCELED", 18_000, 0, 0), result)
         val saved = reload(order)
         assertEquals(OrderItemStatus.CANCELED, saved.findItem(item.id).status)
         assertEquals(18_000, saved.refundedAmount)
@@ -115,7 +117,7 @@ class OrderCancelServiceTest {
 
         val result = service.cancelByBuyer(memberId, order.id!!, c.id!!, "변심")
 
-        assertEquals(CancelItemResult(c.id, "CANCELED", 27_000, 3_000), result)
+        assertEquals(CancelItemResult(c.id, "CANCELED", 27_000, 3_000, 0), result)
         assertEquals(listOf(27_000L), paymentGateway.cancelCalls.map { it.amount })
         val saved = reload(order)
         assertEquals(3_000, saved.shippingFeeRecovered)
@@ -132,7 +134,7 @@ class OrderCancelServiceTest {
 
         val result = service.cancelBySeller(2L, order.sellerOrderIdOf(2L), c.id!!, "재고 착오")
 
-        assertEquals(CancelItemResult(c.id, "CANCELED", 30_000, 0), result)
+        assertEquals(CancelItemResult(c.id, "CANCELED", 30_000, 0, 0), result)
         assertEquals(listOf(30_000L), paymentGateway.cancelCalls.map { it.amount })
         assertEquals(0, reload(order).shippingFeeRecovered)
         assertEquals("재고 착오", reload(order).findItem(c.id).cancelReason)
@@ -146,7 +148,7 @@ class OrderCancelServiceTest {
 
         val result = service.cancelByAdmin(order.id!!, c.id!!, "운영 정책")
 
-        assertEquals(CancelItemResult(c.id, "CANCELED", 30_000, 0), result)
+        assertEquals(CancelItemResult(c.id, "CANCELED", 30_000, 0, 0), result)
     }
 
     @Test
@@ -159,7 +161,7 @@ class OrderCancelServiceTest {
         val result = service.cancelByBuyer(memberId, order.id!!, small.id!!, "변심")
 
         // 3,000 짜리를 취소하면 남은 금액이 47,000 이라 배송비 3,000 이 차감되어 환불이 0 이다.
-        assertEquals(CancelItemResult(small.id, "CANCELED", 0, 3_000), result)
+        assertEquals(CancelItemResult(small.id, "CANCELED", 0, 3_000, 0), result)
         assertTrue(paymentGateway.cancelCalls.isEmpty())
         val saved = reload(order)
         assertEquals(OrderItemStatus.CANCELED, saved.findItem(small.id).status)
@@ -282,7 +284,7 @@ class OrderCancelServiceTest {
         cancelDone(33_000, 0)
         val last = service.cancelByBuyer(memberId, order.id, order.itemOf(10L).id!!, "변심")
 
-        assertEquals(CancelItemResult(order.itemOf(10L).id!!, "CANCELED", 33_000, 0), last)
+        assertEquals(CancelItemResult(order.itemOf(10L).id!!, "CANCELED", 33_000, 0, 0), last)
         assertEquals(listOf(27_000L, 33_000L), paymentGateway.cancelCalls.map { it.amount })
         val saved = reload(order)
         assertEquals(OrderStatus.CANCELED, saved.status)
@@ -329,5 +331,140 @@ class OrderCancelServiceTest {
         assertError(ErrorCode.ORDER_INVALID) { service.cancelByBuyer(memberId, order.id!!, item, "가".repeat(501)) }
         assertTrue(paymentGateway.cancelCalls.isEmpty())
         assertEquals(OrderItemStatus.ORDERED, reload(order).findItem(item).status)
+    }
+
+    /**
+     * 스펙 6장 예시 주문: b1(sku 31, 판매자 1, 30,000×1, 플랫폼 쿠폰 501), c1(sku 32, 판매자 2, 20,000×2, 판매자 쿠폰 502),
+     * 장바구니 쿠폰 503, 포인트 10,000. 총 49,000원, paidAmount 21,438/27,562.
+     */
+    private fun spec6Order(): Order {
+        sku(31L, 1L, 30_000)
+        sku(32L, 2L, 20_000)
+        benefitApplier.product(501L, issuer = "PLATFORM", value = 2_000)
+        benefitApplier.product(502L, issuer = "SELLER", target = "SELLER", sellerId = 2L, discountType = "RATE", value = 1_000, max = 5_000)
+        benefitApplier.cart(503L, value = 1_000, max = 5_000, min = 50_000)
+        benefitApplier.balance = 20_000
+        val placed = orderService.place(
+            memberId,
+            PlaceOrderCommand(
+                listOf(OrderItemCommand(31L, 1), OrderItemCommand(32L, 2)), 49_000, address,
+                listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 502L)), 503L, 10_000,
+            ),
+        )
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, 49_000, 49_000, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(placed.orderNo, "pay-${placed.orderId}", 49_000))
+        return orderRepository.findById(placed.orderId)!!
+    }
+
+    @Test
+    fun 스펙_예시_c1_취소는_PG에_24562를_요청하고_revertItem에_5625와_판매자_쿠폰을_넘긴다() {
+        val order = spec6Order()
+        val c1 = order.itemOf(32L)
+        cancelDone(24_562, 24_438)
+
+        val result = service.cancelByBuyer(memberId, order.id!!, c1.id!!, "변심")
+
+        assertEquals(CancelItemResult(c1.id, "CANCELED", 24_562, 3_000, 5_625), result)
+        assertEquals(24_562, paymentGateway.cancelCalls.single().amount)
+        assertEquals(listOf(FakeBenefitReverter.RevertItem(order.id, memberId, c1.id, 5_625, 502L, null)), benefitReverter.revertItemCalls)
+        assertEquals(listOf("revertItem", "restore"), stockManager.events)
+    }
+
+    @Test
+    fun 마지막_항목_취소는_cartCouponId를_넘긴다() {
+        val order = spec6Order()
+        cancelDone(24_562, 24_438)
+        service.cancelByBuyer(memberId, order.id!!, order.itemOf(32L).id!!, "변심")
+        cancelDone(24_438, 0)
+
+        val result = service.cancelByBuyer(memberId, order.id, order.itemOf(31L).id!!, "변심")
+
+        assertEquals(24_438, result.refundAmount)
+        assertEquals(4_375, result.pointsRefund)
+        assertEquals(
+            FakeBenefitReverter.RevertItem(order.id, memberId, order.itemOf(31L).id!!, 4_375, 501L, 503L),
+            benefitReverter.revertItemCalls.last(),
+        )
+        assertEquals("CANCELED", paymentGateway.get(order.id).status)
+    }
+
+    @Test
+    fun 중간_항목_취소는_cartCouponId가_null이다() {
+        val order = spec6Order()
+        cancelDone(24_562, 24_438)
+
+        service.cancelByBuyer(memberId, order.id!!, order.itemOf(32L).id!!, "변심")
+
+        assertEquals(null, benefitReverter.revertItemCalls.single().cartCouponId)
+    }
+
+    @Test
+    fun 판매자_관리자_취소에서도_revertItem_인자는_구매자와_같다() {
+        val bySeller = spec6Order()
+        cancelDone(27_562, 21_438)
+        service.cancelBySeller(2L, bySeller.sellerOrderIdOf(2L), bySeller.itemOf(32L).id!!, "재고 착오")
+        benefitApplier.used.clear() // Fake 는 쿠폰을 되돌리지 않는다. 같은 쿠폰으로 두 번째 주문을 만든다.
+        val byAdmin = spec6Order()
+        cancelDone(27_562, 21_438)
+        service.cancelByAdmin(byAdmin.id!!, byAdmin.itemOf(32L).id!!, "운영 정책")
+
+        assertEquals(
+            listOf(
+                FakeBenefitReverter.RevertItem(bySeller.id!!, memberId, bySeller.itemOf(32L).id!!, 5_625, 502L, null),
+                FakeBenefitReverter.RevertItem(byAdmin.id, memberId, byAdmin.itemOf(32L).id!!, 5_625, 502L, null),
+            ),
+            benefitReverter.revertItemCalls,
+        )
+    }
+
+    @Test
+    fun PG가_실패하면_revertItem은_불리지_않는다() {
+        val order = spec6Order()
+        paymentGateway.nextCancel = PgOutcome.Failed("REJECT_CANCEL", "거절")
+
+        assertError(ErrorCode.PAYMENT_CANCEL_FAILED) { service.cancelByBuyer(memberId, order.id!!, order.itemOf(32L).id!!, "변심") }
+
+        assertEquals(emptyList(), benefitReverter.revertItemCalls)
+    }
+
+    @Test
+    fun 현금_환불_0원_항목은_PG_없이_닫히고_revertItem이_불린다() {
+        sku(10L, 1L, 30_000)
+        sku(40L, 1L, 2_000)
+        benefitApplier.product(601L, value = 2_000)
+        val items = listOf(OrderItemCommand(10L, 1), OrderItemCommand(40L, 1))
+        val coupons = listOf(ProductCouponCommand(40L, 601L))
+        val total = orderService.quote(memberId, QuoteOrderCommand(items, coupons, null, 0)).totalAmount
+        val placed = orderService.place(memberId, PlaceOrderCommand(items, total, address, coupons))
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, total, total, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(placed.orderNo, "pay-${placed.orderId}", total))
+        val order = orderRepository.findById(placed.orderId)!!
+        val free = order.itemOf(40L)
+
+        val result = service.cancelByBuyer(memberId, order.id!!, free.id!!, "변심")
+
+        assertEquals("CANCELED", result.itemStatus)
+        assertEquals(0, result.refundAmount)
+        assertEquals(emptyList(), paymentGateway.cancelCalls)
+        assertEquals(listOf(FakeBenefitReverter.RevertItem(order.id, memberId, free.id, 0, 601L, null)), benefitReverter.revertItemCalls)
+    }
+
+    @Test
+    fun `0원_결제_주문의_항목_취소는_paymentKey_없이_PG_없이_닫힌다`() {
+        sku(10L, 1L, 60_000)
+        benefitApplier.product(701L, value = 60_000)
+        val placed = orderService.place(
+            memberId, PlaceOrderCommand(listOf(OrderItemCommand(10L, 1)), 0, address, listOf(ProductCouponCommand(10L, 701L))),
+        )
+        val order = orderRepository.findById(placed.orderId)!!
+        assertEquals(OrderStatus.PAID, order.status)
+        assertEquals(null, paymentGateway.get(order.id!!).paymentKey)
+        val item = order.itemOf(10L)
+
+        val result = service.cancelByBuyer(memberId, order.id, item.id!!, "변심")
+
+        assertEquals("CANCELED", result.itemStatus)
+        assertEquals(emptyList(), paymentGateway.cancelCalls)
+        assertEquals(listOf(FakeBenefitReverter.RevertItem(order.id, memberId, item.id, 0, 701L, null)), benefitReverter.revertItemCalls)
     }
 }
