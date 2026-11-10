@@ -4,7 +4,12 @@ import com.dogyun.kairos.CommerceTestSupport
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrderStatus
+import com.dogyun.kairos.order.domain.CouponIssuer
 import com.dogyun.kairos.order.domain.line
+import com.dogyun.kairos.order.domain.newOrderWith
+import com.dogyun.kairos.order.domain.specAllocation
+import com.dogyun.kairos.order.domain.specB1
+import com.dogyun.kairos.order.domain.specC1
 import com.dogyun.kairos.order.domain.newOrder
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.support.TransactionTemplate
@@ -53,6 +58,40 @@ class OrderRepositoryImplTest : CommerceTestSupport() {
 
         assertEquals(found.orderNo, repository.findByOrderNo(found.orderNo)?.orderNo)
         assertEquals(found.id, repository.findBySellerOrderId(requireNotNull(found.sellerOrders.first().id))?.id)
+    }
+
+    @Test
+    fun 할인_필드가_저장되고_복원된다() {
+        val saved = repository.save(newOrderWith(specAllocation(), specB1(), specC1()))
+
+        val found = assertNotNull(repository.findById(requireNotNull(saved.id)))
+
+        assertEquals(6_000, found.productCouponDiscount)
+        assertEquals(99L, found.cartCouponId)
+        assertEquals(5_000, found.cartCouponDiscount)
+        assertEquals(10_000, found.pointsUsed)
+        assertEquals(0, found.pointsRefunded)
+        assertEquals(49_000, found.totalAmount)
+        val b = found.allItems.first { it.skuId == 21L }
+        val c = found.allItems.first { it.skuId == 31L }
+        assertEquals(1L, b.productCouponId)
+        assertEquals(CouponIssuer.PLATFORM, b.productCouponIssuer)
+        assertEquals(2_000, b.productCouponDiscount)
+        assertEquals(2_187, b.cartCouponAllocated)
+        assertEquals(4_375, b.pointsAllocated)
+        assertEquals(21_438, b.paidAmount)
+        assertEquals(CouponIssuer.SELLER, c.productCouponIssuer)
+        assertEquals(27_562, c.paidAmount)
+
+        found.markPaid(java.time.LocalDateTime.of(2026, 11, 10, 12, 0))
+        val plan = found.planCancel(requireNotNull(c.id), com.dogyun.kairos.order.domain.CancelActor.BUYER, com.dogyun.kairos.order.domain.ShippingPolicy(50_000, 3_000))
+        found.requestCancel(requireNotNull(c.id), com.dogyun.kairos.order.domain.CancelActor.BUYER, null, plan)
+        found.confirmCancel(requireNotNull(c.id), plan, java.time.LocalDateTime.of(2026, 11, 10, 12, 1))
+        repository.save(found)
+        val after = assertNotNull(repository.findById(requireNotNull(saved.id)))
+        assertEquals(5_625, after.pointsRefunded)
+        assertEquals(5_625, after.allItems.first { it.skuId == 31L }.pointsRefunded)
+        assertEquals(0, after.allItems.first { it.skuId == 21L }.pointsRefunded)
     }
 
     @Test

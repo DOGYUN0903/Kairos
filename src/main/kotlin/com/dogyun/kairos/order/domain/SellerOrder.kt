@@ -35,6 +35,8 @@ class SellerOrder(
     val itemsAmount: Long get() = items.sumOf { it.lineAmount }
     val remainingItemsAmount: Long
         get() = items.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.lineAmount }
+    val remainingPaidAmount: Long
+        get() = items.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.paidAmount }
     val hasCancelRequested: Boolean get() = items.any { it.status == OrderItemStatus.CANCEL_REQUESTED }
 
     fun markPaid() = transit(setOf(SellerOrderStatus.PENDING_PAYMENT), SellerOrderStatus.PAID)

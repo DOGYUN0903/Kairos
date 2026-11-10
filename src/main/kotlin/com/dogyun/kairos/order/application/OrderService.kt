@@ -2,6 +2,7 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.order.domain.DiscountAllocation
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderLine
 import com.dogyun.kairos.order.domain.OrderNo
@@ -48,6 +49,7 @@ class OrderService(
             orderNo = OrderNo.generate(now, random),
             memberId = memberId,
             lines = lines,
+            allocation = DiscountAllocation.none(lines),
             address = cmd.shippingAddress.toDomain(),
             policy = properties.shippingPolicy(),
             now = now,

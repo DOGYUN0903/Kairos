@@ -320,4 +320,42 @@ class OrderTest {
         assertEquals(3_000, o.remainingBuyerShippingFee)
         assertEquals(Duration.ofMinutes(15), Duration.between(NOW, o.expiresAt))
     }
+
+    @Test
+    fun confirmCancel은_pointsRefunded를_누적한다() {
+        val o = paidSpecOrder()
+
+        o.cancel(o.itemIdOf(2))
+        assertEquals(4_375, o.pointsRefunded)
+        o.cancel(o.itemIdOf(3))
+
+        assertEquals(10_000, o.pointsRefunded)
+        assertEquals(4_375, o.findItem(o.itemIdOf(2)).pointsRefunded)
+        assertEquals(5_625, o.findItem(o.itemIdOf(3)).pointsRefunded)
+    }
+
+    @Test
+    fun allItemsCanceled는_모든_항목이_CANCELED일_때만_true다() {
+        val o = paidSpecOrder()
+        assertFalse(o.allItemsCanceled)
+
+        o.cancel(o.itemIdOf(2))
+        assertFalse(o.allItemsCanceled)
+
+        o.cancel(o.itemIdOf(3))
+        assertTrue(o.allItemsCanceled)
+    }
+
+    @Test
+    fun 주문_생성은_할인을_반영해_totalAmount와_사용_쿠폰을_계산한다() {
+        val o = newOrderWith(specAllocation(), specB1(), specC1())
+
+        assertEquals(70_000, o.itemsAmount)
+        assertEquals(49_000, o.totalAmount)
+        assertEquals(6_000, o.productCouponDiscount)
+        assertEquals(5_000, o.cartCouponDiscount)
+        assertEquals(10_000, o.pointsUsed)
+        assertEquals(49_000, o.remainingPaidAmount)
+        assertEquals(listOf(1L, 2L, 99L), o.usedCouponIds())
+    }
 }

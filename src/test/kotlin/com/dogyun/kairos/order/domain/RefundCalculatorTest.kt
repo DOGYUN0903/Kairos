@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.domain.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class RefundCalculatorTest {
 
@@ -25,7 +26,7 @@ class RefundCalculatorTest {
 
         val plan = o.cancel(o.itemIdOf(3))
 
-        assertEquals(30_000, plan.itemAmount)
+        assertEquals(30_000, plan.paidAmount)
         assertEquals(0, plan.shippingFeeRefund)
         assertEquals(3_000, plan.shippingFeeDeducted)
         assertEquals(27_000, plan.refundAmount)
@@ -212,5 +213,83 @@ class RefundCalculatorTest {
 
         assertEquals(27_000, plan.refundAmount)
         assertEquals(OrderStatus.PAID, o.status)
+    }
+
+    @Test
+    fun 스펙_예시_c1_취소는_환불_24562_포인트_5625_판매자_쿠폰_반환이다() {
+        val o = paidSpecOrder()
+        assertEquals(49_000, o.totalAmount)
+
+        val plan = o.cancel(o.itemIdOf(3))
+
+        assertEquals(27_562, plan.paidAmount)
+        assertEquals(3_000, plan.shippingFeeDeducted)
+        assertEquals(24_562, plan.refundAmount)
+        assertEquals(5_625, plan.pointsRefund)
+        assertEquals(2L, plan.productCouponReturn)
+        assertEquals(5_625, o.pointsRefunded)
+        assertEquals(24_562, o.refundedAmount)
+        assertEquals(5_625, o.findItem(o.itemIdOf(3)).pointsRefunded)
+        assertEquals(o.totalAmount - o.refundedAmount, o.remainingPaidAmount + o.remainingBuyerShippingFee + o.shippingFeeRecovered)
+        assertEquals(24_438, o.remainingPaidAmount + o.shippingFeeRecovered)
+    }
+
+    @Test
+    fun 이어_b1_취소는_24438이고_누적_환불이_49000이다() {
+        val o = paidSpecOrder()
+        o.cancel(o.itemIdOf(3))
+
+        val plan = o.cancel(o.itemIdOf(2))
+
+        assertEquals(24_438, plan.refundAmount)
+        assertEquals(3_000, plan.shippingFeeReturned)
+        assertEquals(4_375, plan.pointsRefund)
+        assertEquals(1L, plan.productCouponReturn)
+        assertEquals(49_000, o.refundedAmount)
+        assertEquals(10_000, o.pointsRefunded)
+        assertEquals(o.pointsUsed, o.pointsRefunded)
+        assertTrue(o.allItemsCanceled)
+    }
+
+    @Test
+    fun paidAmount가_3000보다_작으면_차감은_현금_환불까지만이고_포인트는_전액_돌아온다() {
+        val small = line(sellerId = 2, price = 3_000, skuId = 21)
+        val big = line(sellerId = 3, price = 47_000, skuId = 31)
+        val allocation = DiscountAllocation(
+            lines = mapOf(
+                21L to LineAllocation(21, null, 0, null, 0, 2_500),
+                31L to LineAllocation(31, null, 0, null, 0, 0),
+            ),
+            productCouponDiscount = 0, cartCouponId = null, cartCouponDiscount = 0, pointsUsed = 2_500,
+        )
+        val o = withIds(newOrderWith(allocation, small, big)).also { it.markPaid(NOW) }
+        assertTrue(o.freeShippingApplied)
+
+        val plan = o.cancel(o.itemIdOf(2))
+
+        assertEquals(500, plan.paidAmount)
+        assertEquals(500, plan.shippingFeeDeducted)
+        assertEquals(0, plan.refundAmount)
+        assertEquals(2_500, plan.pointsRefund)
+        assertEquals(500, o.shippingFeeRecovered)
+    }
+
+    @Test
+    fun 쿠폰으로_결제액이_4만원이_돼도_itemsAmount가_5만원_이상이면_무료배송이다() {
+        val a = line(sellerId = 2, price = 30_000, skuId = 21)
+        val b = line(sellerId = 3, price = 20_000, skuId = 31)
+        val allocation = DiscountAllocation(
+            lines = mapOf(
+                21L to LineAllocation(21, 1, 6_000, CouponIssuer.PLATFORM, 0, 0),
+                31L to LineAllocation(31, 2, 4_000, CouponIssuer.SELLER, 0, 0),
+            ),
+            productCouponDiscount = 10_000, cartCouponId = null, cartCouponDiscount = 0, pointsUsed = 0,
+        )
+        val o = newOrderWith(allocation, a, b)
+
+        assertEquals(50_000, o.itemsAmount)
+        assertTrue(o.freeShippingApplied)
+        assertEquals(0, o.buyerShippingFee)
+        assertEquals(40_000, o.totalAmount)
     }
 }

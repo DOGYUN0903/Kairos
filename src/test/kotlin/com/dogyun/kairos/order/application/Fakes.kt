@@ -29,7 +29,9 @@ class FakeOrderRepository : OrderRepository {
         val id = order.id ?: ++orderSeq
         val saved = Order(
             id, order.orderNo, order.memberId, order.status, order.shippingAddress, order.itemsAmount, order.buyerShippingFee,
-            order.totalAmount, order.freeShippingApplied, order.shippingFeeRecovered, order.refundedAmount, order.expiresAt,
+            order.totalAmount, order.freeShippingApplied, order.shippingFeeRecovered, order.refundedAmount,
+            order.productCouponDiscount, order.cartCouponId, order.cartCouponDiscount, order.pointsUsed, order.pointsRefunded,
+            order.expiresAt,
             order.paidAt, order.sellerOrders.map { so ->
                 SellerOrder(
                     so.id ?: ++sellerOrderSeq, so.sellerId, so.sellerName, so.commissionRateBp, so.status, so.shippingFee,
@@ -38,7 +40,9 @@ class FakeOrderRepository : OrderRepository {
                         OrderItem(
                             it.id ?: ++itemSeq, it.skuId, it.productId, it.productName, it.brandName, it.optionDisplayName,
                             it.salePrice, it.extraPrice, it.quantity, it.status, it.cancelActor, it.cancelReason,
-                            it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt,
+                            it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
+                            it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated,
+                            it.paidAmount, it.pointsRefunded,
                         )
                     },
                 )

@@ -157,11 +157,12 @@ class OrderRepositoryImpl(
             OrderEntity(
                 order.orderNo, order.memberId, a.receiverName, a.phone, a.zipCode, a.address1, a.address2, a.memo,
                 order.itemsAmount, order.buyerShippingFee, order.totalAmount, order.freeShippingApplied, order.expiresAt,
-                order.status, order.shippingFeeRecovered, order.refundedAmount, order.paidAt,
+                order.productCouponDiscount, order.cartCouponId, order.cartCouponDiscount, order.pointsUsed,
+                order.status, order.shippingFeeRecovered, order.refundedAmount, order.paidAt, order.pointsRefunded,
             )
         } else {
             requireNotNull(orderJpaRepository.findByIdOrNull(id)) { "존재하지 않는 주문입니다: $id" }
-                .also { it.change(order.status, order.shippingFeeRecovered, order.refundedAmount, order.paidAt) }
+                .also { it.change(order.status, order.shippingFeeRecovered, order.refundedAmount, order.paidAt, order.pointsRefunded) }
         }
         return orderJpaRepository.saveAndFlush(entity)
     }
@@ -187,12 +188,14 @@ class OrderRepositoryImpl(
                 sellerOrder, item.skuId, item.productId, item.productName, item.brandName, item.optionDisplayName,
                 item.salePrice, item.extraPrice, item.quantity, item.status, item.cancelActor, item.cancelReason,
                 item.refundAmount, item.shippingFeeDeducted, item.shippingFeeReturned, item.canceledAt,
+                item.productCouponId, item.productCouponDiscount, item.productCouponIssuer, item.cartCouponAllocated,
+                item.pointsAllocated, item.paidAmount, item.pointsRefunded,
             )
         } else {
             requireNotNull(current[id]) { "이 주문의 항목이 아닙니다: $id" }.also {
                 it.change(
                     item.status, item.cancelActor, item.cancelReason, item.refundAmount, item.shippingFeeDeducted,
-                    item.shippingFeeReturned, item.canceledAt,
+                    item.shippingFeeReturned, item.canceledAt, item.pointsRefunded,
                 )
             }
         }
@@ -221,6 +224,11 @@ class OrderRepositoryImpl(
         freeShippingApplied = e.freeShippingApplied,
         shippingFeeRecovered = e.shippingFeeRecovered,
         refundedAmount = e.refundedAmount,
+        productCouponDiscount = e.productCouponDiscount,
+        cartCouponId = e.cartCouponId,
+        cartCouponDiscount = e.cartCouponDiscount,
+        pointsUsed = e.pointsUsed,
+        pointsRefunded = e.pointsRefunded,
         expiresAt = e.expiresAt,
         paidAt = e.paidAt,
         sellerOrders = sellerOrders.map { so ->
@@ -231,7 +239,9 @@ class OrderRepositoryImpl(
                     OrderItem(
                         it.id, it.skuId, it.productId, it.productName, it.brandName, it.optionDisplayName, it.salePrice,
                         it.extraPrice, it.quantity, it.orderItemStatus, it.cancelActor, it.cancelReason, it.refundAmount,
-                        it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt,
+                        it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
+                        it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated,
+                        it.paidAmount, it.pointsRefunded,
                     )
                 },
             )
