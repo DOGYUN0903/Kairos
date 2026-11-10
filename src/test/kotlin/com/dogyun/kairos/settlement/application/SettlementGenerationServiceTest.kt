@@ -57,8 +57,7 @@ class SettlementGenerationServiceTest {
             val aa = adjustments.rows.values.map {
                 listOf(it.sellerId, it.settlementId?.let(keyOf::get), it.type, it.amount, it.reason.substringBefore('#'), it.sourceSettlementId?.let(keyOf::get))
             }.sortedBy { it.toString() }
-            // settlement_run.seller_count 는 "그 실행이 다룬 판매자 수"라 중단·재실행이면 달라질 수 있어 비교에서 뺀다.
-            return listOf(ss, aa, runs.runs.map { it.periodStart })
+            return listOf(ss, aa, runs.runs.map { it.periodStart to it.sellerCount })
         }
     }
 
@@ -244,6 +243,18 @@ class SettlementGenerationServiceTest {
         assertEquals(GenerateSettlementResult(p1, p2, 1, 1, 0, 0, false), r2)
         assertTrue(env.runs.exists(p1))
         assertEquals(once.snapshot(), env.snapshot())
+    }
+
+    @Test
+    fun 라인_UNIQUE_충돌은_건너뜀이_아니라_실패이고_run이_없다() {
+        val env = Env().also { threeSellers(it) }
+        env.settlements.lineCollisionOnSave(8)
+
+        val r = env.service.generate(p1)
+
+        assertEquals(GenerateSettlementResult(p1, p2, 3, 2, 0, 1, false), r)
+        assertFalse(env.runs.exists(p1))
+        assertNull(env.settlements.bySeller(8, p1))
     }
 
     @Test

@@ -7,5 +7,6 @@ import java.time.LocalDate
 
 interface SettlementJpaRepository : JpaRepository<SettlementEntity, Long> {
     fun existsBySellerIdAndPeriodStart(sellerId: Long, periodStart: LocalDate): Boolean
+    fun countByPeriodStart(periodStart: LocalDate): Long
     fun findBySellerId(sellerId: Long, pageable: Pageable): Page<SettlementEntity>
 }

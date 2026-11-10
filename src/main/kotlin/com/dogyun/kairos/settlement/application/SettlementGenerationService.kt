@@ -67,7 +67,14 @@ class SettlementGenerationService(
                 val done = tx.run { generateForSeller(sellerId, period, bySeller[sellerId].orEmpty()) }
                 if (done) created++ else skipped++
             } catch (e: DataIntegrityViolationException) {
-                skipped++
+                // (seller_id, period_start) 경합에서 진 것만 "이미 끝남"이다. 라인 UNIQUE 등 다른 위반은 실패로 센다
+                // (건너뛰면 run 이 남고 그 판매자 주문이 어느 정산에도 들어가지 못한다).
+                if (tx.run { settlementRepository.existsBySellerIdAndPeriodStart(sellerId, period.start) }) {
+                    skipped++
+                } else {
+                    failed++
+                    log.error("정산 생성 중 제약 위반: periodStart={}, sellerId={}", periodStart, sellerId, e)
+                }
             } catch (e: RuntimeException) {
                 failed++
                 log.error("정산 생성에 실패했다: periodStart={}, sellerId={}", periodStart, sellerId, e)
@@ -75,7 +82,8 @@ class SettlementGenerationService(
         }
         if (failed > 0) return result(period, sellerIds.size, created, skipped, failed, alreadyGenerated = false)
         return try {
-            tx.run { runRepository.save(SettlementRun(periodStart, now, created + skipped)) }
+            // 판매자 수는 이 실행이 다룬 수가 아니라 기간의 정산 수다(중단 뒤 재실행해도 한 번에 끝난 것과 같다).
+            tx.run { runRepository.save(SettlementRun(periodStart, now, settlementRepository.countByPeriodStart(periodStart))) }
             result(period, sellerIds.size, created, skipped, 0, alreadyGenerated = false)
         } catch (e: DataIntegrityViolationException) {
             result(period, sellerIds.size, created, skipped, 0, alreadyGenerated = true)
@@ -103,6 +111,8 @@ class SettlementGenerationService(
 
     /** 이미 이 기간 정산이 있으면 false(건너뜀). 트랜잭션 안에서 부른다. */
     private fun generateForSeller(sellerId: Long, period: SettlementPeriod, sources: List<SettlementSource>): Boolean {
+        // 이미 이 기간 정산이 있으면 건너뛴다. 그 뒤 새로 잡힌 미정산 늦은 확정분은 다음 기간의 lookback 이 가져간다
+        // (확정 시각이 lookback 창 안에 있는 동안만 유효하다).
         if (settlementRepository.existsBySellerIdAndPeriodStart(sellerId, period.start)) return false
         val saved = settlementRepository.save(Settlement.generate(sellerId, period, sources, adjustmentAmount = 0))
         val settlementId = requireNotNull(saved.id)

@@ -59,6 +59,8 @@ class SettlementRepositoryImpl(
     override fun existsBySellerIdAndPeriodStart(sellerId: Long, periodStart: LocalDate): Boolean =
         settlementJpaRepository.existsBySellerIdAndPeriodStart(sellerId, periodStart)
 
+    override fun countByPeriodStart(periodStart: LocalDate): Int = settlementJpaRepository.countByPeriodStart(periodStart).toInt()
+
     override fun findSettledSellerOrderIds(sellerOrderIds: Collection<Long>): Set<Long> =
         if (sellerOrderIds.isEmpty()) emptySet() else lineJpaRepository.findSellerOrderIdsIn(sellerOrderIds).toSet()
 

@@ -29,10 +29,15 @@ class FakeSettlementRepository : SettlementRepository {
 
     /** 이 판매자의 새 정산 저장에서 예외를 던진다. */
     fun failOnSave(sellerId: Long) { failSellers += sellerId }
-    fun clearFailures() = failSellers.clear()
+    private val diveSellers = mutableSetOf<Long>()
+
+    /** 이 판매자의 새 정산 저장에서 (seller, period) 가 아닌 UNIQUE 위반(예: 라인 seller_order_id)을 흉내 낸다. */
+    fun lineCollisionOnSave(sellerId: Long) { diveSellers += sellerId }
+    fun clearFailures() { failSellers.clear(); diveSellers.clear() }
 
     override fun save(s: Settlement): Settlement {
         if (s.id == null) {
+            if (s.sellerId in diveSellers) throw DataIntegrityViolationException("uk_settlement_line_seller_order")
             if (s.sellerId in failSellers) throw IllegalStateException("테스트 실패 주입: ${s.sellerId}")
             if (rows.values.any { it.sellerId == s.sellerId && it.period == s.period }) throw DataIntegrityViolationException("uk_settlement_seller_period")
             val lineIds = rows.values.flatMap { r -> r.lines.map { it.sellerOrderId } }.toSet()
@@ -65,6 +70,7 @@ class FakeSettlementRepository : SettlementRepository {
     override fun findById(id: Long): Settlement? = rows[id]?.let { copyOf(it) }
     override fun existsBySellerIdAndPeriodStart(sellerId: Long, periodStart: LocalDate) =
         rows.values.any { it.sellerId == sellerId && it.period.start == periodStart }
+    override fun countByPeriodStart(periodStart: LocalDate) = rows.values.count { it.period.start == periodStart }
     override fun findSettledSellerOrderIds(sellerOrderIds: Collection<Long>): Set<Long> =
         rows.values.flatMap { r -> r.lines.map { it.sellerOrderId } }.filter { it in sellerOrderIds }.toSet()
     override fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<Settlement> = throw UnsupportedOperationException()
