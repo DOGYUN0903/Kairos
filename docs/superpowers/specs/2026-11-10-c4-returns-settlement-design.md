@@ -38,10 +38,10 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 
 - **반품 기한**은 `kairos.order.return-window`(기본 7d)로 두고 자동 확정 기간 `auto-confirm-after`(현재 설정값 **이미 7d**, 변경 없음. 작업 주기 `jobs.auto-confirm-delay`는 1h)와 같게 유지한다. 기한 판정은 `deliveredAt + return-window ≥ now`(KST). 기한 안에 요청만 하면 승인·수거는 기한 뒤라도 진행된다. 틀렸을 때 비용: 두 값을 다르게 바꾸면 "확정 전 7일"과 "반품 가능 7일"이 어긋나 반품도 확정도 안 되는 틈이 생기므로, 기동 시 두 값이 다르면 경고 로그를 남긴다.
 - **수동 확정도 반품이 열려 있으면 막는다**(`SELLER_ORDER_HAS_OPEN_RETURN`, 409). 반품을 걸어 둔 채 확정하면 환불과 적립이 동시에 일어난다. 틀렸을 때 비용: 구매자가 반품 요청을 철회해야 확정할 수 있다 → 구매자 철회 API를 둔다(§7).
-- **거절은 그 항목에 대해 최종**이다. 같은 항목 재요청은 `RETURN_ALREADY_REQUESTED`. 분쟁은 관리자가 본다(관리자는 거절된 반품을 다시 승인할 수 있다, §7). `return_request.order_item_id UNIQUE`가 마지막 방어선이 된다. 틀렸을 때 비용: 사유를 잘못 고른 구매자가 재요청하지 못하고 CS로 가야 한다. 거절 전까지는 구매자 철회 뒤 재요청이 가능하므로(철회는 행을 `WITHDRAWN`으로 두지 않고 **삭제가 아니라 `return_status = WITHDRAWN`**으로 남기고, 재요청은 같은 행을 `REQUESTED`로 되살린다) 거절만 최종이다.
+- **거절은 그 항목에 대해 최종**이다. 같은 항목 재요청은 `RETURN_ALREADY_REQUESTED`. 분쟁은 관리자가 본다(관리자는 **판매자 주문이 `CONFIRMED`되기 전까지만** 거절된 반품을 다시 승인할 수 있다 — Claude 결정. 확정 뒤는 정산 조정 경로(§8-6). 틀렸을 때 비용: 확정 뒤 분쟁은 구매자 환불 API가 없어 PG 콘솔 수동 환불 + 조정). `return_request.order_item_id UNIQUE`가 마지막 방어선이 된다. 틀렸을 때 비용: 사유를 잘못 고른 구매자가 재요청하지 못하고 CS로 가야 한다. 거절 전까지는 구매자 철회 뒤 재요청이 가능하므로(철회는 행을 `WITHDRAWN`으로 두지 않고 **삭제가 아니라 `return_status = WITHDRAWN`**으로 남기고, 재요청은 같은 행을 `REQUESTED`로 되살린다) 거절만 최종이다.
 - 판매자는 사유(부담 주체)를 바꿀 수 없다. "불량 아님"이면 거절하고 관리자가 판단한다. 틀렸을 때 비용: 판매자 귀책 판단이 구매자 신고에 의존해 판매자가 억울할 수 있다. 관리자 조정(§8-6)으로 보상한다.
 - 수거 확인에는 기한을 두지 않는다. 승인 뒤 수거 확인이 안 되면 관리자가 대신 수거 확인할 수 있다(`POST /admin/returns/{id}/receive`).
-- 반품 완료 항목은 **재고를 복구하지 않는다**(반품 상품은 재판매 가능 여부를 판매자가 보고 C1 재고 수정으로 올린다). **판매량은 감소**시킨다(C2 취소와 동일, 판매량은 "실제 팔린 수"). 틀렸을 때 비용: 재판매 가능한 상품의 재고를 판매자가 손으로 올려야 한다.
+- 재고·판매량(사용자 결정, 빌더 체크 반영): **`CHANGE_OF_MIND` 반품은 수거 확인 시(환불 tx2) SKU 재고를 복구하고 판매량을 줄인다**(정상 상품이 돌아온다). **`DEFECTIVE`/`WRONG_DELIVERY`는 재고를 복구하지 않고** 판매량만 줄인다(재판매 가능 여부는 판매자가 보고 C1 재고 수정으로 올린다). 락 순서는 ADR 0003/0004 그대로 `orders → member_point → coupon → sku → product`.
 - 판매자 주문의 **남은 `ORDERED` 항목이 0**이 되면(전부 반품, 또는 반품 + 앞선 취소) 그 판매자 주문은 마지막 반품 확정 트랜잭션에서 **`CONFIRMED`로 닫는다**(`confirmedAt` = 그 시각). 구매자가 확정할 상품이 없고, 판매자는 이미 발송했으므로 배송비 정산 대상이다(사용자 결정 "발송한 판매자 주문의 배송비는 항상 지급"). 적립은 `confirmedPaidAmount = 0`이라 0P. 조회 응답에 `allItemsReturned`(계산값)를 내려 화면이 "구매 확정"과 "전부 반품"을 구분한다. 틀렸을 때 비용: 상태 하나를 두 뜻으로 쓴다. 대안(`SellerOrderStatus.RETURNED` 추가)은 정산 대상 조건·`Order.settle`·조회 필터가 모두 둘을 알아야 해서 더 비싸다.
 - 구매 확정 뒤 반품(불량 뒤늦게 발견 등)은 C4 범위 밖이다. CS가 관리자 조정(§8-6)으로 판매자 정산에서 빼고, 구매자 환불은 관리자 환불 API 없이… **C4에서는 구매자에게 돈을 돌려주는 경로를 두지 않는다**(비목표). 틀렸을 때 비용: 확정 뒤 CS 환불은 PG 콘솔에서 수동으로 한다. 빈도가 보이면 C5+에서 관리자 환불 API를 만든다.
 
@@ -56,14 +56,15 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 - **구매자가 낸 발송 배송비 환불**(`shippingFeeRefund`): 반품으로 판매자 주문의 `ORDERED` 항목이 0이 되고, `shippingFeePayer == BUYER`이며, 사유가 **판매자 귀책**일 때만 그 판매자 주문의 `shippingFee`를 돌려준다. 단순 변심은 돌려주지 않는다(발송은 정상). 이때 그 판매자 주문의 "판매자에게 줄 배송비"는 0이 된다(§8-3). 틀렸을 때 비용: 불량 상품을 받고 발송비까지 물면 CS가 온다. 반대 방향 오류는 3,000원이 판매자 정산에서 빠지는 것인데, 귀책이 판매자이므로 받아들인다.
 - 구매자 부담 반품비는 **현금 환불에서만** 뺀다. `returnFee + outboundFeeRecovered > paidAmount`이면 `paidAmount`까지만 받고 나머지는 플랫폼 손실로 둔다(포인트 반환액에서 빼지 않는다). 틀렸을 때 비용: 포인트·쿠폰으로 거의 다 낸 항목을 변심 반품하면 플랫폼이 최대 6,000원을 못 받는다. 포인트에서 빼면 원장·로트 되돌림 규칙(C3)이 복잡해지고 액수가 작다.
 - 포인트·쿠폰: `pointsRefund = pointsAllocated` 전액, `productCouponReturn = productCouponId`(만료 전이면 반환), 장바구니 쿠폰은 **주문 전체가 취소·반품으로 비었을 때**(`allItemsClosed`: 모든 항목이 `CANCELED` 또는 `RETURNED`) 반환. 구매 확정 전이므로 **적립 포인트 회수는 없다**.
-- 불변식: `0 ≤ refundAmount`, `order.refundedAmount + refundAmount ≤ order.totalAmount`, 누적 포인트 반환 ≤ `pointsUsed`. 주문당 발송 구간 회수 합(취소 차감 + 반품 회수 − 취소 반환) ≤ 3,000. `order.shippingFeeRecovered`(C2 컬럼)에 반품의 `outboundFeeRecovered`도 더해 "플랫폼 발송비 회수금"을 한 열로 본다. 반품 회수 구간(`returnFee`)은 다른 성격(플랫폼이 수거 택배비를 내고 회수)이므로 `return_request.return_fee`에만 둔다.
+- 결제 상태(Claude 결정): 부분 반품 뒤 주문이 `COMPLETED`로 닫혀도 결제는 **`PARTIAL_CANCELED`로 남는다**(`CANCELED`는 누적 환불 = 결제 금액일 때만). 구매자 부담 반품비 때문에 전부 반품해도 누적 환불 < 결제 금액이면 `PARTIAL_CANCELED`다(예시 A). 틀렸을 때 비용: "전부 반품인데 결제가 취소 상태가 아님"이 화면에 설명돼야 한다.
+- 불변식: `0 ≤ refundAmount`, `order.refundedAmount + refundAmount ≤ order.totalAmount`, 누적 포인트 반환 ≤ `pointsUsed`. C2·C3 돈 불변식을 확장한다: **(결제 금액 − 누적 환불액) = 남은(`ORDERED`·열린 반품) 항목 `paidAmount` 합 + 남은 구매자 배송비 + `order.shippingFeeRecovered`(취소 차감 − 취소 반환 + 반품 발송 회수) + Σ `return_request.return_fee`(완료된 반품의 회수 구간)**. 기존 불변식 테스트(C2 §5, C3 7-3)는 이 식으로 바꾼다. 주문당 발송 구간 회수 합(취소 차감 + 반품 회수 − 취소 반환) ≤ 3,000. `order.shippingFeeRecovered`(C2 컬럼)에 반품의 `outboundFeeRecovered`도 더해 "플랫폼 발송비 회수금"을 한 열로 본다. 반품 회수 구간(`returnFee`)은 다른 성격(플랫폼이 수거 택배비를 내고 회수)이므로 `return_request.return_fee`에만 둔다.
 
 ### 5-1. 예시 (숫자로 고정)
 
 예시 A — 무료배송, 변심 반품 두 번. 판매자 S 항목 a1 40,000 + a2 20,000 = 60,000 ≥ 50,000 → 무료배송, 판매자 주문 배송비 3,000(PLATFORM). 쿠폰·포인트 없음, 결제 60,000.
 1. a2 변심 반품: `returnFee` 3,000 + `outboundFeeRecovered` 3,000(무료배송, 첫 회수) → 환불 20,000 − 6,000 = **14,000**. `order.shippingFeeRecovered` = 3,000.
 2. a1 변심 반품: `returnFee` 3,000, 발송 구간은 이미 회수 → 환불 40,000 − 3,000 = **37,000**. 누적 환불 51,000, 남은 항목 0 → 판매자 주문 `CONFIRMED`(전부 반품), 주문 `COMPLETED`, 적립 0P.
-3. 돈: 구매자 60,000 냄, 51,000 받음, 9,000 부담(발송 3,000 + 회수 2회 6,000). 플랫폼은 발송비 3,000을 S에게 주고 3,000 회수, 수거 택배비 6,000을 내고 6,000 회수 → 순부담 0. S 정산: 매출 0, 배송비 3,000(§8-3).
+3. 결제는 `PARTIAL_CANCELED`(51,000 < 60,000). 돈: 구매자 60,000 냄, 51,000 받음, 9,000 부담(발송 3,000 + 회수 2회 6,000). 플랫폼은 발송비 3,000을 S에게 주고 3,000 회수, 수거 택배비 6,000을 내고 6,000 회수 → 순부담 0. S 정산: 매출 0, 배송비 3,000(§8-3).
 
 예시 B — 유료배송, 불량 반품. 판매자 T 항목 b1 30,000, 배송비 3,000(BUYER), 결제 33,000.
 - b1 불량 반품: `returnFee` 0, `sellerBorneFee` 3,000, 판매자 주문이 비고 구매자 부담 배송비 → `shippingFeeRefund` 3,000 → 환불 **33,000**(결제 전액, 결제 `CANCELED`). 판매자 주문 `CONFIRMED`(전부 반품). T 정산 명세: 매출 0, 배송비 0(구매자에게 돌려줌), 판매자 귀책 반품비 −3,000 → **−3,000**(§8-5 음수 처리).
@@ -82,7 +83,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 - "열린 반품" = 항목이 `RETURN_REQUESTED | RETURN_APPROVED | RETURN_REFUNDING`. `SellerOrder.hasOpenReturn`.
 - 판매자 주문: 상태 집합은 그대로(`DELIVERED`에 머문다). 전부 반품되면 `CONFIRMED`(§4-1). `Order.settle`은 그대로(`CONFIRMED`/`CANCELED`만 본다).
 - 주문 상태: 변화 없음. 반품만으로 `CANCELED`가 되지는 않는다(판매자 주문이 `CONFIRMED`로 닫히므로 `COMPLETED`).
-- 반품 중 다른 항목 취소: 같은 주문의 다른(`PAID`) 판매자 주문 항목 취소는 허용. C2 `RefundCalculator`의 "다른 항목이 `CANCEL_REQUESTED`면 거절" 조건은 **`RETURN_REFUNDING`도 포함**한다(환불 계획이 서로 영향을 주지 않게 한 번에 하나). 틀렸을 때 비용: 드물게 동시 요청이 409를 받고 다시 시도한다.
+- 반품 중 다른 항목 취소: 같은 주문의 다른(`PAID`) 판매자 주문 항목 취소는 허용. **열린 반품(`RETURN_REQUESTED`/`RETURN_APPROVED`) 항목은 `RefundCalculator`의 '남은 항목'으로 센다**(Claude 결정: 아직 환불되지 않았고 거절·철회로 `ORDERED`로 돌아올 수 있다. 따라서 그 상태에서 다른 항목의 마지막 취소는 `remainingAfter > 0`이라 차감 반환이 일어나지 않고, 반품이 거절되면 상품이 남아 있어 맞다. 틀렸을 때 비용: 반품이 결국 완료되면 C2 차감 3,000이 돌아오지 않는데, 상품이 실제로 오갔으므로 §5 규칙과 일치한다). C2 `RefundCalculator`의 "다른 항목이 `CANCEL_REQUESTED`면 거절" 조건은 **`RETURN_REFUNDING`도 포함**한다(환불 계획이 서로 영향을 주지 않게 한 번에 하나). 틀렸을 때 비용: 드물게 동시 요청이 409를 받고 다시 시도한다.
 
 ## 7. 반품 API (SDD, `docs/api/openapi.yaml` 먼저)
 
@@ -97,7 +98,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 - `PATCH /api/v1/seller/returns/{returnId}/approve`, `PATCH .../reject`(본문 `rejectReason` 필수), `PATCH .../receive`(수거 확인 → 환불 실행). 셋 다 멱등: 이미 목표 상태면 현재 상태를 돌려준다. `receive`는 PG 호출이 있으므로 응답이 `RETURNED` 또는 `RETURN_REFUNDING`(PG 불확실)일 수 있다.
 
 관리자
-- `GET /api/v1/admin/returns?status&sellerId&memberId`, `PATCH /api/v1/admin/returns/{returnId}/approve`(거절된 건 포함), `PATCH .../receive`(판매자 대신 수거 확인), `PATCH .../cancel`(승인 상태에서 구매자 요청으로 중단 → 항목 `ORDERED`, `CANCELED_BY_ADMIN`).
+- `GET /api/v1/admin/returns?status&sellerId&memberId`, `PATCH /api/v1/admin/returns/{returnId}/approve`(거절된 건 포함, 판매자 주문이 `CONFIRMED`면 `RETURN_NOT_ELIGIBLE`), `PATCH .../receive`(판매자 대신 수거 확인), `PATCH .../cancel`(승인 상태에서 구매자 요청으로 중단 → 항목 `ORDERED`, `CANCELED_BY_ADMIN`).
 
 구매 확정(기존 `POST .../confirm`)은 열린 반품이 있으면 `SELLER_ORDER_HAS_OPEN_RETURN`.
 
@@ -105,7 +106,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 
 - 대상: **구매 확정(`CONFIRMED`)된 판매자 주문만**.
 - 기간: **월~일 주간**, 확정 시각(`confirmedAt`, KST) 기준. 지급일은 **다음 주 수요일**(= `period_end` + 3일).
-- 수수료: 판매자 상품 매출의 **10%**, 플랫폼 전체 설정값(`kairos.settlement.commission-rate-bp: 1000`).
+- 수수료: **판매자별 수수료율 스냅샷 `seller_order.commission_rate_bp`**(판매자 승인 시 관리자가 정함, 기본 1000bp = 10%, 판매자별로 관리자 수정 가능. 빌더 체크 뒤 사용자 결정 2026-11-10). 플랫폼 전체 설정값은 **두지 않는다**. 기본값이 필요하면 판매자 승인의 기본값(10%)이다. 적용 비율은 정산 라인마다 저장한다.
 - 판매자 지급액 = 상품 매출 − 판매자 발급 쿠폰 할인 − 수수료 + 판매자에게 줄 배송비 − 판매자 귀책 반품 배송비 ± 관리자 조정.
 - 플랫폼 부담(장바구니 쿠폰, 플랫폼 상품 쿠폰, 포인트, 무료배송비)은 판매자에게서 빼지 않는다.
 - 실제 이체는 없다. 관리자가 **지급 완료로 표시**한다.
@@ -128,15 +129,18 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 - `shipping_fee_owed` = 판매자 주문 `shippingFee`(발송했으므로 항상) **− 판매자 귀책 반품으로 구매자에게 돌려준 발송 배송비**(§5 `shippingFeeRefund`). 누가 냈는지(구매자/플랫폼)는 영향 없음(C2 §4).
 - `return_fee_borne` = 그 판매자 주문 반품들의 `sellerBorneFee` 합(완료된 반품만).
 - `line_amount` = `sales_amount − seller_coupon_discount − commission + shipping_fee_owed − return_fee_borne`.
-- 수수료율: 라인에 `commission_rate_bp`를 생성 시점 설정값으로 저장. **`seller_order.commission_rate_bp`(C1 판매자 승인 시 정한 판매자별 스냅샷)는 C4에서 쓰지 않는다**(사용자 결정이 "플랫폼 전체 10%"). 두 값이 공존하므로 사용자에게 표시한다: 판매자별 차등을 원하면 생성기에서 설정값 대신 `seller_order.commission_rate_bp`를 읽는 한 줄 변경이다. 틀렸을 때 비용: 그동안 생성된 정산은 라인에 저장된 비율로 재현되므로 소급 문제는 없다.
+- 수수료율(사용자 결정): 라인의 `commission_rate_bp` = 그 **판매자 주문의 `commission_rate_bp` 스냅샷**(주문 시점에 판매자에서 복사한 값, C2 §3). 판매자의 현재 비율을 다시 읽지 않는다(주문 뒤 관리자가 바꿔도 이미 생긴 주문은 주문 시점 비율). 한 정산 안에 비율이 다른 라인이 섞일 수 있으므로 정산 헤더에는 비율을 두지 않고 라인에만 둔다.
 
 ### 8-3. 정산 생성과 멱등 (Claude 결정)
 
 - 작업 `SettlementGenerationService.generate(periodStart)`: `periodStart`는 월요일이어야 하고 `periodEnd ≤ now`여야 한다(`SETTLEMENT_PERIOD_INVALID`). 스케줄은 **매주 월요일 03:00 KST**(`kairos.jobs.settlement-generate-cron: "0 0 3 * * MON"`) 지난주를 생성. 관리자가 같은 API로 재실행할 수 있다(멱등).
 - 대상 조회(포트 `ConfirmedSellerOrderReader.findConfirmedBetween(from, to, afterId, limit)`): `seller_order_status = CONFIRMED AND confirmed_at ∈ [from, periodEnd)`, `id > afterId` keyset. **`from = periodStart − late-confirm-lookback`**(`kairos.settlement.late-confirm-lookback: 28d`). 즉 이번 기간뿐 아니라 **지난 4주 안에 확정됐는데 아직 어느 정산에도 안 들어간 판매자 주문**도 이번 정산에 넣는다(늦게 들어온 확정 처리). "아직 안 들어감"은 `settlement_line.seller_order_id` IN 조회로 거른다(정산 쪽 지식). 틀렸을 때 비용: 정산 작업이 4주 넘게 멈췄다가 재개되면 그 전 확정분이 빠진다 → 관리자가 조정으로 넣는다. lookback을 무한으로 두면 확정 판매자 주문 전부를 매주 훑는다(`confirmed_at` 인덱스 없음, 3-2 측정 후보로 표시).
+- **생성 순서 엄격화(Claude 결정)**: 생성은 항상 **아직 생성되지 않은 가장 오래된 기간**부터 한다. 작업은 `kairos.settlement.start-date`(§12, 정산 시작 월요일) 이후 기간을 오래된 순으로 훑어 끝난 기간 중 미생성분을 차례로 만든다("생성됨"은 `settlement_run(period_start UNIQUE, generated_at)` 행으로 기록 — 판매자 정산이 0개인 기간도 생성됐음을 남기기 위해). 관리자가 더 뒤 기간을 요청하는데 앞 기간이 비어 있으면 `SETTLEMENT_PERIOD_INVALID`(앞 기간을 먼저 생성). 이렇게 하면 lookback 포함 집합이 실행 순서와 무관하게 결정된다. 틀렸을 때 비용: 한 기간이 막히면 뒤 기간도 멈춘다(의도한 것: 건너뛴 기간의 확정분이 뒤 기간에 섞이는 것보다 낫다).
+- **정산 시작 기준(Claude 결정)**: `kairos.settlement.start-date`(월요일 DATE) 이전에 확정된 판매자 주문은 정산 대상이 아니고, lookback 하한도 이 날짜보다 앞으로 가지 않는다(`from = max(periodStart − lookback, start-date)`). 틀렸을 때 비용: 시작일을 잘못 잡으면 그 전 확정분은 조정으로만 넣을 수 있다.
 - 확정 시각은 서버 `now()`로 기록되고 생성은 기간이 끝난 뒤 하므로 정상 운영에서 "늦은 확정"은 생기지 않는다. 생기는 경우는 (1) 관리자가 기간이 끝나기 전에 생성하지 못하게 막았으므로 없음, (2) 작업 장애 뒤 재개, (3) 시계 어긋남. 모두 위 규칙으로 다음 정산에 들어간다.
 - 판매자별 **한 트랜잭션**: 대상 판매자 주문을 판매자 ID로 묶은 뒤, 판매자마다 `tx.run { settlement INSERT(UNIQUE) → line INSERT(UNIQUE) → 조정 붙이기(§8-6) → 합계 계산 }`. UNIQUE 위반(동시 실행·재실행)은 그 판매자를 건너뛰고 다음 판매자로 간다. 스케줄러는 서비스를 감싸는 `@Transactional`을 붙이지 않는다(ADR 0003). keyset 순회는 `sweepByKeyset`을 `common`으로 옮기거나 settlement에 같은 함수를 둔다(빌더 선택).
 - 생성 중 판매자 주문 수가 많으면 한 판매자 트랜잭션이 길어진다. 라인 INSERT는 배치(`saveAll`)로 하고, 3-2에서 측정한다. 대용량 집계·배치 최적화는 로드맵대로 3-2.
+- 정지·탈퇴(소프트 딜리트) 판매자도 확정 판매자 주문이 있으면 정산을 **만든다**(Claude 결정: 받을 돈은 판매자 상태와 무관. 지급 여부는 관리자가 `PAID` 처리로 결정). 틀렸을 때 비용: 정지 판매자 정산이 목록에 섞인다(상세에 판매자 상태 표시).
 - **정산이 없는 판매자**(이번 기간 확정 0건)는 정산을 만들지 않는다. 단 **붙일 조정이 있으면** 라인 0개짜리 정산을 만든다(조정이 다음 정산으로 미뤄지지 않게).
 
 ### 8-4. 불변성과 상태 (Claude 결정)
@@ -157,13 +161,15 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 
 ### 8-7. 정산 예시 (숫자로 고정)
 
-판매자 S, 기간 2026-11-16(월)~11-22(일), 지급일 2026-11-25(수), 수수료 10%.
+판매자 S, 기간 2026-11-16(월)~11-22(일), 지급일 2026-11-25(수).
+- 판매자 S의 승인 수수료율 10%(1000bp). 판매자 주문 #1·#2·#3 모두 주문 시점 스냅샷 1000bp. (비교용: 비율 800bp인 판매자 주문이 섞이면 그 라인만 8%.)
 - 라인 1 — 판매자 주문 #1(11-17 확정): 항목 50,000 + 30,000, 첫 항목에 **판매자** 쿠폰 5,000, 장바구니 쿠폰 배분 8,000(플랫폼), 포인트 2,000, 무료배송(배송비 3,000 PLATFORM). `sales` 80,000, `seller_coupon` 5,000, `base` 75,000, `commission` 7,500, `shipping_owed` 3,000, `return_borne` 0 → **70,500**. (구매자가 실제 낸 현금은 65,000이지만 정산과 무관.)
 - 라인 2 — 판매자 주문 #2(11-20 확정): 항목 20,000은 불량 반품 완료, 항목 15,000만 남아 확정. 배송비 3,000 BUYER(판매자 주문이 비지 않아 환불 없음). `sales` 15,000, `commission` 1,500, `shipping_owed` 3,000, `return_borne` 3,000 → **13,500**.
 - 라인 3 — 판매자 주문 #3(11-21, 전부 반품으로 자동 확정, 예시 B): `sales` 0, `shipping_owed` 0(구매자에게 환불), `return_borne` 3,000 → **−3,000**.
 - 조정 — 11-19 등록, −10,000 "주문 1001 확정 후 파손 보상(CS 처리)".
 - 합계 `total_amount` = 70,500 + 13,500 − 3,000 − 10,000 = **71,000**, `payable_amount` 71,000. 라인 3이 음수여도 합계가 양수이므로 CARRY_OVER 없음.
-- 버림 예: `base` 12,345 → 수수료 1,234. `base` 9 → 0.
+- 버림 예: `base` 12,345, 1000bp → 수수료 1,234. `base` 9 → 0. `base` 12,345, 850bp → 1,049(1,049.325).
+- 비율 혼합 예: 같은 정산에 #4(주문 시점 800bp, `base` 10,000 → 800)가 있으면 라인마다 저장된 비율로 계산하고 헤더는 합만 가진다.
 
 ### 8-8. 정확성과 멱등성 (사용자 결정, 최우선)
 
@@ -172,7 +178,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 1. **입력이 결정적이다.** 기간 `P`에 속하는 판매자 주문 = `seller_order_status = CONFIRMED AND confirmed_at ∈ [period_start 00:00:00 KST, period_start + 7일 00:00:00 KST)`(반열린 구간, 경계 시각 `00:00:00.000000`은 다음 기간). 여기에 §8-3의 "lookback 안에서 확정됐지만 아직 어느 라인에도 없는 판매자 주문"을 더한다. `confirmed_at`은 확정 트랜잭션이 한 번 쓰고 다시 쓰지 않는다(`SellerOrder.confirm`은 `CONFIRMED`면 no-op). 정산이 한 번 생성되면 그 정산의 입력 집합은 **동결**된다: 뒤늦게·소급해 확정된 판매자 주문은 **아직 열려 있는 다음 기간**에 들어가고, 이미 생성된 정산을 절대 바꾸지 않는다.
 2. **판매자 단위 = 트랜잭션 단위.** 판매자 하나의 정산 헤더 + 라인 전부 + 조정 연결(`settlement_adjustment.settlement_id` 조건부 UPDATE) + 합계를 **한 트랜잭션**으로 커밋한다. 라인 INSERT가 곧 "이 판매자 주문은 정산됐다"는 포함 표시이며(별도 플래그 없음), `UNIQUE(seller_id, period_start)`와 `settlement_line.seller_order_id UNIQUE`가 재실행·동시 실행의 이중 집계를 DB 수준에서 막는다. 둘 중 하나라도 위반하면 그 판매자 트랜잭션 전체가 롤백된다 → 반쪽 정산은 커밋되지 않는다.
 3. **부분 실행 뒤 재실행.** N번째 판매자에서 예외가 나면 그 판매자는 롤백, 앞 판매자들은 이미 커밋. 재실행은 앞 판매자들을 UNIQUE 위반(또는 생성 전 `existsBySellerIdAndPeriodStart` 조회)으로 건너뛰고 남은 판매자만 만든다. 결과는 처음부터 한 번에 끝난 실행과 **같다**. "생성 중" 상태를 두지 않으므로 외부에 반쪽 정산이 보이는 순간이 없다. 작업 전체를 감싸는 트랜잭션은 없다(ADR 0003).
-4. **금액은 저장된 스냅샷에서만 계산한다.** 입력 = `order_item.line_amount(=단가×수량 스냅샷)`, `order_item_status`, `product_coupon_discount`·`product_coupon_issuer`, `seller_order.shipping_fee`·`shipping_fee_payer`, `return_request.seller_borne_fee`·`shipping_fee_refund`, 설정 수수료율. 상품·쿠폰 정책·판매자 현재 값은 읽지 않는다. 모든 연산은 **원 단위 정수(Long)**, 나눗셈은 수수료 한 곳뿐이며 **라인별 버림**(§8-2). 계산은 settlement 도메인 순수 함수 `SettlementCalculator` 한 곳. 같은 입력이면 같은 출력(테스트에서 두 번 계산해 `==`).
+4. **금액은 저장된 스냅샷에서만 계산한다.** 입력 = `seller_order.commission_rate_bp`(주문 시점 스냅샷), `order_item.line_amount(=단가×수량 스냅샷)`, `order_item_status`, `product_coupon_discount`·`product_coupon_issuer`, `seller_order.shipping_fee`·`shipping_fee_payer`, `return_request.seller_borne_fee`·`shipping_fee_refund`. 상품·쿠폰 정책·판매자 현재 값은 읽지 않는다. 모든 연산은 **원 단위 정수(Long)**, 나눗셈은 수수료 한 곳뿐이며 **라인별 버림**(§8-2). 계산은 settlement 도메인 순수 함수 `SettlementCalculator` 한 곳. 같은 입력이면 같은 출력(테스트에서 두 번 계산해 `==`).
 5. **조정은 정확히 한 번.** 조정 행은 `settlement_id`로 소비한 정산에 묶이고, 묶는 UPDATE는 `WHERE settlement_id IS NULL`이라 두 정산이 같은 조정을 가져갈 수 없다(조건부 UPDATE 영향 행 수로 판정, 0행이면 이미 소비됨). `CARRY_OVER`도 `source_settlement_id`로 어느 정산이 만들었는지 남기고, 한 정산은 CARRY_OVER를 최대 하나만 만든다(`UNIQUE(source_settlement_id)` — NULL 허용 UNIQUE라 MANUAL 행은 걸리지 않는다).
 
 판매자 간 순서(판매자 ID 오름차순)와 라인 순서(판매자 주문 ID 오름차순)를 고정해 생성 결과가 **바이트 단위로 같게** 한다(`created_at`·id 자동값 제외).
@@ -200,8 +206,9 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 - `order_item`: `order_item_status` 값 추가(DDL 변경 없음, VARCHAR). 새 컬럼 없음(반품 금액은 `return_request`에).
 - `orders`: `shipping_fee_recovered`(C2 기존)에 반품 발송 회수를 더해 쓴다. 새 컬럼 없음.
 - `return_request`(order 모듈): `order_id`, `seller_order_id`, `order_item_id` **UNIQUE**, `member_id`, `seller_id`, `return_reason`(CHANGE_OF_MIND/DEFECTIVE/WRONG_DELIVERY), `detail`, `return_status`, `fee_bearer`(BUYER/SELLER, 사유에서 유도해 저장), `return_fee`(구매자 부담 회수 구간), `outbound_fee_recovered`, `shipping_fee_refund`, `seller_borne_fee`, `refund_amount`, `points_refund`, `reject_reason NULL`, `requested_at`, `decided_at NULL`, `received_at NULL`, `completed_at NULL`, `decided_by`(SELLER/SYSTEM/ADMIN, NULL). 환불 계획 값은 수거 확인(tx1) 때 채운다.
-- `settlement`: `seller_id`, `period_start DATE`, `period_end DATE`, `payout_date DATE`, `settlement_status`, `commission_rate_bp`, `sales_amount`, `seller_coupon_discount`, `commission_amount`, `shipping_fee_owed`, `return_fee_borne`, `adjustment_amount`, `total_amount`, `payable_amount`, `line_count`, `confirmed_at NULL`, `paid_at NULL`, `paid_memo NULL`. **`UNIQUE(seller_id, period_start)`**.
+- `settlement`: `seller_id`, `period_start DATE`, `period_end DATE`, `payout_date DATE`, `settlement_status`, `sales_amount`, `seller_coupon_discount`, `commission_amount`, `shipping_fee_owed`, `return_fee_borne`, `adjustment_amount`, `total_amount`, `payable_amount`, `line_count`, `confirmed_at NULL`, `paid_at NULL`, `paid_memo NULL`. **`UNIQUE(seller_id, period_start)`**.
 - `settlement_line`: `settlement_id`, `seller_order_id` **UNIQUE**, `order_id`, `order_no`, `confirmed_at`, `sales_amount`, `seller_coupon_discount`, `commission_base`, `commission_rate_bp`, `commission_amount`, `shipping_fee_owed`, `return_fee_borne`, `line_amount`. settlement ↔ line은 한 애그리거트(`@OneToMany` 허용, review와 같은 예외. 라인은 정산 안에서만 만들어지고 바뀌지 않는다).
+- `settlement_run`: `period_start DATE` **UNIQUE**, `generated_at`, `seller_count`(기간 생성 완료 표시. 판매자별 트랜잭션이 모두 끝난 뒤 별도 트랜잭션으로 INSERT; 재실행은 이 행이 있으면 기간을 건너뛴다. 기간 중간에 멈추면 행이 없어 재실행이 남은 판매자를 채운다).
 - `settlement_adjustment`: `seller_id`, `settlement_id NULL`, `adjustment_type`(MANUAL/CARRY_OVER), `amount`(부호), `reason`, `ref_seller_order_id NULL`, `source_settlement_id NULL`(**UNIQUE**, CARRY_OVER는 정산당 하나), `created_by_admin_id`. 조정은 정산과 다른 생명주기(정산보다 먼저 생기고 나중에 붙는다)라 별도 애그리거트, ID로만 참조.
 
 인덱스 없이 받아들이는 조회(3-2 측정 후보): `seller_order(seller_order_status, confirmed_at)` 범위 조회(정산 생성), `return_request(seller_id, return_status)`(판매자 반품 목록), `return_request(return_status, requested_at)`(자동 승인 작업), `order_item(order_item_status)`(열린 반품·정체 환불 조회), `settlement(seller_id)`(판매자 정산 목록). 생성 작업이 주 1회라 풀스캔을 받아들인다. 반품 목록이 느리면 측정 뒤 결정.
@@ -209,7 +216,7 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 ## 10. 동시성·멱등성·락
 
 - 반품의 모든 상태 변경은 **주문 행 락** 아래에서 한다(ADR 0003): 구매자 요청·철회는 `findByIdForUpdate(orderId)`, 판매자·관리자 엔드포인트는 트랜잭션 밖에서 `findOrderIdBySellerOrderId`/`findOrderIdByReturnId`(일반 조회)로 주문 ID를 찾고 안에서 잠근다. `return_request` 행 자체는 잠그지 않는다(주문 행 락이 직렬화).
-- 수거 확인(환불): C2 `OrderCancelService`와 같은 구조의 **`OrderReturnService`**. tx1(락 → `ReturnRefundCalculator` → 항목 `RETURN_REFUNDING`, `return_request.refund_amount` 저장) → PG 부분 취소(트랜잭션 밖, `refundKey(itemId, amount)`) → tx2(락 → `RETURNED` 확정, `refundedAmount`·`pointsRefunded`·`shippingFeeRecovered` 갱신, `paymentGateway.recordRefund`, `BenefitReverter.revertItem(..., cartCouponId = allItemsClosed ? cartCouponId : null)`, `decreaseSales`, 판매자 주문이 비면 `confirm` + `PointEarner`(0P), `settle`). 락 순서 `orders → member_point → coupon → product`(ADR 0004, 재고 복구 없음). `refund_amount == 0` 또는 `paymentKey` 없음이면 PG 없이 tx2(C3 7-3). PG 실패 → `RETURN_APPROVED`로 되돌리고 `PAYMENT_CANCEL_FAILED`. 불확실 → `RETURN_REFUNDING` 유지, 대사가 맞춘다.
+- 수거 확인(환불): C2 `OrderCancelService`와 같은 구조의 **`OrderReturnService`**. tx1(락 → `ReturnRefundCalculator` → 항목 `RETURN_REFUNDING`, `return_request.refund_amount` 저장) → PG 부분 취소(트랜잭션 밖, `refundKey(itemId, amount)`) → tx2(락 → `RETURNED` 확정, `refundedAmount`·`pointsRefunded`·`shippingFeeRecovered` 갱신, `paymentGateway.recordRefund`, `BenefitReverter.revertItem(..., cartCouponId = allItemsClosed ? cartCouponId : null)`, `CHANGE_OF_MIND`면 `stockManager.restore` → `decreaseSales`(항상), 판매자 주문이 비면 `confirm` + `PointEarner`(0P), `settle`). 락 순서 `orders → member_point → coupon → sku → product`(ADR 0004). `refund_amount == 0` 또는 `paymentKey` 없음이면 PG 없이 tx2(C3 7-3). PG 실패 → `RETURN_APPROVED`로 되돌리고 `PAYMENT_CANCEL_FAILED`. 불확실 → `RETURN_REFUNDING` 유지, 대사가 맞춘다.
 - 대사: `PaymentReconciliationService.reconcileCancels`의 대상에 `RETURN_REFUNDING`(`cancel-request-timeout` 경과)을 더한다. PG 조회 결과로 같은 tx2를 실행한다. `findCancelRequestedItems`를 상태 집합을 받는 형태로 넓힌다.
 - 자동 확정과 반품 요청의 경합(배송 완료 6일 23시간에 요청, 7일에 자동 확정): 둘 다 주문 행 락 아래. 요청이 먼저 커밋되면 자동 확정은 `hasOpenReturn`으로 건너뛰고, 확정이 먼저면 요청은 `RETURN_NOT_ELIGIBLE`.
 - 멱등: 반품 요청 POST는 C2 `Idempotency-Key` 필터 + `return_request.order_item_id UNIQUE`. 정산 생성 POST는 Idempotency-Key + `UNIQUE(seller_id, period_start)` + `settlement_line.seller_order_id UNIQUE`. 조정 POST는 Idempotency-Key(같은 금액·사유를 두 번 넣는 것은 정당할 수 있어 UNIQUE를 두지 않는다). PATCH(승인·거절·수거·정산 확정·지급)는 이미 목표 상태면 성공.
@@ -229,7 +236,7 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 
 ## 12. 설정값
 
-`kairos.order.return-window: 7d`, `kairos.order.return-auto-approve-after: 3d`, `kairos.order.return-shipping-fee: 3000`(기본 배송비와 같지만 따로 둔다 — 수거 택배비가 다를 수 있다. 틀렸을 때 비용: 설정 하나 더), `kairos.settlement.commission-rate-bp: 1000`, `kairos.settlement.late-confirm-lookback: 28d`, `kairos.jobs.return-auto-approve-delay: 1h`, `kairos.jobs.settlement-generate-cron`.
+`kairos.order.return-window: 7d`, `kairos.order.return-auto-approve-after: 3d`, `kairos.order.return-shipping-fee: 3000`(회수 구간 `returnFee`·`sellerBorneFee`에만 쓴다. 발송 구간 회수 `outboundFeeRecovered`는 C2 `base-shipping-fee`(3,000)를 쓴다 — 플랫폼이 낸 발송비를 되받는 것이므로. Claude 결정, 틀렸을 때 비용: 두 값을 다르게 바꾸면 "왕복 6,000"이 아니라 두 값의 합이 된다. 틀렸을 때 비용: 설정 하나 더), `kairos.settlement.late-confirm-lookback: 28d`, `kairos.settlement.start-date`(정산 시작 월요일, 필수), `kairos.jobs.return-auto-approve-delay: 1h`, `kairos.jobs.settlement-generate-cron`.
 
 ## 13. 에러 코드 (ErrorCode enum과 OpenAPI 일치)
 
@@ -253,22 +260,24 @@ PK/UNIQUE 외 인덱스는 두지 않는다. 모든 테이블은 `BaseEntity` �
 ## 14. 증명할 테스트 (완료 기준)
 
 - §5-1 예시 A·B·C·D 숫자 그대로(환불액, `shippingFeeRecovered`, 결제 상태, 판매자 주문 `CONFIRMED`, 적립 0P).
-- 이중 청구 방지 양방향: C2 취소 차감 뒤 변심 반품은 3,000만; 변심 반품(6,000) 뒤 다른 판매자 주문 구매자 취소는 차감 없음. 주문당 발송 회수 합 ≤ 3,000(property 식: 취소·반품을 무작위 순서로 섞어도).
+- 이중 청구 방지 양방향: C2 취소 차감 뒤 변심 반품은 3,000만; 변심 반품(6,000) 뒤 다른 판매자 주문 구매자 취소는 차감 없음. 주문당 발송 회수 합 ≤ 3,000(property 식: 취소·반품 요청·거절·철회·완료를 무작위 순서로 섞어도. 열린 반품 항목은 '남은 항목'으로 세어 마지막 취소 판정이 바뀌지 않음을 포함).
+- 확장 돈 불변식(§5)이 취소·반품의 모든 중간 상태에서 성립. 부분 반품 뒤 주문 `COMPLETED` + 결제 `PARTIAL_CANCELED`; 누적 환불 = 결제 금액일 때만 `CANCELED`.
 - 전부 반품·취소로 주문이 비면: 누적 환불 = 결제 금액 − 구매자 부담 반품비 합, 포인트 전액 반환, 장바구니 쿠폰 반환(만료 전), 결제 `CANCELED`는 누적 환불 = 결제 금액일 때만.
 - 기한: 배송 완료 + 7일 − 1초 요청 성공, + 7일 + 1초 `RETURN_WINDOW_EXPIRED`. 확정된 판매자 주문 `RETURN_NOT_ELIGIBLE`.
 - 열린 반품이 있는 판매자 주문은 자동 확정 작업이 건너뛰고, 반품 완료 뒤 다음 실행에서 확정. 수동 확정은 `SELLER_ORDER_HAS_OPEN_RETURN`.
 - 3일 미응답 자동 승인, 2일 23시간은 미승인. 판매자 승인과 자동 승인 동시 → 한 번만 `decided_*` 기록.
 - 수거 확인 PG 실패 → `RETURN_APPROVED` 복귀, 포인트·쿠폰·판매량 변화 없음. PG 불확실 → `RETURN_REFUNDING` 유지 → 대사가 PG 조회로 `RETURNED` 확정. 0원 환불·`paymentKey` 없음 → PG 없이 완료.
 - 거절 뒤 재요청 `RETURN_ALREADY_REQUESTED`, 철회 뒤 재요청 성공(같은 행 재사용). 관리자가 거절 건 승인 가능.
-- 반품 완료 항목은 재고 그대로, 판매량 −수량.
-- §8-7 숫자 그대로: 라인 70,500 / 13,500 / −3,000, 조정 −10,000, 합계 71,000. 버림 12,345 → 1,234.
+- 변심 반품 완료 → SKU 재고 +수량, 판매량 −수량. 불량·오배송 반품 완료 → 재고 그대로, 판매량 −수량. PG 실패 되돌림에서는 둘 다 변화 없음.
+- §8-7 숫자 그대로: 라인 70,500 / 13,500 / −3,000, 조정 −10,000, 합계 71,000. 버림 12,345·1000bp → 1,234, 850bp → 1,049. 비율 800bp 판매자 주문이 섞이면 그 라인만 8%, 판매자의 현재 비율을 바꿔도 라인 불변.
 - 플랫폼 쿠폰·포인트·무료배송을 아무리 넣어도 `line_amount`가 안 바뀜(판매자 쿠폰만 바뀜).
 - §8-8 불변식 전부: 헤더 각 금액 = 라인 합, `total = Σ line + adjustments`, `payable = max(total, 0)`, `line_count`.
 - 같은 기간 생성 두 번(순차) → 두 번째 실행은 새 행 0개, 정산·라인 전부 동일(바이트 비교). 동시 2회 → 판매자별 정산 1개. 판매자 주문이 두 정산에 들어가지 않음(`seller_order_id UNIQUE`).
 - 중간 실패: 판매자 3명 중 2번째 뒤에 예외를 던지는 Fake로 실행 → 1번째만 커밋, 2·3번째 없음(반쪽 정산 없음) → 재실행 → 3명 모두 생성, 한 번에 끝난 실행과 결과 동일.
-- 저장 스냅샷만 쓰는지: 생성 전에 상품 가격·쿠폰 정책·판매자 수수료율(`seller.commission_rate_bp`)을 바꿔도 라인 값 불변. 같은 입력으로 `SettlementCalculator`를 두 번 돌리면 같은 결과.
+- 저장 스냅샷만 쓰는지: 생성 전에 상품 가격·쿠폰 정책·판매자의 현재 수수료율(`seller.commission_rate_bp`)을 바꿔도(판매자 주문 스냅샷은 그대로) 라인 값 불변. 같은 입력으로 `SettlementCalculator`를 두 번 돌리면 같은 결과.
 - 조정 한 번만: 같은 판매자 정산을 두 기간에 걸쳐 만들 때 조정 하나는 한 정산에만 붙음. CARRY_OVER는 정산당 최대 1개.
-- 늦은 확정: 기간 A 생성 뒤 `confirmed_at`이 A 안인 판매자 주문이 생기면(테스트에서 시각 조작) 기간 B 정산에 들어간다. lookback 밖이면 안 들어간다.
+- 늦은 확정: 기간 A 생성 뒤 `confirmed_at`이 A 안인 판매자 주문이 생기면(테스트에서 시각 조작) 기간 B 정산에 들어간다. lookback 밖이면 안 들어간다. `start-date` 전 확정분은 어떤 정산에도 안 들어간다.
+- 생성 순서: 기간 A·B가 모두 끝난 상태에서 (A→B)로 만들든 작업이 한 번에 만들든 결과가 같다. A 미생성 상태에서 B 요청은 `SETTLEMENT_PERIOD_INVALID`. 판매자 정산 0개 기간도 `settlement_run`에 남아 다음 실행이 건너뛴다.
 - 조정: 기간 끝 전 등록 → 이번 정산, 기간 끝 뒤 등록 → 다음 정산. 붙은 조정 삭제 `SETTLEMENT_ADJUSTMENT_APPLIED`. 확정 0건 + 조정만 → 라인 0개 정산 생성.
 - 음수 합계 → `payable_amount` 0, `CARRY_OVER` 조정이 다음 정산에 붙음.
 - 상태 전이: `GENERATED → PAID` 직행 409, `CONFIRMED → PAID` 두 번 호출 멱등.
