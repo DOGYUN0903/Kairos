@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItem
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrder
@@ -25,6 +26,25 @@ class OrderQueryService(
         val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
         return toDetail(order)
+    }
+
+    /**
+     * 후기 작성 자격 조회(review 모듈용). 남의 항목·없는 항목은 null. 판매자 주문이 `CONFIRMED` 이고 항목이 `ORDERED` 일 때만
+     * `confirmedAt` 을 채운다. 구매 확정 뒤에는 취소·상태 변경이 없으므로 일반 읽기로 충분하다.
+     */
+    fun findConfirmedItem(memberId: Long, orderItemId: Long): ConfirmedItemResult? {
+        val order = orderRepository.findByOrderItemId(orderItemId)?.takeIf { it.memberId == memberId } ?: return null
+        val sellerOrder = order.sellerOrders.first { so -> so.items.any { it.id == orderItemId } }
+        val item = sellerOrder.items.first { it.id == orderItemId }
+        val confirmed = sellerOrder.status == SellerOrderStatus.CONFIRMED && item.status == OrderItemStatus.ORDERED
+        return ConfirmedItemResult(
+            orderId = requireNotNull(order.id),
+            orderItemId = orderItemId,
+            productId = item.productId,
+            sellerId = sellerOrder.sellerId,
+            productName = item.productName,
+            confirmedAt = if (confirmed) sellerOrder.confirmedAt else null,
+        )
     }
 
     fun listMine(memberId: Long, page: Int, size: Int): PageResult<OrderSummary> {

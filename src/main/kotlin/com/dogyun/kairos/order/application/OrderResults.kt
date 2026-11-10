@@ -168,3 +168,13 @@ data class CancelItemResult(
     /** 이 항목 취소로 되돌린 포인트(확정 전이면 0) */
     val pointsRefund: Long,
 )
+
+/** 후기 작성 자격 조회 결과. [confirmedAt] 은 구매 확정된 `ORDERED` 항목일 때만 있다. */
+data class ConfirmedItemResult(
+    val orderId: Long,
+    val orderItemId: Long,
+    val productId: Long,
+    val sellerId: Long,
+    val productName: String,
+    val confirmedAt: LocalDateTime?,
+)

@@ -38,6 +38,8 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         // C3 테이블은 각 Task 가 만들 때 FK 자식 순서로 이 줄 앞에 추가한다:
         // review_image, review, product_like, point_lot_usage, point_transaction, point_lot, member_point, coupon, coupon_policy
         // (order_item 이 쿠폰·후기를 참조하므로 review → coupon 계열은 order_item 삭제 전에 지운다)
+        jdbcTemplate.update("delete from review_image")
+        jdbcTemplate.update("delete from review")
         jdbcTemplate.update("delete from point_lot_usage")
         jdbcTemplate.update("delete from product_like")
         jdbcTemplate.update("delete from point_transaction")
@@ -81,11 +83,11 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun adminToken(): String = login("admin@kairos.test", "test-admin-password")
 
     /** 랜덤 이메일로 가입하고 로그인한 일반 회원의 액세스 토큰. */
-    protected fun newUserToken(): String {
+    protected fun newUserToken(name: String = "홍길동"): String {
         val email = "user-${UUID.randomUUID()}@kairos.com"
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to "password1", "name" to "홍길동"))
+            content = objectMapper.writeValueAsString(mapOf("email" to email, "password" to "password1", "name" to name))
         }
         return login(email, "password1")
     }
@@ -412,6 +414,45 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     /** 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data. */
     protected fun orderDetail(token: String, orderId: Long): JsonNode =
         json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 결제 → 판매자 주문마다 배송 시작(`-D` 송장) → 배송 완료 → 구매 확정까지 마치고 내 주문 상세의 data 를 돌려준다. */
+    protected fun confirmedOrder(buyerToken: String, sellerToken: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
+        val order = paidOrder(buyerToken, items, expectedTotal)
+        val orderId = order.get("orderId").asLong()
+        val sellerOrders = order.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val soId = sellerOrders.get(i).get("sellerOrderId").asLong()
+            patch("/api/v1/seller/orders/$soId/ship", sellerToken, mapOf("carrierCode" to "04", "trackingNumber" to "T-$soId-D"))
+                .andExpect { status { isOk() } }
+            patch("/api/v1/seller/orders/$soId/deliver", sellerToken).andExpect { status { isOk() } }
+            patch("/api/v1/orders/$orderId/seller-orders/$soId/confirm", buyerToken).andExpect { status { isOk() } }
+        }
+        return orderDetail(buyerToken, orderId)
+    }
+
+    /** 후기를 쓰고(201) reviewId 를 돌려준다. */
+    protected fun writeReview(
+        token: String,
+        orderId: Long,
+        orderItemId: Long,
+        rating: Int = 5,
+        content: String = "열 글자 이상 되는 후기 본문입니다",
+        imageFileIds: List<Long> = emptyList(),
+    ): Long {
+        val created = postIdem(
+            "/api/v1/orders/$orderId/items/$orderItemId/reviews", token,
+            mapOf("rating" to rating, "content" to content, "imageFileIds" to imageFileIds),
+        ).andExpect { status { isCreated() } }
+        return json(created).get("data").get("reviewId").asLong()
+    }
+
+    /** product 의 (review_count, rating_sum, like_count). */
+    protected fun productStats(productId: Long): Triple<Long, Long, Long> =
+        jdbcTemplate.queryForObject(
+            "select review_count, rating_sum, like_count from product where id = ?",
+            { rs, _ -> Triple(rs.getLong(1), rs.getLong(2), rs.getLong(3)) },
+            productId,
+        )!!
 
     protected fun suspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/suspend", adminToken(), mapOf("reason" to "약관 위반"))

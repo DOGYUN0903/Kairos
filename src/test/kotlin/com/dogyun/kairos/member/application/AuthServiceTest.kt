@@ -39,6 +39,7 @@ class AuthServiceTest {
         override fun findById(id: MemberId): Member? = members[id.value]
         override fun findByEmail(email: Email): Member? = members.values.firstOrNull { it.email == email }
         override fun existsByEmail(email: Email): Boolean = findByEmail(email) != null
+        override fun findAllByIds(ids: Collection<MemberId>): List<Member> = ids.mapNotNull { members[it.value] }
     }
 
     private class FakeRefreshTokenStore : RefreshTokenStore {

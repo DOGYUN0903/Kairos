@@ -31,6 +31,9 @@ class MemberRepositoryImpl(private val jpaRepository: MemberJpaRepository) : Mem
 
     override fun existsByEmail(email: Email): Boolean = jpaRepository.existsByEmail(email.value)
 
+    override fun findAllByIds(ids: Collection<MemberId>): List<Member> =
+        if (ids.isEmpty()) emptyList() else jpaRepository.findAllById(ids.map { it.value }).map(::toDomain)
+
     private fun toDomain(entity: MemberEntity) =
         Member.restore(MemberId(entity.id), Email(entity.email), entity.password, entity.name, entity.role)
 }

@@ -61,6 +61,9 @@ class FakeOrderRepository : OrderRepository {
     override fun findBySellerOrderId(sellerOrderId: Long): Order? =
         rows.values.firstOrNull { o -> o.sellerOrders.any { it.id == sellerOrderId } }
 
+    override fun findByOrderItemId(orderItemId: Long): Order? =
+        rows.values.firstOrNull { o -> o.sellerOrders.any { so -> so.items.any { it.id == orderItemId } } }
+
     override fun findOrderIdBySellerOrderId(sellerOrderId: Long): Long? = findBySellerOrderId(sellerOrderId)?.id
 
     override fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Order> =

@@ -1045,6 +1045,39 @@ paths:
           $ref: '#/components/responses/InvalidRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/products/{productId}/reviews:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Review]
+      operationId: listProductReviews
+      summary: 상품 후기 목록 (공개, 최신순)
+      description: 작성자 이름은 첫 글자 + `**` 로 마스킹한다.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 상품 후기 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReviewResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
   /api/v1/products/{productId}/like:
     parameters:
       - $ref: '#/components/parameters/ProductId'
@@ -2623,6 +2656,145 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/orders/{orderId}/items/{orderItemId}/reviews:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - $ref: '#/components/parameters/OrderItemId'
+    post:
+      tags: [Review]
+      operationId: writeReview
+      summary: 후기 작성 (구매 확정 항목, 항목당 1개)
+      description: |
+        판매자 주문이 `CONFIRMED` 이고 항목이 `ORDERED` 인 내 주문 항목에만, 구매 확정 후 90일(`kairos.review.write-deadline`) 안에 쓴다.
+        별점 1~5, 본문 10~1000자, 사진은 본인이 올린 이미지 최대 3장. 적립금은 글 100P, 사진 포함 500P(작성 시 한 번, 삭제해도 회수하지 않음).
+        삭제한 항목에는 다시 쓸 수 없다(`UNIQUE(order_item_id)`). `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteReviewRequest'
+      responses:
+        '201':
+          description: 작성 완료
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WriteReviewResponse'
+        '400':
+          description: "`REVIEW_INVALID` 별점·본문 길이·사진 수·소유, `INVALID_REQUEST`, `IDEMPOTENCY_KEY_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`ORDER_ITEM_NOT_FOUND` 없거나 남의 주문 항목"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`REVIEW_NOT_ELIGIBLE` 미확정·취소 항목 또는 기한 경과, `REVIEW_ALREADY_WRITTEN` 이미 작성(삭제 포함), 또는 `IDEMPOTENCY_KEY_REUSED`/`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/reviews/me:
+    get:
+      tags: [Review]
+      operationId: listMyReviews
+      summary: 내 후기 목록 (최신순)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 후기 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReviewResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/reviews/{reviewId}:
+    parameters:
+      - $ref: '#/components/parameters/ReviewId'
+    patch:
+      tags: [Review]
+      operationId: editReview
+      summary: 후기 수정 (작성자, 덮어쓰기)
+      description: 상품 별점 집계는 별점 차이만 반영한다. 사진을 뒤늦게 붙여도 적립금을 더 주지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteReviewRequest'
+      responses:
+        '200':
+          description: 수정된 후기
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReviewResult'
+        '400':
+          description: "`REVIEW_INVALID`, `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`REVIEW_NOT_FOUND` 없거나 삭제됐거나 남의 후기"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Review]
+      operationId: deleteReview
+      summary: 후기 삭제 (작성자, 소프트 삭제)
+      description: 상품 후기 수·별점 합에서 빠진다. 적립금은 회수하지 않는다.
+      responses:
+        '204':
+          description: 삭제 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`REVIEW_NOT_FOUND` 없거나 이미 삭제됐거나 남의 후기"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/coupons/policies:
     get:
       tags: [Coupon]
@@ -3091,6 +3263,13 @@ components:
         format: int64
     PolicyId:
       name: policyId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ReviewId:
+      name: reviewId
       in: path
       required: true
       schema:
@@ -3986,6 +4165,76 @@ components:
           type: boolean
           nullable: true
           description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
+    WriteReviewRequest:
+      type: object
+      required: [rating, content]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        content:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: 앞뒤 공백을 뺀 길이로 판정한다.
+        imageFileIds:
+          type: array
+          maxItems: 3
+          items:
+            type: integer
+            format: int64
+    WriteReviewResponse:
+      type: object
+      required: [reviewId, rewardPoints]
+      properties:
+        reviewId:
+          type: integer
+          format: int64
+        rewardPoints:
+          type: integer
+          format: int64
+          description: 이번 작성으로 적립된 포인트(100 또는 500)
+    ReviewResult:
+      type: object
+      required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, writerName, rewardPoints, createdAt, modifiedAt]
+      properties:
+        reviewId:
+          type: integer
+          format: int64
+        orderItemId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        rating:
+          type: integer
+        content:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+        writerName:
+          type: string
+          description: 마스킹한 작성자 이름(예 `김**`)
+        replyContent:
+          type: [string, 'null']
+        repliedAt:
+          type: [string, 'null']
+          format: date-time
+        rewardPoints:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        modifiedAt:
+          type: string
+          format: date-time
     LikedProduct:
       type: object
       required: [productId, name, brandName, thumbnailUrl, salePrice, productStatus, likedAt]

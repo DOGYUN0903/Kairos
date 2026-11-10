@@ -13,6 +13,9 @@ interface OrderRepository {
     fun findByOrderNoForUpdate(orderNo: String): Order?
     fun findBySellerOrderId(sellerOrderId: Long): Order?
 
+    /** 주문 항목이 속한 주문(일반 읽기, 후기 작성 자격 조회용). */
+    fun findByOrderItemId(orderItemId: Long): Order?
+
     /**
      * 판매자 주문이 속한 주문 id. 주문 행 락을 잡는 트랜잭션 **밖에서** 부른 뒤 `findByIdForUpdate` 로 잠근다.
      * 트랜잭션 안에서 먼저 일반 조회를 하면 REPEATABLE READ 스냅샷이 락보다 먼저 만들어져, 락을 잡은 뒤에도
