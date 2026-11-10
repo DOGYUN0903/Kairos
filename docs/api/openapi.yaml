@@ -3785,6 +3785,54 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/settlements/generate:
+    post:
+      tags: [Admin Settlement]
+      operationId: generateSettlements
+      summary: 주간 정산 생성 (ADMIN)
+      description: |
+        `periodStart`(월요일) 주간 기간 `[periodStart 00:00, periodStart+7일 00:00)`(KST)의 정산을 판매자별 트랜잭션으로 만든다.
+        끝나지 않은 기간, `kairos.settlement.start-date` 이전 기간, 직전 기간이 아직 생성되지 않은 기간은 400 `SETTLEMENT_PERIOD_INVALID` 다(오래된 기간부터).
+        이미 생성 완료(`settlement_run`)된 기간이면 아무것도 만들지 않고 `alreadyGenerated=true` 로 응답한다.
+        일부 판매자가 실패하면 `failedCount > 0` 이고 완료 기록을 남기지 않는다(다시 요청하면 나머지만 만든다). `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateSettlementRequest'
+      responses:
+        '200':
+          description: 생성 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GenerateSettlementResult'
+        '400':
+          description: "`SETTLEMENT_PERIOD_INVALID`, `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: "`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
 components:
   securitySchemes:
     bearerAuth:
@@ -4032,6 +4080,36 @@ components:
             message: 같은 요청이 처리 중입니다.
             timestamp: '2026-11-08T12:00:00'
   schemas:
+    GenerateSettlementRequest:
+      type: object
+      required: [periodStart]
+      properties:
+        periodStart:
+          type: string
+          format: date
+          description: 기간 시작 월요일 (KST)
+    GenerateSettlementResult:
+      type: object
+      required: [periodStart, periodEnd, sellerCount, createdCount, skippedCount, failedCount, alreadyGenerated]
+      properties:
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+          description: 기간 끝(다음 월요일, 미포함)
+        sellerCount:
+          type: integer
+        createdCount:
+          type: integer
+        skippedCount:
+          type: integer
+          description: 이미 정산이 있어 건너뛴 판매자 수
+        failedCount:
+          type: integer
+        alreadyGenerated:
+          type: boolean
     ApiResponse:
       type: object
       description: 모든 성공 응답의 공통 래퍼. 엔드포인트별로 `data`를 allOf로 구체화한다.

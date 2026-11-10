@@ -19,5 +19,6 @@ data class IdempotencyProperties(
         "/api/v1/admin/coupons/policies",
         "/api/v1/orders/*/items/*/reviews",
         "/api/v1/orders/*/items/*/returns",
+        "/api/v1/admin/settlements/generate",
     ),
 )

@@ -563,6 +563,39 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             .andExpect { status { isOk() } }
     }
 
+    @Autowired
+    protected lateinit var settlementGenerationService: com.dogyun.kairos.settlement.application.SettlementGenerationService
+
+    @Autowired
+    protected lateinit var appClock: java.time.Clock
+
+    /** 지금(KST) 기준 이미 끝난 가장 최근 정산 기간의 시작 월요일. */
+    protected fun lastEndedPeriodStart(): java.time.LocalDate =
+        com.dogyun.kairos.settlement.domain.SettlementPeriod.lastEndedBefore(java.time.LocalDateTime.now(appClock)).start
+
+    protected fun setConfirmedAt(sellerOrderId: Long, at: java.time.LocalDateTime) {
+        jdbcTemplate.update("update seller_order set confirmed_at = ? where id = ?", at, sellerOrderId)
+    }
+
+    /** `POST /api/v1/admin/settlements/generate` 의 data(200). */
+    protected fun generateSettlement(adminToken: String, periodStart: java.time.LocalDate): JsonNode =
+        json(
+            postIdem("/api/v1/admin/settlements/generate", adminToken, mapOf("periodStart" to periodStart.toString()))
+                .andExpect { status { isOk() } },
+        ).get("data")
+
+    /** start-date 부터 [untilInclusive] 까지 미생성 기간을 오래된 순으로 만든다(스케줄 작업과 같은 경로). */
+    protected fun catchUpSettlements(untilInclusive: java.time.LocalDate = lastEndedPeriodStart()): Int =
+        settlementGenerationService.generateDue(untilInclusive)
+
+    /** settlement·settlement_line·settlement_adjustment 행을 표별 id 순으로(created_at·modified_at 제외) 덤프한다. */
+    protected fun settlementRows(): List<Map<String, Any?>> =
+        listOf("settlement", "settlement_line", "settlement_adjustment").flatMap { table ->
+            jdbcTemplate.queryForList("select * from $table order by id").map { row ->
+                mapOf("table" to table) + row.filterKeys { !it.equals("created_at", true) && !it.equals("modified_at", true) }
+            }
+        }
+
     companion object {
         val PNG_1X1: ByteArray = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",

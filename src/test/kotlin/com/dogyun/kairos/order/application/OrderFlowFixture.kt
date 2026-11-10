@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.InlineTransactionRunner
 import com.dogyun.kairos.order.domain.Order
 import java.time.Clock
 import java.time.LocalDateTime

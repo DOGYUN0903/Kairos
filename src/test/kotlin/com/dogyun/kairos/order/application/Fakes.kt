@@ -1,6 +1,5 @@
 package com.dogyun.kairos.order.application
 
-import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
@@ -15,10 +14,6 @@ import com.dogyun.kairos.order.domain.ReturnStatus
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.LocalDateTime
-
-class InlineTransactionRunner : TransactionRunner {
-    override fun <T> run(block: () -> T): T = block()
-}
 
 /** 저장 시 id 를 채워(주문 1.., 판매자 주문 100.., 항목 1000..) DB 에서 읽은 것처럼 돌려준다. */
 class FakeOrderRepository : OrderRepository {
