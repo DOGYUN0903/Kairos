@@ -28,10 +28,5 @@ class PointLotUsageEntity(
     val id: Long = 0L
 
     @Column(name = "reverted_amount", nullable = false)
-    var revertedAmount: Long = revertedAmount
-        protected set
-
-    fun changeReverted(value: Long) {
-        revertedAmount = value
-    }
+    val revertedAmount: Long = revertedAmount
 }

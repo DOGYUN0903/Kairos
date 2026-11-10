@@ -186,6 +186,16 @@ class PointServiceTest {
     }
 
     @Test
+    fun 전액_되돌린_항목을_다시_되돌리면_예외가_아니라_false다() {
+        grant(300, 10, 1)
+        service.use(memberId, 100, 300)
+        assertTrue(service.refund(memberId, 100, PointRefType.ORDER, 100, 300))
+
+        assertFalse(service.refund(memberId, 100, PointRefType.ORDER, 100, 300))
+        assertEquals(300, repo.balance(memberId))
+    }
+
+    @Test
     fun 만료_작업은_원장_EXPIRE와_잔액_감소를_한_번만_한다() {
         val lot = grant(300, 5, 1)
         grant(100, 20, 2)

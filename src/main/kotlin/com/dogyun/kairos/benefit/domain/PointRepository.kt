@@ -15,11 +15,14 @@ interface PointRepository {
     fun saveLot(lot: PointLot): PointLot
     fun saveLots(lots: Collection<PointLot>)
 
-    /** 사용 거래라면 [PointTransaction.usages] 가 채워져 있다. */
+    /** `FOR UPDATE` 현재 읽기. 사용 거래라면 [PointTransaction.usages] 가 채워져 있다. 있다고 기대하는 거래를 읽을 때만 쓴다(없음 확인은 [saveTransactionIfAbsent]). */
     fun findTransaction(type: PointTransactionType, refType: PointRefType, refId: Long): PointTransaction?
 
-    /** 새 거래와 그 [PointTransaction.usages] 를 함께 저장한다. */
-    fun saveTransaction(tx: PointTransaction): PointTransaction
+    /**
+     * 새 거래와 그 [PointTransaction.usages] 를 함께 저장한다. 같은 (type, refType, refId) 가 이미 있으면 아무것도 저장하지 않고 null.
+     * 없음을 먼저 읽어 확인하는 대신 INSERT 의 UNIQUE 충돌로 판정한다(없는 키를 `FOR UPDATE` 로 읽으면 갭 락끼리 교착한다).
+     */
+    fun saveTransactionIfAbsent(tx: PointTransaction): PointTransaction?
 
     /** 이미 저장된 사용 내역(id 있음)의 `reverted_amount` 를 갱신한다. */
     fun saveUsages(usages: Collection<PointLotUsage>)

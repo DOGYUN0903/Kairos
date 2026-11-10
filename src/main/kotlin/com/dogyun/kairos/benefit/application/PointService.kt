@@ -38,11 +38,11 @@ class PointService(
     ): Boolean {
         val point = pointRepository.lockOrCreate(memberId)
         if (amount <= 0) return false
-        if (pointRepository.findTransaction(type, refType, refId) != null) return false
-        pointRepository.saveLot(PointLot(null, memberId, amount, amount, source, refId, expiresAt))
         point.add(amount)
+        // 원장이 멱등 키다. 먼저 넣어 보고 중복이면 아무 것도 바꾸지 않는다.
+        pointRepository.saveTransactionIfAbsent(PointTransaction(null, memberId, type, amount, point.balance, refType, refId)) ?: return false
+        pointRepository.saveLot(PointLot(null, memberId, amount, amount, source, refId, expiresAt))
         pointRepository.save(point)
-        pointRepository.saveTransaction(PointTransaction(null, memberId, type, amount, point.balance, refType, refId))
         return true
     }
 
@@ -73,9 +73,6 @@ class PointService(
         val point = pointRepository.lockOrCreate(memberId)
         if (amount == 0L) return
         require(amount > 0) { "사용액은 0 이상이어야 한다." }
-        check(pointRepository.findTransaction(PointTransactionType.USE, PointRefType.ORDER, orderId) == null) {
-            "이미 포인트를 사용한 주문이다: orderId=$orderId"
-        }
         if (point.balance < amount) throw DomainException(ErrorCode.POINT_INSUFFICIENT)
 
         var left = amount
@@ -92,12 +89,14 @@ class PointService(
         // 잔액은 충분한데 사용 가능한 로트가 모자란 경우(만료 작업 전의 만료 로트)도 부족으로 본다.
         if (left > 0) throw DomainException(ErrorCode.POINT_INSUFFICIENT)
 
-        pointRepository.saveLots(touched)
         point.subtract(amount)
+        checkNotNull(
+            pointRepository.saveTransactionIfAbsent(
+                PointTransaction(null, memberId, PointTransactionType.USE, -amount, point.balance, PointRefType.ORDER, orderId, usages),
+            ),
+        ) { "이미 포인트를 사용한 주문이다: orderId=$orderId" }
+        pointRepository.saveLots(touched)
         pointRepository.save(point)
-        pointRepository.saveTransaction(
-            PointTransaction(null, memberId, PointTransactionType.USE, -amount, point.balance, PointRefType.ORDER, orderId, usages),
-        )
     }
 
     /**
@@ -108,10 +107,14 @@ class PointService(
         val point = pointRepository.lockOrCreate(memberId)
         if (amount == 0L) return false
         require(amount > 0) { "되돌림 금액은 0 이상이어야 한다." }
-        if (pointRepository.findTransaction(PointTransactionType.REFUND, refType, refId) != null) return false
         val use = checkNotNull(pointRepository.findTransaction(PointTransactionType.USE, PointRefType.ORDER, orderId)) {
             "포인트 사용 내역이 없는 주문이다: orderId=$orderId"
         }
+        point.add(amount)
+        // 같은 되돌림을 이미 했다면(원장 UNIQUE 충돌) 계산 전에 false. 계산이 예외로 끝나면 트랜잭션째 롤백되므로 원장도 남지 않는다.
+        pointRepository.saveTransactionIfAbsent(
+            PointTransaction(null, memberId, PointTransactionType.REFUND, amount, point.balance, refType, refId),
+        ) ?: return false
         val now = LocalDateTime.now(clock)
         val lots = pointRepository.findLotsByIds(use.usages.map { it.lotId }.toSet()).associateBy { it.id }
 
@@ -141,11 +144,7 @@ class PointService(
             pointRepository.saveLot(PointLot(null, memberId, toNewLot, toNewLot, PointSourceType.REFUND, refId, expiresAt))
         }
         pointRepository.saveUsages(updatedUsages)
-        point.add(amount)
         pointRepository.save(point)
-        pointRepository.saveTransaction(
-            PointTransaction(null, memberId, PointTransactionType.REFUND, amount, point.balance, refType, refId),
-        )
         return true
     }
 
@@ -155,16 +154,15 @@ class PointService(
         val lot = pointRepository.findLotForUpdate(lotId) ?: return false
         if (lot.memberId != memberId) return false
         if (!lot.isExpired(LocalDateTime.now(clock)) || lot.remainingAmount == 0L) return false
-        if (pointRepository.findTransaction(PointTransactionType.EXPIRE, PointRefType.POINT_LOT, lotId) != null) return false
 
         val remaining = lot.remainingAmount
+        point.subtract(remaining)
+        pointRepository.saveTransactionIfAbsent(
+            PointTransaction(null, memberId, PointTransactionType.EXPIRE, -remaining, point.balance, PointRefType.POINT_LOT, lotId),
+        ) ?: return false
         lot.expire()
         pointRepository.saveLot(lot)
-        point.subtract(remaining)
         pointRepository.save(point)
-        pointRepository.saveTransaction(
-            PointTransaction(null, memberId, PointTransactionType.EXPIRE, -remaining, point.balance, PointRefType.POINT_LOT, lotId),
-        )
         return true
     }
 }

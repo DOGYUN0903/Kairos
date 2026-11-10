@@ -52,8 +52,8 @@ class FakePointRepository : PointRepository {
     override fun findTransaction(type: PointTransactionType, refType: PointRefType, refId: Long): PointTransaction? =
         transactions.values.firstOrNull { it.type == type && it.refType == refType && it.refId == refId }?.let(::withUsages)
 
-    override fun saveTransaction(tx: PointTransaction): PointTransaction {
-        check(findTransaction(tx.type, tx.refType, tx.refId) == null) { "uk_point_transaction_ref" }
+    override fun saveTransactionIfAbsent(tx: PointTransaction): PointTransaction? {
+        if (findTransaction(tx.type, tx.refType, tx.refId) != null) return null
         val id = nextTxId++
         val savedUsages = tx.usages.map { it.copy(id = nextUsageId++) }.toMutableList()
         usagesByTx[id] = savedUsages

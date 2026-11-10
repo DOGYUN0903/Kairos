@@ -37,10 +37,5 @@ class PointLotEntity(
     val id: Long = 0L
 
     @Column(name = "remaining_amount", nullable = false)
-    var remainingAmount: Long = remainingAmount
-        protected set
-
-    fun changeRemaining(value: Long) {
-        remainingAmount = value
-    }
+    val remainingAmount: Long = remainingAmount
 }

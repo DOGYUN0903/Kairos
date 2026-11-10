@@ -24,10 +24,5 @@ class MemberPointEntity(
     val id: Long = 0L
 
     @Column(name = "balance", nullable = false)
-    var balance: Long = balance
-        protected set
-
-    fun changeBalance(value: Long) {
-        balance = value
-    }
+    val balance: Long = balance
 }
