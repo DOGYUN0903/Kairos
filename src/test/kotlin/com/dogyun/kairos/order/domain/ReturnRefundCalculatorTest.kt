@@ -164,4 +164,18 @@ class ReturnRefundCalculatorTest {
 
         assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { o.plan(id) }
     }
+
+    @Test
+    fun 발송_회수_설정이_기본_배송비와_달라도_취소_차감_뒤_변심_반품은_outbound_0이다() {
+        val o = paidOrder(line(2, 30_000), line(3, 30_000))
+        assertEquals(3_000, o.cancel(o.itemIdOf(3)).shippingFeeDeducted)
+        o.deliverAll()
+        val b = o.itemIdOf(2)
+        o.withReturn(b, ReturnReason.CHANGE_OF_MIND)
+
+        val plan = o.planReturnRefund(returnIdOf(b), ReturnFeePolicy(returnFee = 3_000, outboundFee = 2_500))
+
+        assertEquals(0, plan.outboundFeeRecovered)
+        assertEquals(27_000, plan.refundAmount)
+    }
 }

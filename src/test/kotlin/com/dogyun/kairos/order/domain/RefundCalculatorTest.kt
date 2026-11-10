@@ -338,4 +338,22 @@ class RefundCalculatorTest {
 
         assertCode(ErrorCode.ORDER_ITEM_NOT_CANCELABLE) { o.planCancel(o.itemIdOf(2), CancelActor.BUYER, POLICY) }
     }
+
+    @Test
+    fun 예시C_역순_두_판매자_변심_반품_6000_뒤_다른_판매자_주문_마지막_취소는_차감도_반환도_없다() {
+        val o = paidOrder(line(2, 30_000), line(3, 30_000))
+        val so2 = o.sellerOrders.first { it.sellerId == 2L }.id!!
+        o.ship(so2, "04", "T2", NOW)
+        o.deliver(so2, NOW)
+        val b = o.itemIdOf(2)
+        o.withReturn(b, ReturnReason.CHANGE_OF_MIND, ReturnStatus.COMPLETED)
+        assertEquals(6_000, o.findItem(b).returnRequest!!.let { it.returnFee + it.outboundFeeRecovered })
+
+        val plan = o.planCancel(o.itemIdOf(3), CancelActor.BUYER, POLICY)
+
+        // 반품의 발송 구간 회수는 마지막 취소에서도 돌려주지 않는다(스펙 5장).
+        assertEquals(0, plan.shippingFeeDeducted)
+        assertEquals(0, plan.shippingFeeReturned)
+        assertEquals(30_000, plan.refundAmount)
+    }
 }

@@ -68,7 +68,9 @@ object ReturnRefundCalculator {
         check(plan.refundAmount >= 0) { "환불액은 0 이상이어야 한다: $plan" }
         check(order.refundedAmount + plan.refundAmount <= order.totalAmount) { "누적 환불액이 결제 금액을 넘는다: $plan" }
         check(order.pointsRefunded + plan.pointsRefund <= order.pointsUsed) { "누적 포인트 되돌림이 사용액을 넘는다: $plan" }
-        check(order.outboundFeeRecoveredEver + plan.outboundFeeRecovered <= fees.outboundFee) { "발송 구간 회수가 한 번을 넘는다: $plan" }
+        // 발송 구간 회수는 주문당 한 번. 이미 회수했으면(취소 차감은 ShippingPolicy 금액이라 fees.outboundFee 와 다를 수 있다) 이번 회수는 0이어야 한다.
+        check(order.outboundFeeRecoveredEver == 0L || plan.outboundFeeRecovered == 0L) { "발송 구간 회수가 한 번을 넘는다: $plan" }
+        check(plan.outboundFeeRecovered <= fees.outboundFee) { "발송 구간 회수가 설정 금액을 넘는다: $plan" }
         return plan
     }
 }
