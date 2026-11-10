@@ -392,4 +392,27 @@ class OrderReturnServiceTest {
         assertEquals("CANCELED_BY_ADMIN", service.cancelByAdmin(returnId).status)
         assertEquals(OrderItemStatus.ORDERED, reload(order).itemOf(1L).status)
     }
+
+    @Test
+    fun 현금_환불이_있는데_paymentKey가_없으면_RETURN_REFUNDING으로_남고_되돌림이_없다() {
+        sku(1L, 1L, 30_000)
+        sku(2L, 1L, 30_000)
+        val order = deliveredOrder(1L to 1, 2L to 1, total = 60_000)
+        val returnId = approved(order, 1L)
+        paymentGateway.payments[order.id!!] = paymentGateway.get(order.id!!).copy(paymentKey = null)
+        val stock = stockManager.stock.toMap()
+        val sales = stockManager.sales.toMap()
+
+        val result = service.receiveBySeller(1L, returnId)
+
+        assertEquals("REFUNDING", result.status)
+        assertEquals(OrderItemStatus.RETURN_REFUNDING, reload(order).itemOf(1L).status)
+        assertEquals(0, reload(order).refundedAmount)
+        assertEquals(0, paymentGateway.get(order.id!!).refundedAmount)
+        assertTrue(paymentGateway.cancelCalls.isEmpty())
+        assertTrue(benefitReverter.revertItemCalls.isEmpty())
+        assertTrue(stockManager.restoreCalls.isEmpty())
+        assertEquals(stock, stockManager.stock)
+        assertEquals(sales, stockManager.sales)
+    }
 }

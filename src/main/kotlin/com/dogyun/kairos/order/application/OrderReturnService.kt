@@ -110,11 +110,15 @@ class OrderReturnService(
         if (claim is Claim.Current) return claim.result
         val started = claim as Claim.Started
 
-        val outcome = if (started.refundAmount > 0 && started.paymentKey != null) {
-            paymentGateway.cancelWithPg(
+        val outcome = when {
+            started.refundAmount == 0L -> NO_PG_CALL
+            // 현금 환불이 있는데 paymentKey 가 없으면 환불할 수 없다. 환불 완료로 처리하지 않고 RETURN_REFUNDING 으로 두어
+            // 대사(같은 조건이면 건너뜀)·운영자가 보게 한다.
+            started.paymentKey == null -> PgOutcome.Unknown
+            else -> paymentGateway.cancelWithPg(
                 started.paymentKey, started.refundAmount, "orderItem:${started.itemId}", refundKey(started.itemId, started.refundAmount),
             )
-        } else NO_PG_CALL
+        }
 
         val finish = finishReturn(orderId, returnId, outcome)
         if (finish == ReturnFinish.REVERTED) throw DomainException(ErrorCode.PAYMENT_CANCEL_FAILED)
@@ -188,7 +192,7 @@ class OrderReturnService(
     private fun notFound() = DomainException(ErrorCode.RETURN_NOT_FOUND)
 
     private companion object {
-        /** 환불 0원이거나 paymentKey 가 없으면 PG 를 부르지 않는다. */
+        /** 현금 환불 0원이면 PG 를 부르지 않는다. [finishReturn] 이 환불 0 을 먼저 판단하므로 내용은 쓰이지 않는다. */
         val NO_PG_CALL: PgOutcome = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.CANCELED, 0, 0, emptyList()))
     }
 }

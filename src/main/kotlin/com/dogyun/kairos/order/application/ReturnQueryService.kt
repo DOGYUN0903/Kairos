@@ -9,14 +9,12 @@ import com.dogyun.kairos.order.domain.ReturnRequest
 import com.dogyun.kairos.order.domain.ReturnStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
 
 /** 구매자·판매자·관리자용 반품 조회. 남의 반품은 존재 여부를 숨기려 `RETURN_NOT_FOUND` 로 답한다. */
 @Service
 @Transactional(readOnly = true)
 class ReturnQueryService(
     private val orderRepository: OrderRepository,
-    @Suppress("unused") private val clock: Clock,
 ) {
 
     fun getMine(memberId: Long, returnId: Long): ReturnRequestResult = find(returnId) { it.memberId == memberId }
