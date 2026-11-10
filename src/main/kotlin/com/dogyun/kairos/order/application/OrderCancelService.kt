@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.order.domain.CancelActor
@@ -124,6 +125,8 @@ class OrderCancelService(
             OrderItemStatus.CANCELED -> return@run CancelFinish.CANCELED
             OrderItemStatus.ORDERED -> return@run CancelFinish.REVERTED
             OrderItemStatus.CANCEL_REQUESTED -> Unit
+            // 반품 항목은 취소 마무리 대상이 아니다(반품은 OrderReturnService 가 마무리한다).
+            else -> throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         }
         val sellerOrder = order.sellerOrders.first { so -> so.items.any { it.id == orderItemId } }
         if (order.status != OrderStatus.PAID || sellerOrder.status != SellerOrderStatus.PAID) return@run CancelFinish.PENDING

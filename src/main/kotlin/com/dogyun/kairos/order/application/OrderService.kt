@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.order.domain.CouponDiscountType

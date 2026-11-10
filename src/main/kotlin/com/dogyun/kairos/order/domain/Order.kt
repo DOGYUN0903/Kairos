@@ -43,12 +43,19 @@ class Order(
     val allItems: List<OrderItem> get() = sellerOrders.flatMap { it.items }
     val remainingItemsAmount: Long get() = sellerOrders.sumOf { it.remainingItemsAmount }
     /** 아직 취소되지 않은(ORDERED) 항목이 실제로 낸 금액 합계. 배송비는 포함하지 않는다. */
-    val remainingPaidAmount: Long get() = allItems.filter { it.status == OrderItemStatus.ORDERED }.sumOf { it.paidAmount }
+    val remainingPaidAmount: Long get() = allItems.filter { it.status.isRemaining }.sumOf { it.paidAmount }
     val allItemsCanceled: Boolean get() = allItems.all { it.status == OrderItemStatus.CANCELED }
+    val allItemsClosed: Boolean get() = allItems.all { it.status == OrderItemStatus.CANCELED || it.status == OrderItemStatus.RETURNED }
+
+    /** 발송 구간 배송비를 구매자에게서 회수한 합계(취소 차감 + 환불 중·완료 반품). 이중 회수를 막는 기준이다. */
+    val outboundFeeRecoveredEver: Long
+        get() = allItems.sumOf { it.shippingFeeDeducted } + allItems.mapNotNull { it.returnRequest }
+            .filter { it.status == ReturnStatus.REFUNDING || it.status == ReturnStatus.COMPLETED }
+            .sumOf { it.outboundFeeRecovered }
     val remainingBuyerShippingFee: Long
         get() = sellerOrders
             .filter { it.status != SellerOrderStatus.CANCELED && it.shippingFeePayer == ShippingFeePayer.BUYER }
-            .sumOf { it.shippingFee }
+            .sumOf { it.shippingFee - it.buyerShippingFeeRefunded }
 
     /** SKU별 수량 합계, SKU ID 오름차순(재고 복구 순서). */
     val skuQuantities: List<Pair<Long, Int>>
@@ -62,6 +69,52 @@ class Order(
 
     fun findSellerOrder(id: Long): SellerOrder =
         sellerOrders.firstOrNull { it.id == id } ?: throw DomainException(ErrorCode.SELLER_ORDER_NOT_FOUND)
+
+    fun findReturn(returnId: Long): Pair<SellerOrder, OrderItem> {
+        for (so in sellerOrders) for (item in so.items) if (item.returnRequest?.id == returnId) return so to item
+        throw DomainException(ErrorCode.RETURN_NOT_FOUND)
+    }
+
+    fun requestReturn(itemId: Long, reason: ReturnReason, detail: String?, window: Duration, now: LocalDateTime): ReturnRequest {
+        val item = findItem(itemId)
+        val sellerOrder = sellerOrderOf(itemId)
+        if (item.status.isOpenReturn) throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+        if (status != OrderStatus.PAID || sellerOrder.status != SellerOrderStatus.DELIVERED || item.status != OrderItemStatus.ORDERED) {
+            throw DomainException(ErrorCode.RETURN_NOT_ELIGIBLE)
+        }
+        val deliveredAt = checkNotNull(sellerOrder.deliveredAt) { "배송 완료 시각이 없는 DELIVERED 판매자 주문" }
+        if (deliveredAt.plus(window).isBefore(now)) throw DomainException(ErrorCode.RETURN_WINDOW_EXPIRED)
+        val existing = item.returnRequest
+        return when {
+            existing == null -> ReturnRequest.request(
+                checkNotNull(id) { "저장되지 않은 주문" }, checkNotNull(sellerOrder.id) { "저장되지 않은 판매자 주문" },
+                itemId, memberId, sellerOrder.sellerId, reason, detail, now,
+            ).also { item.requestReturn(it) }
+            existing.status == ReturnStatus.WITHDRAWN -> existing.also { item.reopenReturn(reason, detail, now) }
+            else -> throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+        }
+    }
+
+    fun approveReturn(returnId: Long, by: DecidedBy, now: LocalDateTime) {
+        val (sellerOrder, item) = findReturn(returnId)
+        if (item.returnRequest?.status == ReturnStatus.REJECTED && sellerOrder.status == SellerOrderStatus.CONFIRMED) {
+            throw DomainException(ErrorCode.RETURN_NOT_ELIGIBLE)
+        }
+        item.approveReturn(by, now)
+    }
+
+    fun rejectReturn(returnId: Long, reason: String, now: LocalDateTime) = findReturn(returnId).second.rejectReturn(reason, now)
+
+    fun withdrawReturn(returnId: Long) = findReturn(returnId).second.withdrawReturn()
+
+    fun cancelReturnByAdmin(returnId: Long) = findReturn(returnId).second.cancelReturnByAdmin()
+
+    fun startReturnRefund(returnId: Long, plan: ReturnRefundPlan, now: LocalDateTime) {
+        if (status != OrderStatus.PAID) throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
+        findReturn(returnId).second.startReturnRefund(plan, now)
+    }
+
+    fun revertReturnRefund(returnId: Long) = findReturn(returnId).second.revertReturnRefund()
 
     fun markPaid(now: LocalDateTime) {
         transit(setOf(OrderStatus.PENDING_PAYMENT), OrderStatus.PAID)
@@ -183,7 +236,7 @@ class Order(
                             shippingFeeReturned = 0, canceledAt = null,
                             productCouponId = a.productCouponId, productCouponDiscount = a.productCouponDiscount,
                             productCouponIssuer = a.productCouponIssuer, cartCouponAllocated = a.cartCouponAllocated,
-                            pointsAllocated = a.pointsAllocated, paidAmount = paid, pointsRefunded = 0,
+                            pointsAllocated = a.pointsAllocated, paidAmount = paid, pointsRefunded = 0, returnRequest = null,
                         )
                     },
                 )

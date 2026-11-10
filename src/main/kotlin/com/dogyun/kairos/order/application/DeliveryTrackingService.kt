@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import org.slf4j.LoggerFactory

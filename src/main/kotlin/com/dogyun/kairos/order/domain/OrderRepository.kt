@@ -31,8 +31,20 @@ interface OrderRepository {
     fun findSellerOrderIdsByStatus(status: SellerOrderStatus, afterId: Long, limit: Int): List<Long>
     fun findSellerOrderIdsDeliveredBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Long>
 
-    /** orderId to itemId. 항목 id 오름차순, [afterItemId] 보다 큰 것부터. */
-    fun findCancelRequestedItems(before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>>
+    /**
+     * orderId to itemId. 항목 id 오름차순, [afterItemId] 보다 큰 것부터. 항목은 해당 상태로 바뀔 때 갱신되므로
+     * `modified_at` 이 [before] 보다 이른 것(그 상태로 오래 머문 것)만 준다.
+     */
+    fun findItemsInStatusBefore(statuses: Set<OrderItemStatus>, before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>>
+
+    /** 반품이 속한 주문 id. 주문 행 락을 잡는 트랜잭션 **밖에서** 부른 뒤 `findByIdForUpdate` 로 잠근다. */
+    fun findOrderIdByReturnId(returnId: Long): Long?
+
+    /** [memberId]·[sellerId]·[status] 로 거른 반품 목록. `requested_at DESC, id DESC`. */
+    fun findReturnPage(memberId: Long?, sellerId: Long?, status: ReturnStatus?, page: Int, size: Int): PageResult<ReturnRequest>
+
+    /** orderId to returnId. `return_status = REQUESTED` 이고 `requested_at < threshold` 인 반품, 반품 id 오름차순 keyset. */
+    fun findReturnIdsRequestedBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Pair<Long, Long>>
 
     /** [orderIds] 중 `CANCELED` 인 주문 id. */
     fun findCanceledIdsAmong(orderIds: Collection<Long>): Set<Long>

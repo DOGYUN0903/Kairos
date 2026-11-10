@@ -6,6 +6,8 @@ import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
+import com.dogyun.kairos.order.domain.ReturnRequest
+import com.dogyun.kairos.order.domain.ReturnStatus
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import com.dogyun.kairos.order.domain.ShippingAddress
@@ -25,6 +27,7 @@ class OrderRepositoryImpl(
     private val orderJpaRepository: OrderJpaRepository,
     private val sellerOrderJpaRepository: SellerOrderJpaRepository,
     private val orderItemJpaRepository: OrderItemJpaRepository,
+    private val returnRequestJpaRepository: ReturnRequestJpaRepository,
     private val queryFactory: JPAQueryFactory,
 ) : OrderRepository {
 
@@ -34,9 +37,15 @@ class OrderRepositoryImpl(
         val currentItems = if (currentSellerOrders.isEmpty()) emptyMap()
         else orderItemJpaRepository.findAllBySellerOrderIdInOrderByIdAsc(currentSellerOrders.keys).associateBy { it.id }
 
+        val currentReturns = if (currentItems.isEmpty()) emptyMap()
+        else returnRequestJpaRepository.findAllByOrderItemIdIn(currentItems.keys).associateBy { it.orderItem.id }
+
         order.sellerOrders.forEach { sellerOrder ->
             val sellerOrderEntity = saveSellerOrder(orderEntity, sellerOrder, currentSellerOrders)
-            sellerOrder.items.forEach { saveItem(sellerOrderEntity, it, currentItems) }
+            sellerOrder.items.forEach { item ->
+                val itemEntity = saveItem(sellerOrderEntity, item, currentItems)
+                item.returnRequest?.let { saveReturn(itemEntity, it, currentReturns) }
+            }
         }
         orderJpaRepository.flush()
         return requireNotNull(findById(orderEntity.id)) { "방금 저장한 주문을 다시 읽지 못했습니다: ${orderEntity.id}" }
@@ -134,12 +143,45 @@ class OrderRepositoryImpl(
             .fetch()
     }
 
-    /** 항목은 `CANCEL_REQUESTED` 로 바뀔 때 갱신되므로 `modified_at` 이 요청 시각이다. */
-    override fun findCancelRequestedItems(before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>> {
+    /** 항목은 해당 상태로 바뀔 때 갱신되므로 `modified_at` 이 그 상태가 된 시각이다. */
+    override fun findItemsInStatusBefore(
+        statuses: Set<OrderItemStatus>,
+        before: LocalDateTime,
+        afterItemId: Long,
+        limit: Int,
+    ): List<Pair<Long, Long>> {
+        if (statuses.isEmpty()) return emptyList()
         val i = QOrderItemEntity.orderItemEntity
         return queryFactory.select(i.sellerOrder.order.id, i.id).from(i)
-            .where(i.orderItemStatus.eq(OrderItemStatus.CANCEL_REQUESTED), i.modifiedAt.before(before), i.id.gt(afterItemId))
+            .where(i.orderItemStatus.`in`(statuses), i.modifiedAt.before(before), i.id.gt(afterItemId))
             .orderBy(i.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+            .map { requireNotNull(it.get(0, Long::class.javaObjectType)) to requireNotNull(it.get(1, Long::class.javaObjectType)) }
+    }
+
+    override fun findOrderIdByReturnId(returnId: Long): Long? = returnRequestJpaRepository.findOrderIdById(returnId)
+
+    override fun findReturnPage(memberId: Long?, sellerId: Long?, status: ReturnStatus?, page: Int, size: Int): PageResult<ReturnRequest> {
+        val r = QReturnRequestEntity.returnRequestEntity
+        val where = BooleanBuilder()
+        memberId?.let { where.and(r.memberId.eq(it)) }
+        sellerId?.let { where.and(r.sellerId.eq(it)) }
+        status?.let { where.and(r.returnStatus.eq(it)) }
+        val rows = queryFactory.selectFrom(r).where(where)
+            .orderBy(r.requestedAt.desc(), r.id.desc())
+            .offset(page.toLong() * size)
+            .limit(size.toLong())
+            .fetch()
+        val total = queryFactory.select(r.count()).from(r).where(where).fetchOne() ?: 0L
+        return PageResult.of(rows.map { it.toDomain() }, page, size, total)
+    }
+
+    override fun findReturnIdsRequestedBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Pair<Long, Long>> {
+        val r = QReturnRequestEntity.returnRequestEntity
+        return queryFactory.select(r.orderId, r.id).from(r)
+            .where(r.returnStatus.eq(ReturnStatus.REQUESTED), r.requestedAt.before(threshold), r.id.gt(afterId))
+            .orderBy(r.id.asc())
             .limit(limit.toLong())
             .fetch()
             .map { requireNotNull(it.get(0, Long::class.javaObjectType)) to requireNotNull(it.get(1, Long::class.javaObjectType)) }
@@ -184,7 +226,7 @@ class OrderRepositoryImpl(
         return sellerOrderJpaRepository.saveAndFlush(entity)
     }
 
-    private fun saveItem(sellerOrder: SellerOrderEntity, item: OrderItem, current: Map<Long, OrderItemEntity>) {
+    private fun saveItem(sellerOrder: SellerOrderEntity, item: OrderItem, current: Map<Long, OrderItemEntity>): OrderItemEntity {
         val id = item.id
         val entity = if (id == null) {
             OrderItemEntity(
@@ -202,7 +244,22 @@ class OrderRepositoryImpl(
                 )
             }
         }
-        orderItemJpaRepository.saveAndFlush(entity)
+        return orderItemJpaRepository.saveAndFlush(entity)
+    }
+
+    private fun saveReturn(item: OrderItemEntity, request: ReturnRequest, current: Map<Long, ReturnRequestEntity>) {
+        val existing = current[item.id]
+        val entity = if (existing == null) {
+            ReturnRequestEntity(
+                request.orderId, request.sellerOrderId, item, request.memberId, request.sellerId, request.reason,
+                request.detail, request.status, request.returnFee, request.outboundFeeRecovered, request.shippingFeeRefund,
+                request.sellerBorneFee, request.refundAmount, request.pointsRefund, request.rejectReason,
+                request.requestedAt, request.decidedAt, request.decidedBy, request.receivedAt, request.completedAt,
+            )
+        } else {
+            existing.also { it.change(request) }
+        }
+        returnRequestJpaRepository.saveAndFlush(entity)
     }
 
     private fun assemble(orders: List<OrderEntity>): List<Order> {
@@ -210,12 +267,19 @@ class OrderRepositoryImpl(
         val sellerOrders = sellerOrderJpaRepository.findAllByOrderIdInOrderByIdAsc(orders.map { it.id })
         val items = if (sellerOrders.isEmpty()) emptyList()
         else orderItemJpaRepository.findAllBySellerOrderIdInOrderByIdAsc(sellerOrders.map { it.id })
+        val returnsByItem = if (items.isEmpty()) emptyMap()
+        else returnRequestJpaRepository.findAllByOrderItemIdIn(items.map { it.id }).associateBy { it.orderItem.id }
         val itemsBySellerOrder = items.groupBy { it.sellerOrder.id }
         val sellerOrdersByOrder = sellerOrders.groupBy { it.order.id }
-        return orders.map { toDomain(it, sellerOrdersByOrder[it.id].orEmpty(), itemsBySellerOrder) }
+        return orders.map { toDomain(it, sellerOrdersByOrder[it.id].orEmpty(), itemsBySellerOrder, returnsByItem) }
     }
 
-    private fun toDomain(e: OrderEntity, sellerOrders: List<SellerOrderEntity>, items: Map<Long, List<OrderItemEntity>>) = Order.restore(
+    private fun toDomain(
+        e: OrderEntity,
+        sellerOrders: List<SellerOrderEntity>,
+        items: Map<Long, List<OrderItemEntity>>,
+        returns: Map<Long, ReturnRequestEntity>,
+    ) = Order.restore(
         id = e.id,
         orderNo = e.orderNo,
         memberId = e.memberId,
@@ -244,7 +308,7 @@ class OrderRepositoryImpl(
                         it.extraPrice, it.quantity, it.orderItemStatus, it.cancelActor, it.cancelReason, it.refundAmount,
                         it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
                         it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated,
-                        it.paidAmount, it.pointsRefunded,
+                        it.paidAmount, it.pointsRefunded, returns[it.id]?.toDomain(),
                     )
                 },
             )

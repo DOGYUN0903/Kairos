@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
@@ -9,6 +10,8 @@ import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.PointUsePolicy
+import com.dogyun.kairos.order.domain.ReturnRequest
+import com.dogyun.kairos.order.domain.ReturnStatus
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.LocalDateTime
@@ -23,6 +26,7 @@ class FakeOrderRepository : OrderRepository {
     private var orderSeq = 0L
     private var sellerOrderSeq = 100L
     private var itemSeq = 1000L
+    private var returnSeq = 0L
 
     val all: List<Order> get() = rows.values.toList()
 
@@ -44,6 +48,7 @@ class FakeOrderRepository : OrderRepository {
                             it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
                             it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated,
                             it.paidAmount, it.pointsRefunded,
+                            it.returnRequest?.let { r -> if (r.id != null) r else saveReturn(r) },
                         )
                     },
                 )
@@ -96,12 +101,41 @@ class FakeOrderRepository : OrderRepository {
             .filter { it.status == SellerOrderStatus.DELIVERED && it.deliveredAt?.isBefore(threshold) == true }
             .mapNotNull { it.id }.filter { it > afterId }.sorted().take(limit)
 
-    override fun findCancelRequestedItems(before: LocalDateTime, afterItemId: Long, limit: Int): List<Pair<Long, Long>> =
-        rows.values.flatMap { o -> o.allItems.filter { it.status == OrderItemStatus.CANCEL_REQUESTED }.map { requireNotNull(o.id) to requireNotNull(it.id) } }
+    override fun findItemsInStatusBefore(
+        statuses: Set<OrderItemStatus>,
+        before: LocalDateTime,
+        afterItemId: Long,
+        limit: Int,
+    ): List<Pair<Long, Long>> =
+        rows.values.flatMap { o -> o.allItems.filter { it.status in statuses }.map { requireNotNull(o.id) to requireNotNull(it.id) } }
             .filter { it.second > afterItemId }.sortedBy { it.second }.take(limit)
+
+    override fun findOrderIdByReturnId(returnId: Long): Long? =
+        rows.values.firstOrNull { o -> o.allItems.any { it.returnRequest?.id == returnId } }?.id
+
+    override fun findReturnPage(memberId: Long?, sellerId: Long?, status: ReturnStatus?, page: Int, size: Int): PageResult<ReturnRequest> {
+        val list = rows.values.flatMap { o -> o.allItems.mapNotNull { it.returnRequest } }
+            .filter { (memberId == null || it.memberId == memberId) && (sellerId == null || it.sellerId == sellerId) && (status == null || it.status == status) }
+            .sortedWith(compareByDescending<ReturnRequest> { it.requestedAt }.thenByDescending { it.id })
+        return PageResult.of(list.drop(page * size).take(size), page, size, list.size.toLong())
+    }
+
+    override fun findReturnIdsRequestedBefore(threshold: LocalDateTime, afterId: Long, limit: Int): List<Pair<Long, Long>> =
+        rows.values.flatMap { o ->
+            o.allItems.mapNotNull { it.returnRequest }
+                .filter { it.status == ReturnStatus.REQUESTED && it.requestedAt.isBefore(threshold) }
+                .map { requireNotNull(o.id) to requireNotNull(it.id) }
+        }.filter { it.second > afterId }.sortedBy { it.second }.take(limit)
 
     override fun findCanceledIdsAmong(orderIds: Collection<Long>): Set<Long> =
         rows.values.filter { it.id in orderIds && it.status == OrderStatus.CANCELED }.mapNotNull { it.id }.toSet()
+
+    /** 새 반품에 id 를 붙인다. 같은 인스턴스를 도메인이 계속 들고 있으므로 필드를 복사한 새 객체를 돌려준다. */
+    private fun saveReturn(r: ReturnRequest) = ReturnRequest(
+        ++returnSeq, r.orderId, r.sellerOrderId, r.orderItemId, r.memberId, r.sellerId, r.reason, r.detail, r.status,
+        r.returnFee, r.outboundFeeRecovered, r.shippingFeeRefund, r.sellerBorneFee, r.refundAmount, r.pointsRefund,
+        r.rejectReason, r.requestedAt, r.decidedAt, r.decidedBy, r.receivedAt, r.completedAt,
+    )
 
     private fun page(list: List<Order>, page: Int, size: Int) =
         PageResult.of(list.drop(page * size).take(size), page, size, list.size.toLong())

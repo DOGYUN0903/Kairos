@@ -47,6 +47,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         jdbcTemplate.update("delete from member_point")
         jdbcTemplate.update("delete from coupon")
         jdbcTemplate.update("delete from coupon_policy")
+        jdbcTemplate.update("delete from return_request")
         jdbcTemplate.update("delete from order_item")
         jdbcTemplate.update("delete from seller_order")
         jdbcTemplate.update("delete from orders")

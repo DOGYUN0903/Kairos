@@ -28,7 +28,7 @@ class OrderJobsApiTest : CommerceTestSupport() {
     @Autowired private lateinit var pgClient: PgClient
     @Autowired private lateinit var clock: Clock
     @Autowired private lateinit var benefitReverter: com.dogyun.kairos.order.application.BenefitReverter
-    @Autowired private lateinit var tx: com.dogyun.kairos.order.application.TransactionRunner
+    @Autowired private lateinit var tx: com.dogyun.kairos.common.application.TransactionRunner
 
     private class Shop(val sellerToken: String, val productId: Long, val skuId: Long)
 

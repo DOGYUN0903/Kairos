@@ -33,7 +33,7 @@ internal fun withIds(o: Order): Order {
                     it.salePrice, it.extraPrice, it.quantity, it.status, it.cancelActor, it.cancelReason,
                     it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
                     it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated, it.paidAmount,
-                    it.pointsRefunded,
+                    it.pointsRefunded, it.returnRequest,
                 )
             },
         )

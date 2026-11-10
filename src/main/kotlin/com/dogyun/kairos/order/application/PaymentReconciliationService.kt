@@ -1,5 +1,7 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.sweepByKeyset
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -101,7 +103,7 @@ class PaymentReconciliationService(
     /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. [limit] 은 keyset 페이지 크기다. */
     fun reconcileCancels(limit: Int = 100): Int {
         val before = LocalDateTime.now(clock).minus(properties.cancelRequestTimeout)
-        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findCancelRequestedItems(before, after, limit) }) { (orderId, itemId) ->
+        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findItemsInStatusBefore(setOf(OrderItemStatus.CANCEL_REQUESTED), before, after, limit) }) { (orderId, itemId) ->
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
