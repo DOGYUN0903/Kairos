@@ -55,7 +55,6 @@ tags:
   - name: Seller Return
   - name: Admin Return
   - name: Seller Settlement
-  - name: Seller Settlement
   - name: Admin Settlement
 security:
   - bearerAuth: []
