@@ -32,6 +32,10 @@ class PaymentGatewayImpl(
         paymentService.approve(orderId)
     }
 
+    override fun approveWithoutPg(orderId: Long) {
+        paymentService.approveWithoutPg(orderId)
+    }
+
     override fun fail(orderId: Long, reason: String) {
         paymentService.fail(orderId, reason)
     }

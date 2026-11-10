@@ -27,7 +27,9 @@ class OrderCancelServiceTest {
     private val stockManager = FakeStockManager()
     private val paymentGateway = FakePaymentGateway()
     private val orderService = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, OrderProperties(), clock, Random(7),
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(),
+        OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock),
+        OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
     private val paymentService = OrderPaymentService(
         orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), InlineTransactionRunner(), clock,

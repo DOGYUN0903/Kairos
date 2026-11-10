@@ -8,6 +8,7 @@ import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
+import com.dogyun.kairos.order.domain.PointUsePolicy
 import com.dogyun.kairos.order.domain.SellerOrder
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.LocalDateTime
@@ -198,6 +199,12 @@ class FakePaymentGateway : PaymentGateway {
         change(orderId, setOf("IN_PROGRESS", "UNKNOWN")) { it.copy(status = "APPROVED") }
     }
 
+    override fun approveWithoutPg(orderId: Long) {
+        val current = get(orderId)
+        if (current.amount != 0L) throw DomainException(ErrorCode.PAYMENT_INVALID_STATE_TRANSITION)
+        change(orderId, setOf("READY")) { it.copy(status = "APPROVED") }
+    }
+
     override fun fail(orderId: Long, reason: String) {
         change(orderId, setOf("READY", "IN_PROGRESS", "UNKNOWN")) { it.copy(status = "FAILED", failReason = reason) }
     }
@@ -272,5 +279,58 @@ class FakeDeliveryTracker : DeliveryTracker {
     override fun track(carrierCode: String, trackingNumber: String): TrackingResult {
         calls += carrierCode to trackingNumber
         return results[trackingNumber] ?: TrackingResult.IN_TRANSIT
+    }
+}
+
+/** 쿠폰 조건과 포인트 잔액을 메모리에 두고 reserve·commit 호출을 기록한다. */
+class FakeBenefitApplier : BenefitApplier {
+    val coupons = mutableMapOf<Long, ReservedCoupon>()
+    val used = mutableSetOf<Long>()
+    var balance: Long = 0
+    var policy = PointUsePolicy(minUsableBalance = 1_000, useUnit = 10, maxUseRateBp = 3_000)
+
+    /** reserve 로 USED 가 된 쿠폰 ID 묶음(호출 순서대로). */
+    val reserved = mutableListOf<Set<Long>>()
+
+    data class Commit(val memberId: Long, val orderId: Long, val couponIds: Set<Long>, val pointsToUse: Long)
+
+    val committed = mutableListOf<Commit>()
+
+    /** 호출 순서 기록: "reserve", "commit". */
+    val calls = mutableListOf<String>()
+
+    fun product(couponId: Long, issuer: String = "PLATFORM", target: String = "ALL_PRODUCTS", discountType: String = "FIXED",
+                value: Long = 2_000, max: Long? = null, min: Long? = null, sellerId: Long? = null, productId: Long? = null) {
+        coupons[couponId] = ReservedCoupon(couponId, couponId, "PRODUCT", issuer, target, productId, sellerId, discountType, value, max, min)
+    }
+
+    fun cart(couponId: Long, discountType: String = "RATE", value: Long = 1_000, max: Long? = 5_000, min: Long? = null) {
+        coupons[couponId] = ReservedCoupon(couponId, couponId, "CART", "PLATFORM", "NONE", null, null, discountType, value, max, min)
+    }
+
+    private fun lookup(couponIds: Collection<Long>): Map<Long, ReservedCoupon> = couponIds.associateWith {
+        coupons[it] ?: throw DomainException(ErrorCode.COUPON_NOT_FOUND)
+    }
+
+    override fun quote(memberId: Long, couponIds: Collection<Long>): BenefitReservation {
+        val found = lookup(couponIds)
+        if (couponIds.any { it in used }) throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+        return BenefitReservation(found, balance, policy)
+    }
+
+    override fun reserve(memberId: Long, couponIds: Collection<Long>): BenefitReservation {
+        calls += "reserve"
+        val found = lookup(couponIds)
+        if (couponIds.any { it in used }) throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+        used += couponIds
+        reserved += couponIds.toSet()
+        return BenefitReservation(found, balance, policy)
+    }
+
+    override fun commit(memberId: Long, orderId: Long, couponIds: Collection<Long>, pointsToUse: Long) {
+        calls += "commit"
+        if (balance < pointsToUse) throw DomainException(ErrorCode.POINT_INSUFFICIENT)
+        balance -= pointsToUse
+        committed += Commit(memberId, orderId, couponIds.toSet(), pointsToUse)
     }
 }

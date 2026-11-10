@@ -30,6 +30,10 @@ class PaymentService(
     @Transactional
     fun approve(orderId: Long): PaymentSnapshot = change(orderId) { it.approve(LocalDateTime.now(clock)) }
 
+    /** 0원 결제를 PG 없이 승인한다. */
+    @Transactional
+    fun approveWithoutPg(orderId: Long): PaymentSnapshot = change(orderId) { it.approveWithoutPg(LocalDateTime.now(clock)) }
+
     @Transactional
     fun fail(orderId: Long, reason: String): PaymentSnapshot = change(orderId) { it.fail(reason) }
 

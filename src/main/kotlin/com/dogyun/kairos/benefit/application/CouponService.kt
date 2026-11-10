@@ -39,4 +39,61 @@ class CouponService(
         }
         return ClaimedCoupon(requireNotNull(coupon.id), coupon.expiresAt)
     }
+
+    /**
+     * 주문 금액 미리보기용 조회(락·UPDATE 없음). 없거나 남의 쿠폰이면 `COUPON_NOT_FOUND`, 사용됐거나 만료면 `COUPON_NOT_AVAILABLE`.
+     * 정책이 종료됐어도 쿠폰이 만료 전이면 쓸 수 있다(스펙 4-1).
+     */
+    @Transactional(readOnly = true)
+    fun quoteCoupons(memberId: Long, couponIds: Collection<Long>): List<CouponTermsResult> {
+        val now = LocalDateTime.now(clock)
+        val coupons = ownedCoupons(memberId, couponIds)
+        if (coupons.any { it.status != CouponStatus.AVAILABLE || it.isExpired(now) }) throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+        return termsOf(coupons)
+    }
+
+    /**
+     * 쿠폰을 `AVAILABLE → USED` 로 바꾼다(조건부 UPDATE, 쿠폰 ID 오름차순). 영향 행이 0 이면 남의 것·없는 쿠폰은 `COUPON_NOT_FOUND`,
+     * 그 밖(사용됨·만료·동시 사용 경합)은 `COUPON_NOT_AVAILABLE`. 주문 생성 트랜잭션 안에서 `member_point` 락 뒤에 불려야 한다(ADR 0004).
+     */
+    @Transactional
+    fun reserveCoupons(memberId: Long, couponIds: Collection<Long>): List<CouponTermsResult> {
+        val now = LocalDateTime.now(clock)
+        for (couponId in couponIds.toSortedSet()) {
+            if (!couponRepository.markUsed(couponId, memberId, now)) {
+                val coupon = couponRepository.findById(couponId)
+                if (coupon == null || coupon.memberId != memberId) throw DomainException(ErrorCode.COUPON_NOT_FOUND)
+                throw DomainException(ErrorCode.COUPON_NOT_AVAILABLE)
+            }
+        }
+        return termsOf(ownedCoupons(memberId, couponIds))
+    }
+
+    /** 주문 저장 뒤 `USED` 쿠폰에 주문 ID 를 기록한다. */
+    @Transactional
+    fun attachOrder(couponIds: Collection<Long>, orderId: Long) {
+        couponRepository.attachOrder(couponIds, orderId)
+    }
+
+    private fun ownedCoupons(memberId: Long, couponIds: Collection<Long>): List<Coupon> {
+        if (couponIds.isEmpty()) return emptyList()
+        val coupons = couponRepository.findAllByIds(couponIds.toSet())
+        if (coupons.size != couponIds.toSet().size || coupons.any { it.memberId != memberId }) {
+            throw DomainException(ErrorCode.COUPON_NOT_FOUND)
+        }
+        return coupons
+    }
+
+    private fun termsOf(coupons: List<Coupon>): List<CouponTermsResult> {
+        val policies = policyRepository.findAllByIds(coupons.map { it.policyId }.toSet()).associateBy { it.id }
+        return coupons.map { coupon ->
+            val policy = checkNotNull(policies[coupon.policyId]) { "쿠폰 정책이 없다: policyId=${coupon.policyId}" }
+            CouponTermsResult(
+                couponId = requireNotNull(coupon.id), policyId = coupon.policyId, couponType = policy.couponType.name,
+                issuerType = policy.issuerType.name, targetType = policy.targetType.name, targetProductId = policy.targetProductId,
+                sellerId = policy.sellerId, discountType = policy.discountType.name, discountValue = policy.discountValue,
+                maxDiscount = policy.maxDiscount, minOrderAmount = policy.minOrderAmount,
+            )
+        }
+    }
 }

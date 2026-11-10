@@ -68,6 +68,13 @@ class PointService(
         return if (earned) amount else 0L
     }
 
+    /** 회원 포인트 행을 잠그고(없으면 만든다) 락 뒤의 잔액을 돌려준다. 주문 생성이 쿠폰·재고보다 먼저 부른다(ADR 0004). */
+    fun lockBalance(memberId: Long): Long = pointRepository.lockOrCreate(memberId).balance
+
+    /** 미리보기용 잔액(락 없음). 쓰기 판단에는 쓰지 않는다. */
+    @Transactional(readOnly = true)
+    fun balanceOf(memberId: Long): Long = pointRepository.findByMemberId(memberId)?.balance ?: 0L
+
     /** 만료가 가까운 로트부터 [amount] 를 쓴다. 같은 주문에 두 번 쓰면 `IllegalStateException`. */
     fun use(memberId: Long, orderId: Long, amount: Long) {
         val point = pointRepository.lockOrCreate(memberId)

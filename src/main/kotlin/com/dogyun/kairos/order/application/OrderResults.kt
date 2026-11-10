@@ -7,6 +7,33 @@ data class PlaceOrderResult(
     val orderNo: String,
     val totalAmount: Long,
     val expiresAt: LocalDateTime,
+    /** 0원 주문이면 PAID, 아니면 PENDING_PAYMENT */
+    val orderStatus: String,
+    /** 0원 주문이면 APPROVED, 아니면 READY */
+    val paymentStatus: String,
+)
+
+data class QuoteLine(
+    val skuId: Long,
+    val quantity: Int,
+    val lineAmount: Long,
+    val productCouponDiscount: Long,
+    val cartCouponAllocated: Long,
+    val pointsAllocated: Long,
+    val paidAmount: Long,
+)
+
+/** 주문 금액 미리보기. place 와 같은 계산이며 아무것도 저장하지 않는다. */
+data class OrderQuote(
+    val items: List<QuoteLine>,
+    val itemsAmount: Long,
+    val productCouponDiscount: Long,
+    val cartCouponDiscount: Long,
+    val pointsUsed: Long,
+    val buyerShippingFee: Long,
+    val totalAmount: Long,
+    /** 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(잔액이 최소 사용 잔액 미만이면 0) */
+    val maxUsablePoints: Long,
 )
 
 data class ConfirmPaymentResult(
@@ -31,6 +58,14 @@ data class OrderItemResult(
     val cancelActor: String?,
     val cancelReason: String?,
     val refundAmount: Long,
+    val productCouponId: Long?,
+    val productCouponDiscount: Long,
+    /** PLATFORM, SELLER, 쿠폰 없으면 null */
+    val productCouponIssuer: String?,
+    val cartCouponAllocated: Long,
+    val pointsAllocated: Long,
+    val paidAmount: Long,
+    val pointsRefunded: Long,
 )
 
 data class SellerOrderResult(
@@ -74,6 +109,11 @@ data class OrderDetail(
     val freeShippingApplied: Boolean,
     val shippingFeeRecovered: Long,
     val refundedAmount: Long,
+    val productCouponDiscount: Long,
+    val cartCouponId: Long?,
+    val cartCouponDiscount: Long,
+    val pointsUsed: Long,
+    val pointsRefunded: Long,
     val expiresAt: LocalDateTime,
     val paidAt: LocalDateTime?,
     val createdAt: LocalDateTime,

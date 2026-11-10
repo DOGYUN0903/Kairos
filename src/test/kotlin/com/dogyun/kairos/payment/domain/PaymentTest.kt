@@ -94,4 +94,17 @@ class PaymentTest {
         assertInvalid { approved().markVoided() }
         assertInvalid { ready().apply { start("k", now) }.markVoided() }
     }
+
+    @Test
+    fun approveWithoutPg는_READY_0원에서만_된다() {
+        val zero = Payment.ready(1L, "ORD-1", 0L)
+        zero.approveWithoutPg(now)
+        assertEquals(PaymentStatus.APPROVED, zero.status)
+        assertEquals(now, zero.approvedAt)
+        assertEquals(null, zero.paymentKey)
+
+        assertInvalid { zero.approveWithoutPg(now) }
+        assertInvalid { ready().approveWithoutPg(now) }
+        assertInvalid { Payment.ready(1L, "ORD-1", 0L).apply { start("key-1", now) }.approveWithoutPg(now) }
+    }
 }

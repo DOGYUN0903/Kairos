@@ -20,8 +20,11 @@ class OrderFlowFixture {
     val tx = InlineTransactionRunner()
     val properties = OrderProperties()
 
-    val orderService = OrderService(orderRepository, productReader, sellerReader, stockManager, paymentGateway, properties, clock, Random(7))
+    val benefitApplier = FakeBenefitApplier()
     val paymentService = OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeCartItemRemover(), tx, clock)
+    val orderService = OrderService(
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, paymentService, properties, tx, clock, Random(7),
+    )
     val cancelService = OrderCancelService(orderRepository, paymentGateway, stockManager, properties, tx, clock)
     val shippingService = OrderShippingService(orderRepository, tx, clock)
 

@@ -60,3 +60,18 @@ internal fun CouponPolicy.toResult(claimed: Boolean) = CouponPolicyResult(
     status = status.name,
     claimed = claimed,
 )
+
+/** 주문에 쓸 쿠폰의 할인 조건(정책 값). 금액은 원, 정률은 bp. */
+data class CouponTermsResult(
+    val couponId: Long,
+    val policyId: Long,
+    val couponType: String,
+    val issuerType: String,
+    val targetType: String,
+    val targetProductId: Long?,
+    val sellerId: Long?,
+    val discountType: String,
+    val discountValue: Long,
+    val maxDiscount: Long?,
+    val minOrderAmount: Long?,
+)

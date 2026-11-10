@@ -41,6 +41,9 @@ interface PaymentGateway {
     fun prepare(orderId: Long, orderNo: String, amount: Long)
     fun start(orderId: Long, paymentKey: String): PaymentInfo
     fun approve(orderId: Long)
+
+    /** 0원 결제(`READY`, 금액 0)를 PG 없이 `APPROVED` 로 만든다. */
+    fun approveWithoutPg(orderId: Long)
     fun fail(orderId: Long, reason: String)
     fun markUnknown(orderId: Long)
     fun voidAfterApproval(orderId: Long)

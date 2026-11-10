@@ -2,7 +2,13 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.order.domain.CouponIssuer
+import com.dogyun.kairos.order.domain.DiscountAllocation
+import com.dogyun.kairos.order.domain.LineAllocation
+import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItemStatus
+import com.dogyun.kairos.order.domain.OrderLine
+import com.dogyun.kairos.order.domain.ShippingAddress
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import java.time.Clock
@@ -27,11 +33,13 @@ class OrderPaymentServiceTest {
     private val stockManager = FakeStockManager()
     private val paymentGateway = FakePaymentGateway()
     private val cartItemRemover = FakeCartItemRemover()
-    private val orderService = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, OrderProperties(), clock, Random(7),
-    )
+    private val benefitApplier = FakeBenefitApplier()
     private val service = OrderPaymentService(
         orderRepository, paymentGateway, stockManager, cartItemRemover, InlineTransactionRunner(), clock,
+    )
+    private val orderService = OrderService(
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, service,
+        OrderProperties(), InlineTransactionRunner(), clock, Random(7),
     )
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
@@ -316,5 +324,62 @@ class OrderPaymentServiceTest {
         )
 
         assertEquals("IN_PROGRESS", paymentGateway.get(order.orderId).status)
+    }
+
+    /** 판매자 1 의 30,000 x2 (무료배송), 상품 쿠폰으로 전액 할인한 READY 0원 주문. place 를 거치지 않고 저장한다. */
+    private fun zeroWonPendingOrder(orderNo: String = "ORD-ZERO"): Order {
+        productReader.put(30L, sellerId = 1L, salePrice = 30_000)
+        val sku = productReader.skus.getValue(30L)
+        val line = OrderLine(sku.skuId, sku.productId, sku.productName, sku.brandName, sku.optionDisplayName, sku.salePrice, sku.extraPrice, 1L, "판매자1", 1000, 2)
+        val allocation = DiscountAllocation(
+            mapOf(30L to LineAllocation(30L, 900L, 60_000, CouponIssuer.PLATFORM, 0, 0)), 60_000, null, 0, 0,
+        )
+        val order = Order.create(orderNo, memberId, listOf(line), allocation, ShippingAddress("홍길동", "010-1234-5678", "06236", "서울", "101호", null),
+            OrderProperties().shippingPolicy(), now, OrderProperties().paymentTtl)
+        val saved = orderRepository.save(order)
+        paymentGateway.prepare(saved.id!!, saved.orderNo, saved.totalAmount)
+        return saved
+    }
+
+    @Test
+    fun approveWithoutPg는_READY_0원_결제만_승인하고_판매량_증가_장바구니_제거를_한다() {
+        val order = zeroWonPendingOrder()
+        assertEquals(0L, order.totalAmount)
+
+        assertEquals(ApprovalFinish.PAID, service.approveWithoutPg(order.id!!))
+
+        val reloaded = orderRepository.findById(order.id!!)!!
+        assertEquals(OrderStatus.PAID, reloaded.status)
+        assertEquals(now, reloaded.paidAt)
+        assertEquals("APPROVED", paymentGateway.get(order.id!!).status)
+        assertEquals(null, paymentGateway.get(order.id!!).paymentKey)
+        assertEquals(emptyList(), paymentGateway.confirmCalls)
+        assertEquals(mapOf(130L to 2), stockManager.sales)
+        assertEquals(listOf(memberId to setOf(30L)), cartItemRemover.removed)
+
+        // 0원이 아닌 READY 결제는 승인하지 않는다.
+        val paid = place()
+        assertEquals(ApprovalFinish.ALREADY_SETTLED, service.approveWithoutPg(paid.orderId))
+        assertEquals("READY", paymentGateway.get(paid.orderId).status)
+    }
+
+    @Test
+    fun approveWithoutPg는_이미_닫힌_주문이면_no_op이다() {
+        val order = zeroWonPendingOrder()
+        order.expire()
+        orderRepository.save(order)
+
+        assertEquals(ApprovalFinish.ALREADY_SETTLED, service.approveWithoutPg(order.id!!))
+
+        assertEquals(OrderStatus.CANCELED, orderRepository.findById(order.id!!)!!.status)
+        assertEquals("READY", paymentGateway.get(order.id!!).status)
+        assertEquals(emptyMap(), stockManager.sales)
+        assertEquals(emptyList(), cartItemRemover.removed)
+
+        // 이미 승인된 0원 결제도 다시 처리하지 않는다.
+        val other = zeroWonPendingOrder("ORD-ZERO2")
+        service.approveWithoutPg(other.id!!)
+        assertEquals(ApprovalFinish.ALREADY_SETTLED, service.approveWithoutPg(other.id!!))
+        assertEquals(1, cartItemRemover.removed.size)
     }
 }

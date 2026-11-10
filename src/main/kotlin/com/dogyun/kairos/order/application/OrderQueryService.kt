@@ -97,6 +97,11 @@ class OrderQueryService(
             freeShippingApplied = order.freeShippingApplied,
             shippingFeeRecovered = order.shippingFeeRecovered,
             refundedAmount = order.refundedAmount,
+            productCouponDiscount = order.productCouponDiscount,
+            cartCouponId = order.cartCouponId,
+            cartCouponDiscount = order.cartCouponDiscount,
+            pointsUsed = order.pointsUsed,
+            pointsRefunded = order.pointsRefunded,
             expiresAt = order.expiresAt,
             paidAt = order.paidAt,
             createdAt = requireNotNull(order.createdAt),
@@ -152,6 +157,13 @@ class OrderQueryService(
         cancelActor = cancelActor?.name,
         cancelReason = cancelReason,
         refundAmount = refundAmount,
+        productCouponId = productCouponId,
+        productCouponDiscount = productCouponDiscount,
+        productCouponIssuer = productCouponIssuer?.name,
+        cartCouponAllocated = cartCouponAllocated,
+        pointsAllocated = pointsAllocated,
+        paidAmount = paidAmount,
+        pointsRefunded = pointsRefunded,
     )
 
     private fun ShippingAddress.toResult() = ShippingAddressResult(receiverName, phone, zipCode, address1, address2, memo)

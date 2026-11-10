@@ -45,6 +45,13 @@ class Payment(
         status = PaymentStatus.APPROVED
     }
 
+    /** 쿠폰·포인트로 전액 할인된 0원 결제는 PG 를 거치지 않고 바로 승인한다(`paymentKey` 없음). */
+    fun approveWithoutPg(now: LocalDateTime) {
+        ensure(status == PaymentStatus.READY && amount == 0L)
+        approvedAt = now
+        status = PaymentStatus.APPROVED
+    }
+
     fun fail(reason: String) {
         ensure(status == PaymentStatus.READY || status == PaymentStatus.IN_PROGRESS || status == PaymentStatus.UNKNOWN)
         failReason = reason.take(MAX_FAIL_REASON)

@@ -258,18 +258,24 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             header("Idempotency-Key", idemKey)
         }
 
-    /** items 는 (skuId, quantity) 쌍. 주문 생성 요청을 보낸다. */
+    /** items 는 (skuId, quantity), productCoupons 는 (skuId, couponId) 쌍. 주문 생성 요청을 보낸다. */
     protected fun placeOrder(
         token: String,
         items: List<Pair<Long, Int>>,
         expectedTotal: Long,
         idemKey: String = UUID.randomUUID().toString(),
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
     ): ResultActionsDsl = postIdem(
         "/api/v1/orders", token,
         mapOf(
             "items" to items.map { mapOf("skuId" to it.first, "quantity" to it.second) },
             "expectedTotalAmount" to expectedTotal,
             "shippingAddress" to address(),
+            "productCoupons" to productCoupons.map { mapOf("skuId" to it.first, "couponId" to it.second) },
+            "cartCouponId" to cartCouponId,
+            "pointsToUse" to pointsToUse,
         ),
         idemKey,
     )
@@ -288,8 +294,18 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     )
 
     /** 주문을 만들고 승인해 PAID 로 만든 뒤 내 주문 상세(`GET /api/v1/orders/{orderId}`)의 data 를 돌려준다. */
-    protected fun paidOrder(token: String, items: List<Pair<Long, Int>>, expectedTotal: Long): JsonNode {
-        val orderNo = json(placeOrder(token, items, expectedTotal).andExpect { status { isCreated() } }).get("data").get("orderNo").asString()
+    protected fun paidOrder(
+        token: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        idemKey: String = UUID.randomUUID().toString(),
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
+    ): JsonNode {
+        val orderNo = json(
+            placeOrder(token, items, expectedTotal, idemKey, productCoupons, cartCouponId, pointsToUse).andExpect { status { isCreated() } },
+        ).get("data").get("orderNo").asString()
         val confirmed = json(confirmPayment(token, orderNo, "pay-${UUID.randomUUID()}", expectedTotal).andExpect { status { isOk() } }).get("data")
         val orderId = confirmed.get("orderId").asLong()
         return json(get("/api/v1/orders/$orderId", token).andExpect { status { isOk() } }).get("data")

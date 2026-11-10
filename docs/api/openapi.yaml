@@ -1907,6 +1907,9 @@ paths:
         같은 SKU 는 수량을 합산한다. `expectedTotalAmount` 는 클라이언트가 본 총액(상품 금액 + 구매자 부담 배송비)이며
         현재 가격으로 계산한 총액과 다르면 409 `ORDER_PRICE_CHANGED` 다. 재고는 SKU ID 오름차순으로 조건부 차감하고,
         하나라도 부족하면 전부 롤백한다. `Idempotency-Key` 필수.
+        쿠폰·포인트는 상품 쿠폰 → 장바구니 쿠폰 → 포인트 순으로 적용하고(스펙 4-2), `expectedTotalAmount` 는 할인 후 PG 결제 금액이다.
+        잠금 순서는 `member_point → coupon → sku` 이며 쿠폰 사용·포인트 차감·재고 차감은 한 트랜잭션이다.
+        총액이 0원이면 PG 없이 즉시 승인되어 `orderStatus=PAID`, `paymentStatus=APPROVED` 로 응답한다.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -1928,7 +1931,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/CreateOrderResponse'
         '400':
-          description: "`ORDER_INVALID`(항목 없음·수량 범위 밖·배송지 누락), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          description: "`ORDER_INVALID`(항목 없음·수량 범위 밖·배송지 누락·쿠폰 ID 중복·한 SKU 에 상품 쿠폰 두 장·항목에 없는 SKU 지정), `COUPON_NOT_APPLICABLE`, `COUPON_MIN_AMOUNT_NOT_MET`, `POINT_INVALID_AMOUNT`, `POINT_EXCEEDS_LIMIT`, `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
           content:
             application/json:
               schema:
@@ -1936,7 +1939,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
-          description: "`ORDER_PRICE_CHANGED`, `STOCK_SOLD_OUT`, `SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU, 또는 판매자가 없거나 활성이 아님) 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          description: "`ORDER_PRICE_CHANGED`, `STOCK_SOLD_OUT`, `SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU, 또는 판매자가 없거나 활성이 아님), `COUPON_NOT_AVAILABLE`(사용됨·만료·동시 사용 경합), `POINT_INSUFFICIENT` 또는 `IDEMPOTENCY_IN_PROGRESS`"
           content:
             application/json:
               schema:
@@ -1974,6 +1977,52 @@ paths:
           $ref: '#/components/responses/InvalidRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/orders/quote:
+    post:
+      tags: [Order]
+      operationId: quoteOrder
+      summary: 주문 금액 미리보기 (쿠폰·포인트 적용)
+      description: |
+        주문 생성과 같은 계산으로 항목별 할인·배분·`paidAmount` 와 PG 결제 금액을 돌려준다. 쿠폰 상태·포인트·재고를 바꾸지 않고
+        저장하지 않으므로 `Idempotency-Key` 가 없다. `maxUsablePoints` 는 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(10P 단위)다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteOrderRequest'
+      responses:
+        '200':
+          description: 금액 미리보기
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderQuote'
+        '400':
+          description: "`COUPON_NOT_APPLICABLE`, `COUPON_MIN_AMOUNT_NOT_MET`, `POINT_INVALID_AMOUNT`, `POINT_EXCEEDS_LIMIT`, `ORDER_INVALID` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`COUPON_NOT_FOUND`(남의 쿠폰 포함)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`COUPON_NOT_AVAILABLE`, `POINT_INSUFFICIENT` 또는 `SKU_NOT_ORDERABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/orders/{orderId}:
     parameters:
       - $ref: '#/components/parameters/OrderId'
@@ -4255,6 +4304,92 @@ components:
           minimum: 0
           default: 0
           description: 사용할 포인트(0 이상 10의 배수)
+    QuoteOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateOrderItemRequest'
+        productCoupons:
+          type: array
+          description: 항목(SKU)별 상품 쿠폰. 같은 쿠폰 ID·같은 SKU 중복 지정은 `ORDER_INVALID`.
+          items:
+            type: object
+            required: [skuId, couponId]
+            properties:
+              skuId:
+                type: integer
+                format: int64
+              couponId:
+                type: integer
+                format: int64
+        cartCouponId:
+          type: integer
+          format: int64
+          nullable: true
+        pointsToUse:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+    QuoteLine:
+      type: object
+      required: [skuId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
+      properties:
+        skuId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+        lineAmount:
+          type: integer
+          format: int64
+        productCouponDiscount:
+          type: integer
+          format: int64
+        cartCouponAllocated:
+          type: integer
+          format: int64
+        pointsAllocated:
+          type: integer
+          format: int64
+        paidAmount:
+          type: integer
+          format: int64
+    OrderQuote:
+      type: object
+      required: [items, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteLine'
+        itemsAmount:
+          type: integer
+          format: int64
+        productCouponDiscount:
+          type: integer
+          format: int64
+        cartCouponDiscount:
+          type: integer
+          format: int64
+        pointsUsed:
+          type: integer
+          format: int64
+        buyerShippingFee:
+          type: integer
+          format: int64
+        totalAmount:
+          type: integer
+          format: int64
+          description: PG 결제 금액(Σ paidAmount + 구매자 배송비)
+        maxUsablePoints:
+          type: integer
+          format: int64
     ShipRequest:
       type: object
       required: [carrierCode, trackingNumber]
@@ -4337,7 +4472,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     CreateOrderResponse:
       type: object
-      required: [orderId, orderNo, totalAmount, expiresAt]
+      required: [orderId, orderNo, totalAmount, expiresAt, orderStatus, paymentStatus]
       properties:
         orderId:
           type: integer
