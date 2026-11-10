@@ -56,6 +56,10 @@ class SettlementRepositoryImpl(
     override fun findById(id: Long): Settlement? =
         settlementJpaRepository.findById(id).map { toDomain(it, findLines(id)) }.orElse(null)
 
+    @Transactional
+    override fun findByIdForUpdate(id: Long): Settlement? =
+        settlementJpaRepository.findByIdForUpdate(id)?.let { toDomain(it, findLines(id)) }
+
     override fun existsBySellerIdAndPeriodStart(sellerId: Long, periodStart: LocalDate): Boolean =
         settlementJpaRepository.existsBySellerIdAndPeriodStart(sellerId, periodStart)
 

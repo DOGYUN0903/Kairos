@@ -51,6 +51,9 @@ class SettlementAdjustmentRepositoryImpl(
         jpaRepository.saveAndFlush(entity)
     }
 
+    @Transactional
+    override fun deleteUnattachedManual(id: Long): Boolean = jpaRepository.softDeleteUnattachedManual(id, LocalDateTime.now()) == 1
+
     private fun toDomain(e: SettlementAdjustmentEntity) = SettlementAdjustment(
         e.id, e.sellerId, e.settlementId, e.adjustmentType, e.amount, e.reason,
         e.refSellerOrderId, e.sourceSettlementId, e.createdByAdminId, e.createdAt,

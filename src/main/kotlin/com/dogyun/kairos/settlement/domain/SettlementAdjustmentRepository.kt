@@ -21,6 +21,12 @@ interface SettlementAdjustmentRepository {
     fun findSellerIdsWithUnattached(createdBefore: LocalDateTime): Set<Long>
     fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<SettlementAdjustment>
 
-    /** 소프트 삭제(status = DELETED). */
+    /** 소프트 삭제(status = DELETED). 붙었는지 읽고 정하지 않으므로 경합에 안전하지 않다. 관리자 삭제는 [deleteUnattachedManual]을 쓴다. */
     fun delete(a: SettlementAdjustment)
+
+    /**
+     * `UPDATE ... SET status = 'DELETED' WHERE id = ? AND settlement_id IS NULL AND status = 'ACTIVE' AND adjustment_type = 'MANUAL'`.
+     * 정산에 붙이는 [attach]와 같은 행 잠금으로 직렬화돼, 붙은 조정은 절대 지워지지 않는다. 지웠으면 true.
+     */
+    fun deleteUnattachedManual(id: Long): Boolean
 }

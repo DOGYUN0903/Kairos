@@ -3833,6 +3833,283 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/admin/sellers/{sellerId}/settlement-adjustments:
+    parameters:
+      - name: sellerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    post:
+      tags: [Admin Settlement]
+      operationId: createSettlementAdjustment
+      summary: 정산 수동 조정 등록 (ADMIN)
+      description: |
+        판매자에게 가감 금액(양수 가산, 음수 차감)을 등록한다. 정지·탈퇴 판매자도 등록할 수 있다.
+        등록한 조정은 `created_at` 이 정산 기간 끝보다 이른 가장 가까운 다음 정산 생성 때 그 정산에 붙는다(기간 끝 뒤 등록분은 그 다음 정산).
+        `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSettlementAdjustmentRequest'
+      responses:
+        '201':
+          description: 조정 등록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateSettlementAdjustmentResponse'
+        '400':
+          description: "`SETTLEMENT_ADJUSTMENT_INVALID`(금액 0, 사유 비어 있음·500자 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SELLER_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+    get:
+      tags: [Admin Settlement]
+      operationId: listSettlementAdjustments
+      summary: 판매자 정산 조정 목록 (ADMIN)
+      description: 최신 등록순. `settlementId` 가 null 이면 아직 정산에 붙지 않은 조정이다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 조정 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementAdjustmentResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SELLER_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlement-adjustments/{adjustmentId}:
+    delete:
+      tags: [Admin Settlement]
+      operationId: deleteSettlementAdjustment
+      summary: 정산 조정 삭제 (ADMIN, 소프트 삭제)
+      description: |
+        아직 정산에 붙지 않은 `MANUAL` 조정만 지울 수 있다. 정산에 붙은 조정과 시스템이 만든 `CARRY_OVER` 는 바꿀 수 없다(409).
+        붙이기와 삭제는 조건부 UPDATE 로 직렬화되어 둘 중 하나만 성공한다.
+      parameters:
+        - $ref: '#/components/parameters/AdjustmentId'
+      responses:
+        '204':
+          description: 삭제 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND` 없거나 이미 삭제됨"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`SETTLEMENT_ADJUSTMENT_APPLIED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements:
+    get:
+      tags: [Admin Settlement]
+      operationId: listAdminSettlements
+      summary: 정산 목록 (ADMIN)
+      description: 기간 시작 최신순. 라인은 포함하지 않는다.
+      parameters:
+        - name: sellerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [GENERATED, CONFIRMED, PAID]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 정산 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/settlements/{settlementId}:
+    get:
+      tags: [Admin Settlement]
+      operationId: getAdminSettlement
+      summary: 정산 상세 (ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 정산 상세(라인·조정 포함)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements/{settlementId}/confirm:
+    patch:
+      tags: [Admin Settlement]
+      operationId: confirmSettlement
+      summary: 정산 확정 (ADMIN)
+      description: GENERATED → CONFIRMED. 이미 확정(또는 지급)된 정산은 변화 없이 200 이다(멱등). 정산 행을 잠근 뒤 현재 상태로 판단한다.
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 확정된 정산
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements/{settlementId}/pay:
+    patch:
+      tags: [Admin Settlement]
+      operationId: paySettlement
+      summary: 정산 지급 완료 처리 (ADMIN)
+      description: |
+        CONFIRMED → PAID. GENERATED 에서 바로 지급 처리할 수 없다(409). 이미 PAID 면 변화 없이 200 이다(멱등, 메모는 첫 값 유지).
+        메모는 200자 이하(초과 시 400 `INVALID_REQUEST`).
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaySettlementRequest'
+      responses:
+        '200':
+          description: 지급 처리된 정산
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`SETTLEMENT_INVALID_STATE_TRANSITION` GENERATED 에서 직행"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -3926,6 +4203,20 @@ components:
         format: int64
     ReviewId:
       name: reviewId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    AdjustmentId:
+      name: adjustmentId
       in: path
       required: true
       schema:
@@ -4080,6 +4371,112 @@ components:
             message: 같은 요청이 처리 중입니다.
             timestamp: '2026-11-08T12:00:00'
   schemas:
+    CreateSettlementAdjustmentRequest:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount:
+          type: integer
+          format: int64
+          description: 가감 금액(0 불가, 양수 가산·음수 차감)
+        reason:
+          type: string
+          maxLength: 500
+        refSellerOrderId:
+          type: integer
+          format: int64
+          nullable: true
+    CreateSettlementAdjustmentResponse:
+      type: object
+      required: [adjustmentId]
+      properties:
+        adjustmentId:
+          type: integer
+          format: int64
+    PaySettlementRequest:
+      type: object
+      properties:
+        memo:
+          type: string
+          maxLength: 200
+          nullable: true
+    SettlementSummary:
+      type: object
+      required: [settlementId, sellerId, sellerName, sellerStatus, periodStart, periodEnd, payoutDate, status, totalAmount, payableAmount, lineCount]
+      properties:
+        settlementId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        sellerName: {type: string}
+        sellerStatus: {type: string}
+        periodStart: {type: string, format: date}
+        periodEnd: {type: string, format: date, description: '기간 끝(다음 월요일, 미포함)'}
+        payoutDate: {type: string, format: date}
+        status: {type: string, enum: [GENERATED, CONFIRMED, PAID]}
+        totalAmount: {type: integer, format: int64, description: 라인 합 + 조정 합(음수 가능)}
+        payableAmount: {type: integer, format: int64, description: 'max(totalAmount, 0)'}
+        lineCount: {type: integer}
+    SettlementLineResult:
+      type: object
+      required: [lineId, sellerOrderId, orderId, orderNo, confirmedAt, salesAmount, sellerCouponDiscount, commissionBase, commissionRateBp, commissionAmount, shippingFeeOwed, returnFeeBorne, lineAmount]
+      properties:
+        lineId: {type: integer, format: int64}
+        sellerOrderId: {type: integer, format: int64}
+        orderId: {type: integer, format: int64}
+        orderNo: {type: string}
+        confirmedAt: {type: string, format: date-time}
+        salesAmount: {type: integer, format: int64}
+        sellerCouponDiscount: {type: integer, format: int64}
+        commissionBase: {type: integer, format: int64}
+        commissionRateBp: {type: integer}
+        commissionAmount: {type: integer, format: int64}
+        shippingFeeOwed: {type: integer, format: int64}
+        returnFeeBorne: {type: integer, format: int64}
+        lineAmount: {type: integer, format: int64}
+    SettlementAdjustmentResult:
+      type: object
+      required: [adjustmentId, sellerId, type, amount, reason]
+      properties:
+        adjustmentId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        settlementId: {type: integer, format: int64, nullable: true, description: 붙은 정산(없으면 아직 미반영)}
+        type: {type: string, enum: [MANUAL, CARRY_OVER]}
+        amount: {type: integer, format: int64}
+        reason: {type: string}
+        refSellerOrderId: {type: integer, format: int64, nullable: true}
+        sourceSettlementId: {type: integer, format: int64, nullable: true, description: CARRY_OVER 를 만든 정산}
+        createdAt: {type: string, format: date-time, nullable: true}
+    SettlementDetail:
+      type: object
+      required: [settlementId, sellerId, sellerName, sellerStatus, periodStart, periodEnd, payoutDate, status, totalAmount, payableAmount, lineCount, salesAmount, sellerCouponDiscount, commissionAmount, shippingFeeOwed, returnFeeBorne, adjustmentAmount, lines, adjustments]
+      properties:
+        settlementId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        sellerName: {type: string}
+        sellerStatus: {type: string}
+        periodStart: {type: string, format: date}
+        periodEnd: {type: string, format: date}
+        payoutDate: {type: string, format: date}
+        status: {type: string, enum: [GENERATED, CONFIRMED, PAID]}
+        totalAmount: {type: integer, format: int64}
+        payableAmount: {type: integer, format: int64}
+        lineCount: {type: integer}
+        salesAmount: {type: integer, format: int64}
+        sellerCouponDiscount: {type: integer, format: int64}
+        commissionAmount: {type: integer, format: int64}
+        shippingFeeOwed: {type: integer, format: int64}
+        returnFeeBorne: {type: integer, format: int64}
+        adjustmentAmount: {type: integer, format: int64}
+        confirmedAt: {type: string, format: date-time, nullable: true}
+        paidAt: {type: string, format: date-time, nullable: true}
+        paidMemo: {type: string, nullable: true}
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementLineResult'
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementAdjustmentResult'
     GenerateSettlementRequest:
       type: object
       required: [periodStart]

@@ -29,6 +29,16 @@ interface SettlementAdjustmentJpaRepository : JpaRepository<SettlementAdjustment
         @Param("createdBefore") createdBefore: LocalDateTime,
     ): Int
 
+    /** [attach] 와 같은 행 잠금으로 직렬화되는 조건부 소프트 삭제. CARRY_OVER 는 지우지 않는다(source UNIQUE 가 삭제 행도 센다). */
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE settlement_adjustment SET status = 'DELETED', modified_at = :now " +
+            "WHERE id = :id AND settlement_id IS NULL AND status = 'ACTIVE' AND adjustment_type = 'MANUAL'",
+        nativeQuery = true,
+    )
+    fun softDeleteUnattachedManual(@Param("id") id: Long, @Param("now") now: LocalDateTime): Int
+
     @Query(
         "select distinct a.sellerId from SettlementAdjustmentEntity a where a.settlementId is null " +
             "and (a.adjustmentType = com.dogyun.kairos.settlement.domain.AdjustmentType.CARRY_OVER or a.createdAt < :createdBefore)",

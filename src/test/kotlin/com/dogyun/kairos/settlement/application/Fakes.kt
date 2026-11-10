@@ -68,6 +68,7 @@ class FakeSettlementRepository : SettlementRepository {
     )
 
     override fun findById(id: Long): Settlement? = rows[id]?.let { copyOf(it) }
+    override fun findByIdForUpdate(id: Long): Settlement? = findById(id)
     override fun existsBySellerIdAndPeriodStart(sellerId: Long, periodStart: LocalDate) =
         rows.values.any { it.sellerId == sellerId && it.period.start == periodStart }
     override fun countByPeriodStart(periodStart: LocalDate) = rows.values.count { it.period.start == periodStart }
@@ -120,9 +121,17 @@ class FakeSettlementAdjustmentRepository(var now: () -> LocalDateTime) : Settlem
     override fun findBySettlementId(settlementId: Long) = rows.values.filter { it.settlementId == settlementId && it.id !in deleted }
     override fun findSellerIdsWithUnattached(createdBefore: LocalDateTime): Set<Long> =
         rows.values.filter { attachable(it, createdBefore) }.map { it.sellerId }.toSet()
-    override fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<SettlementAdjustment> =
-        throw UnsupportedOperationException()
+    override fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<SettlementAdjustment> {
+        val all = rows.values.filter { it.sellerId == sellerId && it.id !in deleted }.sortedByDescending { it.id }
+        return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
+    }
     override fun delete(a: SettlementAdjustment) { deleted += a.id!! }
+    override fun deleteUnattachedManual(id: Long): Boolean {
+        val a = rows[id] ?: return false
+        if (id in deleted || a.settlementId != null || a.type != AdjustmentType.MANUAL) return false
+        deleted += id
+        return true
+    }
 }
 
 class FakeSettlementRunRepository : SettlementRunRepository {
@@ -137,4 +146,9 @@ class FakeSettlementRunRepository : SettlementRunRepository {
 
     override fun exists(periodStart: LocalDate) = runs.any { it.periodStart == periodStart }
     override fun findAllPeriodStarts() = runs.map { it.periodStart }.toSet()
+}
+
+class FakeSettlementSellerReader(vararg sellers: SettlementSellerInfo) : SettlementSellerReader {
+    private val byId = sellers.associateBy { it.sellerId }
+    override fun findSellers(sellerIds: Collection<Long>) = byId.filterKeys { it in sellerIds }
 }
