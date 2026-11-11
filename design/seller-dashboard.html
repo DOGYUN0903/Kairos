@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 판매자 — 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  body { min-width: 1280px; }
+  .states { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg); font-size: 13px; }
+  .states strong { margin-right: 8px; }
+  .states a { padding: 4px 10px; border: 1px solid var(--border); border-radius: 13px; background: #fff; }
+  .state { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--border); }
+  .state > h2 { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 16px; }
+  .mini-nav { display: inline-flex; gap: 6px; font-size: 12px; color: var(--text-2); margin-left: 8px; font-weight: 400; }
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .summary a { display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; min-height: 96px; color: var(--text); }
+  .summary a:hover { border-color: var(--navy); text-decoration: none; }
+  .summary .n { display: block; font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .summary .l { font-size: 12px; color: var(--text-2); }
+  .summary .go { display: block; font-size: 12px; color: var(--navy); margin-top: 6px; }
+  .dash-cols { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+  .quick { display: flex; flex-direction: column; gap: 8px; }
+  .quick a[disabled] { background: var(--surface-2); border-color: var(--border); color: var(--text-3); cursor: not-allowed; pointer-events: none; }
+  .p-cell { display: flex; align-items: center; gap: 12px; }
+  .p-cell .name { font-weight: 500; display: block; }
+  .p-cell .meta { font-size: 12px; color: var(--text-2); }
+  .kv { width: 100%; border-collapse: collapse; }
+  .kv th, .kv td { text-align: left; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .kv th { width: 160px; color: var(--text-2); font-weight: 500; font-size: 13px; }
+  .onboard { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 16px 0 24px; }
+  .onboard li { list-style: none; padding: 16px; background: var(--surface); border-radius: var(--radius-lg); font-size: 13px; color: var(--text-2); }
+  .onboard b { display: block; color: var(--navy); font-size: 14px; margin-bottom: 4px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .skeleton { background: var(--surface-2); border-radius: var(--radius); height: 14px; }
+</style>
+</head>
+<body>
+<div class="console">
+  <aside class="console__side">
+    <a class="logo" href="index.html">KAIROS</a>
+    <div class="console__role">판매자 센터</div>
+    <nav class="side-nav" aria-label="판매자 메뉴">
+      <a href="seller-dashboard.html" aria-current="page"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>대시보드</a>
+      <a href="seller-product-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>상품 관리</a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 7h16v4H4z"/><path d="M6 11v9h12v-9"/><path d="M10 15h4"/></svg>브랜드</a>
+      <a href="#" aria-disabled="true"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>정산<span class="soon">준비 중</span></a>
+    </nav>
+    <p class="hint" style="margin:16px 8px 0">미신청·심사 중·반려 상태에서는 "대시보드"만 보입니다.</p>
+  </aside>
+
+  <div class="console__main">
+    <header class="console__top">
+      <h1>대시보드</h1>
+      <div class="console__user"><span>[판매자 A 주식회사]</span><span class="avatar" aria-hidden="true">A</span></div>
+    </header>
+
+    <main class="console__content">
+      <nav class="states" aria-label="상태별 보기">
+        <strong>상태별 보기</strong>
+        <a href="#state-apply">① 미신청</a><a href="#state-pending">② 심사 중 PENDING</a><a href="#state-rejected">③ 반려 REJECTED</a><a href="#state-approved">④ 승인 APPROVED</a><a href="#state-suspended">⑤ 정지 SUSPENDED</a><a href="#state-loading">로딩</a>
+      </nav>
+      <p class="hint mt-8">진입 시 <code>GET /seller/me</code>의 <code>status</code>로 화면을 고릅니다(404면 미신청). 상품 수는 <code>GET /seller/products?status=…&amp;size=1</code>의 <code>totalElements</code>입니다.</p>
+
+      <section id="state-apply" class="state" style="border-top:0;margin-top:16px">
+        <h2>① 미신청 — 사이드 메뉴는 "대시보드"만</h2>
+        <div class="card"><div class="card__body">
+          <h3 style="font-size:20px;font-weight:700">KAIROS에 입점하고 브랜드 상품을 판매하세요</h3>
+          <p class="muted mt-8">사업자 정보와 정산 계좌를 등록하면 관리자 심사 후 판매자 센터를 모두 쓸 수 있습니다.</p>
+          <ol class="onboard">
+            <li><b>1. 입점 신청</b>회사명 · 사업자등록번호 · 대표자 · 연락처 · 정산 계좌</li>
+            <li><b>2. 관리자 심사</b>보통 영업일 기준 1–2일이 걸립니다</li>
+            <li><b>3. 브랜드 · 상품 등록</b>브랜드 승인 후 상품을 등록하고 검수를 받습니다</li>
+          </ol>
+          <a class="btn btn-primary btn-lg" href="#state-rejected">입점 신청</a>
+        </div></div>
+      </section>
+
+      <section id="state-pending" class="state">
+        <h2>② 심사 중 — PENDING</h2>
+        <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>심사 중입니다. 내용을 고치면 다시 심사합니다.</span></div>
+        <div class="card mt-16">
+          <div class="card__head"><h2>입점 신청 내용</h2><button type="button" class="btn btn-ghost btn-sm">수정</button></div>
+          <div class="card__body"><table class="kv"><tbody>
+            <tr><th scope="row">회사명</th><td>[판매자 A 주식회사]</td></tr>
+            <tr><th scope="row">사업자등록번호</th><td>123-45-67890</td></tr>
+            <tr><th scope="row">대표자</th><td>박서준</td></tr>
+            <tr><th scope="row">연락처</th><td>02-1234-5678</td></tr>
+            <tr><th scope="row">정산 계좌</th><td>국민은행 123456-01-234567 · 예금주 [판매자 A 주식회사]</td></tr>
+          </tbody></table></div>
+        </div>
+      </section>
+
+      <section id="state-rejected" class="state">
+        <h2>③ 반려 — REJECTED</h2>
+        <div class="notice notice-warn" role="alert"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span><strong>입점이 반려되었습니다.</strong> 사유: 사업자등록번호와 회사명이 사업자등록증과 일치하지 않습니다. 고쳐서 다시 신청해 주세요.</span></div>
+        <form class="card mt-16" action="#" onsubmit="return false">
+          <div class="card__head"><h2>입점 신청 수정</h2></div>
+          <div class="card__body">
+            <div class="form-grid">
+              <div class="field"><label for="r-company">회사명</label><input id="r-company" class="input" value="[판매자 A 주식회사]"></div>
+              <div class="field"><label for="r-biz">사업자등록번호</label><input id="r-biz" class="input" value="123-45-67890" inputmode="numeric"></div>
+              <div class="field"><label for="r-rep">대표자</label><input id="r-rep" class="input" value="박서준"></div>
+              <div class="field"><label for="r-phone">연락처</label><input id="r-phone" class="input" type="tel" value="02-1234-5678"></div>
+              <div class="field"><label for="r-bank">정산 은행</label><select id="r-bank" class="select"><option>국민은행</option><option>신한은행</option><option>우리은행</option><option>하나은행</option></select></div>
+              <div class="field"><label for="r-acc">계좌번호</label><input id="r-acc" class="input" value="123456-01-234567" inputmode="numeric"></div>
+              <div class="field"><label for="r-holder">예금주</label><input id="r-holder" class="input" value="[판매자 A 주식회사]"></div>
+            </div>
+            <div class="row mt-24" style="justify-content:flex-end"><button type="submit" class="btn btn-primary">다시 신청</button></div>
+          </div>
+        </form>
+      </section>
+
+      <section id="state-approved" class="state">
+        <h2>④ 승인 — APPROVED</h2>
+      <div class="summary" role="group" aria-label="상태별 상품 수">
+        <a href="seller-product-list.html?status=PENDING_REVIEW"><span class="l">검수 대기</span><span class="n">3</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=ON_SALE"><span class="l">판매 중</span><span class="n">15</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=PAUSED"><span class="l">일시 중지</span><span class="n">2</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=REJECTED"><span class="l">반려 · 종료</span><span class="n">4</span><span class="go">보기 →</span></a>
+      </div>
+      <div class="dash-cols mt-24">
+        <section class="card" aria-labelledby="recent-ha">
+          <div class="card__head"><h2 id="recent-ha">최근 등록 상품</h2><a class="small" href="seller-product-list.html">전체 보기</a></div>
+          <div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">상품</th><th scope="col">상태</th><th scope="col">등록일</th></tr></thead>
+            <tbody>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">워싱 피그먼트 포켓 티셔츠</a><span class="meta">#1031 · [브랜드 A]</span></div></div></td><td><span class="chip chip-pending">검수 대기</span></td><td class="muted">2026-11-08</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">로고 자수 볼캡</a><span class="meta">#1029 · [브랜드 A]</span></div></div></td><td><span class="chip chip-rejected">반려</span></td><td class="muted">2026-11-05</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">오버핏 헤비웨이트 코튼 티셔츠</a><span class="meta">#1024 · [브랜드 A]</span></div></div></td><td><span class="chip chip-onsale">판매 중</span></td><td class="muted">2026-11-02</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">스트라이프 보트넥 롱슬리브</a><span class="meta">#1012 · [브랜드 B]</span></div></div></td><td><span class="chip chip-onsale">판매 중</span></td><td class="muted">2026-10-21</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">링거 넥 레트로 티셔츠</a><span class="meta">#1007 · [브랜드 B]</span></div></div></td><td><span class="chip chip-paused">일시 중지</span></td><td class="muted">2026-10-15</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section class="card" aria-labelledby="quick-ha">
+          <div class="card__head"><h2 id="quick-ha">바로 가기</h2></div>
+          <div class="card__body quick">
+            <a class="btn btn-primary btn-block" href="seller-product-form.html" >상품 등록</a>
+            <a class="btn btn-block" href="#" >브랜드 신청</a>
+            <a class="btn btn-ghost btn-block" href="seller-product-list.html">상품 관리</a>
+          </div>
+        </section>
+      </div>
+      </section>
+
+      <section id="state-suspended" class="state">
+        <h2>⑤ 정지 — SUSPENDED</h2>
+        <div class="notice notice-warn" role="alert"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span><strong>판매자 정지 중:</strong> 위조 상품 의심 신고 확인 중입니다. 판매 중인 상품은 노출되지 않으며, 새 상품·브랜드를 등록할 수 없습니다.</span></div>
+        <div class="mt-16"></div>
+      <div class="summary" role="group" aria-label="상태별 상품 수">
+        <a href="seller-product-list.html?status=PENDING_REVIEW"><span class="l">검수 대기</span><span class="n">3</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=ON_SALE"><span class="l">판매 중</span><span class="n">15</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=PAUSED"><span class="l">일시 중지</span><span class="n">2</span><span class="go">보기 →</span></a>
+        <a href="seller-product-list.html?status=REJECTED"><span class="l">반려 · 종료</span><span class="n">4</span><span class="go">보기 →</span></a>
+      </div>
+      <div class="dash-cols mt-24">
+        <section class="card" aria-labelledby="recent-hb">
+          <div class="card__head"><h2 id="recent-hb">최근 등록 상품</h2><a class="small" href="seller-product-list.html">전체 보기</a></div>
+          <div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">상품</th><th scope="col">상태</th><th scope="col">등록일</th></tr></thead>
+            <tbody>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">워싱 피그먼트 포켓 티셔츠</a><span class="meta">#1031 · [브랜드 A]</span></div></div></td><td><span class="chip chip-pending">검수 대기</span></td><td class="muted">2026-11-08</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">로고 자수 볼캡</a><span class="meta">#1029 · [브랜드 A]</span></div></div></td><td><span class="chip chip-rejected">반려</span></td><td class="muted">2026-11-05</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">오버핏 헤비웨이트 코튼 티셔츠</a><span class="meta">#1024 · [브랜드 A]</span></div></div></td><td><span class="chip chip-onsale">판매 중</span></td><td class="muted">2026-11-02</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">스트라이프 보트넥 롱슬리브</a><span class="meta">#1012 · [브랜드 B]</span></div></div></td><td><span class="chip chip-onsale">판매 중</span></td><td class="muted">2026-10-21</td></tr>
+              <tr><td><div class="p-cell"><div class="ph ph-sm">[이미지]</div><div><a class="name" href="seller-product-form.html">링거 넥 레트로 티셔츠</a><span class="meta">#1007 · [브랜드 B]</span></div></div></td><td><span class="chip chip-paused">일시 중지</span></td><td class="muted">2026-10-15</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section class="card" aria-labelledby="quick-hb">
+          <div class="card__head"><h2 id="quick-hb">바로 가기</h2></div>
+          <div class="card__body quick">
+            <a class="btn btn-primary btn-block" href="seller-product-form.html" disabled aria-disabled="true" title="정지 중">상품 등록</a>
+            <a class="btn btn-block" href="#" disabled aria-disabled="true" title="정지 중">브랜드 신청</a>
+            <a class="btn btn-ghost btn-block" href="seller-product-list.html">상품 관리</a>
+          </div>
+        </section>
+      </div>
+      </section>
+
+      <section id="state-loading" class="state">
+        <h2>로딩 · 빈 상태</h2>
+        <div class="summary" aria-busy="true" aria-label="불러오는 중">
+          <a><span class="skeleton" style="width:50%"></span><span class="skeleton mt-8" style="width:30%;height:22px"></span></a><a><span class="skeleton" style="width:50%"></span><span class="skeleton mt-8" style="width:30%;height:22px"></span></a><a><span class="skeleton" style="width:50%"></span><span class="skeleton mt-8" style="width:30%;height:22px"></span></a><a><span class="skeleton" style="width:50%"></span><span class="skeleton mt-8" style="width:30%;height:22px"></span></a>
+        </div>
+        <div class="card mt-24"><div class="card__head"><h2>최근 등록 상품</h2></div>
+          <div class="card__body" style="text-align:center;padding:48px 20px">
+            <p class="muted">아직 등록한 상품이 없습니다.</p>
+            <a class="btn btn-primary mt-16" href="seller-product-form.html">첫 상품 등록</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>
