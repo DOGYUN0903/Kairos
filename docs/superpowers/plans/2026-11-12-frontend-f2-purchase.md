@@ -196,6 +196,29 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 
 ---
 
+### Task 4b: 주문 응답 추가 필드 2개 (백엔드, 시안 확인에서 사용자 결정 2026-11-12)
+
+스펙 §5-2.
+
+**Files:**
+- Modify: `docs/api/openapi.yaml`, `frontend/src/api/schema.d.ts`, `order/application/{OrderQueryService,OrderResults}.kt`
+- Test: `order/presentation/OrderQueryApiTest.kt`(또는 `OrderCancelApiTest.kt`), `order/application/OrderQueryServiceTest.kt`
+
+**Interfaces:**
+- Produces: `OrderDetail.remainingAmount: Long`(required, = `totalAmount − refundedAmount`, 구매자·관리자 상세 공통), `OrderSummary.expiresAt: LocalDateTime`(required, 주문의 결제 만료 시각 — `OrderDetail.expiresAt`과 같은 값)
+
+- [ ] **Step 1: OpenAPI 수정** (`remainingAmount` 설명: "결제 금액에서 누적 환불액을 뺀 남은 결제 금액. 화면은 이 값을 그대로 보여준다")
+- [ ] **Step 2: 실패하는 테스트**
+  - `결제_직후_남은_결제_금액은_결제_금액과_같다` — B 30,000 + C 30,000 결제: `remainingAmount=60000`
+  - `부분_취소_뒤_남은_결제_금액은_결제_금액에서_환불액을_뺀_값이다` — C 항목 취소(환불 27,000): `refundedAmount=27000, remainingAmount=33000`
+  - `전부_취소하면_남은_결제_금액은_0이다` — 나머지도 취소: `refundedAmount=60000, remainingAmount=0`
+  - `결제_전_주문의_남은_결제_금액은_주문_총액이다` — `PENDING_PAYMENT`: `remainingAmount == totalAmount`
+  - `주문_목록에_결제_만료_시각이_있다` — `content[0].expiresAt`이 상세의 `expiresAt`과 같다(관리자 목록도)
+- [ ] **Step 3: 실패 확인 → 구현(`OrderQueryService.toDetail`·`toSummary` 매핑. 돈 계산 클래스는 건드리지 않는다) → `./gradlew test --tests '*Order*' --tests '*OpenApiContractTest'` 통과 → `pnpm gen:api && pnpm check:api`**
+- [ ] **Step 4: Commit** `feat(backend): 주문 상세에 남은 결제 금액, 주문 목록에 결제 만료 시각 추가`
+
+---
+
 ### Task 5: 백엔드 보강 마무리 점검
 
 - [ ] **Step 1: `./gradlew test` 전체 통과, `git diff dev --stat -- src/main`에 돈 계산 클래스(`RefundCalculator`, `DiscountAllocator`, `CouponTerms`, `ReturnRefundCalculator`, `SettlementCalculator`, `Settlement`)와 `db/migration`이 없음을 확인**
@@ -392,8 +415,8 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `progress.test.ts`: `PAID`+`["PAID"]` → "배송 준비 중", `["SHIPPING","PAID"]` → "배송 중 1 · 배송 준비 1", `["CANCELED","DELIVERED"]` → "배송 완료", `["CANCELED","CANCELED"]`(주문 `PAID`) → "결제 완료", `PENDING_PAYMENT` → "결제 대기", `COMPLETED` → "구매 확정"
   - `actions.test.ts`: 취소 버튼 조건 4가지(배송 시작된 판매자 주문·취소 확인 중 항목·결제 대기 주문에서는 false), 구매 확정 조건(열린 반품이 있으면 false), `canPay`(만료 시각 지남 → false, 결제 확인 중 → false), `orderHeader` 5가지, `refundLines`: 27,000원 예시에서 `[항목 금액 30000, 배송비 차감 3000(negative)]`, 0인 줄은 없음, `RETURN_REQUESTED` 항목은 취소 불가 (Review Focus 5)
 - [ ] **Step 2: 실패 확인 → 구현 → 통과**
-- [ ] **Step 3: 주문 내역 화면.** `?page=`(URL). `OrderCard`: 주문일(`datetime.ts` 포맷), 주문번호, 이미지(`thumbnailUrl ?? 자리 표시`), `firstProductName` + (`itemCount > 1`이면 " 외 n건"), `<Money totalAmount>`, `orderProgressLabel`, "주문 상세". `PENDING_PAYMENT`면 "결제하기"(→ `/my/orders/{id}/pay`). 빈 상태 "주문 내역이 없습니다 → 상품 보러 가기". `Pagination`.
-- [ ] **Step 4: 주문 상세 화면.** `useOrder(orderId, { refetchInterval: usePollingWindow(needsPolling(order)).interval })`. 404 → not-found. `OrderStatusHeader`(`orderHeader`별 문구, pending이면 `PayCountdown`(1초 간격, 0이 되면 주문 재조회)과 "결제하기", checking이면 "결제 결과를 확인하고 있습니다", 폴링 2분 초과 시 "새로고침해 결과를 확인해 주세요"). `SellerOrderCard`: 판매자명, `StatusChip sellerOrder`, `carrierName(carrierCode)` + 송장번호(있을 때), 배송비·부담 주체("무료배송" / "배송비 3,000원"), 항목들, `canConfirmPurchase`면 "구매 확정"(`ConfirmDialog` "확정하면 되돌릴 수 없습니다" → `PATCH`, 처리 중 버튼 잠금, 성공 시 주문 무효화). `PaymentSummaryCard`: 상품 금액, 배송비, 결제 금액, 환불 금액, 배송비 차감(`shippingFeeRecovered` > 0일 때), 남은 금액은 **프론트에서 더하거나 빼지 않고** 서버 필드를 각각 한 줄로 보여준다("남은 상품 결제액" `remainingPaidAmount`, "남은 배송비" `remainingBuyerShippingFee` — 환불이 한 번이라도 있을 때만 두 줄 표시). 쿠폰·포인트는 0이 아닐 때만.
+- [ ] **Step 3: 주문 내역 화면.** `?page=`(URL). `OrderCard`: 주문일(`datetime.ts` 포맷), 주문번호, 이미지(`thumbnailUrl ?? 자리 표시`), `firstProductName` + (`itemCount > 1`이면 " 외 n건"), `<Money totalAmount>`, `orderProgressLabel`, "주문 상세". `PENDING_PAYMENT`면 "결제하기"(→ `/my/orders/{id}/pay`)와 남은 시간(`OrderSummary.expiresAt`, `PayCountdown` 재사용; 0이 되면 목록 재조회). 빈 상태 "주문 내역이 없습니다 → 상품 보러 가기". `Pagination`.
+- [ ] **Step 4: 주문 상세 화면.** `useOrder(orderId, { refetchInterval: usePollingWindow(needsPolling(order)).interval })`. 404 → not-found. `OrderStatusHeader`(`orderHeader`별 문구, pending이면 `PayCountdown`(1초 간격, 0이 되면 주문 재조회)과 "결제하기", checking이면 "결제 결과를 확인하고 있습니다", 폴링 2분 초과 시 "새로고침해 결과를 확인해 주세요"). `SellerOrderCard`: 판매자명, `StatusChip sellerOrder`, `carrierName(carrierCode)` + 송장번호(있을 때), 배송비·부담 주체("무료배송" / "배송비 3,000원"), 항목들, `canConfirmPurchase`면 "구매 확정"(`ConfirmDialog` "확정하면 되돌릴 수 없습니다" → `PATCH`, 처리 중 버튼 잠금, 성공 시 주문 무효화). `PaymentSummaryCard`: 상품 금액, 배송비, 결제 금액, 환불 금액, 배송비 차감(`shippingFeeRecovered` > 0일 때), "남은 결제 금액"은 서버 필드 `remainingAmount`를 그대로 보여준다(프론트에서 빼지 않는다, 시안대로 한 줄). 쿠폰·포인트는 0이 아닐 때만.
 - [ ] **Step 5: 항목 취소 창 `CancelItemDialog`.** 열리면 `useCancelPreview` → `refundLines` + "환불 예정 금액" `<Money refundAmount>`. `shippingFeeDeducted > 0`이면 "무료배송 기준 금액 아래로 내려가 배송비가 차감됩니다" 한 줄. 미리보기가 409면 서버 메시지를 보여주고 "취소하기" 비활성. 사유(필수, 500자, zod) + `useIdempotentSubmit` → `POST …/cancel`. 결과: `CANCELED` → 토스트 `"취소되었습니다. 환불 {금액}"`(차감이 있으면 "(배송비 3,000원 차감)"), `CANCEL_REQUESTED` → "취소를 확인하고 있습니다", 409 `PAYMENT_CANCEL_FAILED` → "취소가 거절되었습니다. 주문은 그대로입니다", 409 `ORDER_ITEM_NOT_CANCELABLE` → 서버 메시지. 어느 경우든 주문 상세와 목록을 무효화하고 창을 닫는다(거절은 창 유지).
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 주문 내역·상세, 항목 취소(환불 미리보기), 구매 확정 추가`
 

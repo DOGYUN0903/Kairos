@@ -67,6 +67,7 @@ F1에서 상품을 보고 등록·검수하는 데까지 화면이 생겼다. F2
 - `OrderItemResult.thumbnailUrl`(nullable), `OrderSummary.thumbnailUrl`(첫 항목, nullable), `SellerOrderSummary.thumbnailUrl`(nullable)을 추가한다. 주문 시점 복사가 아니라 **조회할 때 상품의 현재 대표 이미지**를 가져온다(DB 변경 없음). 상품이 삭제됐으면 null이고 화면은 자리 표시 이미지를 쓴다. `order.application`의 기존 `ProductReader` 포트에 "상품 ID 목록 → 대표 이미지" 일괄 조회를 더하고(목록 한 페이지에 조회 1번, N+1 금지), 구현은 `order.infrastructure`에서 catalog의 application 서비스를 부른다(모듈 규칙). 틀렸을 때 비용: 판매자가 이미지를 바꾸면 과거 주문의 이미지도 바뀐다 — 스냅샷이 필요해지면 컬럼과 마이그레이션을 추가한다.
 - `OrderSummary.sellerOrderStatuses`(`SellerOrderStatus` 배열, 판매자 주문 수만큼)를 추가한다(Claude 결정). 주문 상태는 `PAID`에서 `COMPLETED`까지 한 값이라, 이것이 없으면 주문 내역 카드에 "배송 중"을 보여줄 수 없다. 한 페이지의 주문 ID로 일괄 조회한다. 틀렸을 때 비용: 필드 하나와 조회 하나를 뺀다(목록 카드는 "결제 완료"만 보인다).
 - 구매자·관리자 목록이 같은 `OrderSummary`를 쓰므로 둘 다 채워진다.
+- (사용자 결정, 시안 확인 2026-11-12) `OrderDetail.remainingAmount`(= 결제 금액 − 누적 환불액)와 `OrderSummary.expiresAt`을 추가한다. 주문 상세의 "남은 결제 금액" 한 줄과 주문 내역 결제 대기 카드의 남은 시간을 프론트 계산 없이 보여주기 위해서다.
 
 ### 5-3. 장바구니·견적의 판매자 정보 (사용자 결정 + Claude 세부)
 
@@ -222,7 +223,7 @@ F1에서 상품을 보고 등록·검수하는 데까지 화면이 생겼다. F2
   - 취소 응답: `CANCELED`면 실제 `refundAmount`·`shippingFeeDeducted`를 토스트로 알리고 상세를 다시 읽는다. `CANCEL_REQUESTED`면 "취소를 확인하고 있습니다" — 항목에 "취소 확인 중" 칩. 409 `PAYMENT_CANCEL_FAILED`는 "취소가 거절되었습니다. 주문은 그대로입니다".
   - **구매 확정**: 판매자 주문 `DELIVERED`일 때 버튼. 확인 창("확정하면 되돌릴 수 없습니다") 뒤 `PATCH …/confirm`(키 없음, 이중 제출 가드, 서버가 이미 확정이면 200). 409 `SELLER_ORDER_HAS_OPEN_RETURN`은 서버 메시지.
   - 반품 관련 항목 상태(`RETURN_*`, `RETURNED`)는 데이터가 있을 수 있으므로 칩 문구만 정의한다. 반품·후기 버튼은 두지 않는다(F3·F4).
-- **결제 요약**(전부 서버 값): 상품 금액, 배송비(구매자 부담), 결제 금액, 환불 금액(`refundedAmount`), 무료배송 기준 미달로 차감된 배송비(`shippingFeeRecovered`, 0이면 숨김), 남은 결제 금액. 쿠폰·포인트 필드는 0이 아닐 때만 줄을 보인다(F3 전에도 데이터가 있을 수 있다).
+- **결제 요약**(전부 서버 값): 상품 금액, 배송비(구매자 부담), 결제 금액, 환불 금액(`refundedAmount`), 무료배송 기준 미달로 차감된 배송비(`shippingFeeRecovered`, 0이면 숨김), 남은 결제 금액(`remainingAmount`). 쿠폰·포인트 필드는 0이 아닐 때만 줄을 보인다(F3 전에도 데이터가 있을 수 있다).
 - **배송지**: 읽기 전용.
 - **자동 재조회**: 결제가 `IN_PROGRESS`/`UNKNOWN`이거나 `CANCEL_REQUESTED` 항목이 있으면 3초 간격으로 다시 읽는다(최대 2분, 그 뒤 "새로고침" 안내). 결제 대기 남은 시간이 0이 되면 한 번 다시 읽는다.
 - 남은 시간 계산: `expiresAt`은 오프셋 없는 KST 문자열이다. `lib/datetime.ts`에 "KST LocalDateTime까지 남은 초"를 구하는 함수를 추가한다(문자열에 `+09:00`을 붙여 해석 — 브라우저 시간대에 흔들리지 않게). 표시용 포맷은 기존 규칙대로 문자열만 다룬다.
