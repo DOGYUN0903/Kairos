@@ -5,6 +5,8 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "2.3.21"
     id("com.google.devtools.ksp") version "2.3.13"
+    // 돈 계산 순수 클래스의 뮤테이션 테스트(./gradlew pitest). check/test에는 묶지 않는다.
+    id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "com.dogyun"
@@ -85,4 +87,37 @@ tasks.withType<Test> {
     // 서버 기본 시간대는 Asia/Seoul로 고정한다(LocalDateTime.now() 기준).
     systemProperty("user.timezone", "Asia/Seoul")
     jvmArgs("-Duser.timezone=Asia/Seoul")
+}
+
+// 돈 계산 클래스만 대상으로 하는 뮤테이션 테스트. 빠른 순수 단위 테스트만 돌린다(Testcontainers·Spring 제외).
+pitest {
+    pitestVersion = "1.30.2"
+    junit5PluginVersion = "1.2.3"
+    // 플러그인이 옛 junit-platform-launcher(1.12)를 끼워 넣으면 Boot 4의 JUnit 6 엔진과 어긋나 실패한다. Boot BOM 버전을 그대로 쓴다.
+    addJUnitPlatformLauncher = false
+    targetClasses = listOf(
+        "com.dogyun.kairos.order.domain.DiscountAllocator*",
+        "com.dogyun.kairos.order.domain.CouponTerms*",
+        "com.dogyun.kairos.order.domain.RefundCalculator*",
+        "com.dogyun.kairos.order.domain.RefundPlan*",
+        "com.dogyun.kairos.order.domain.ReturnRefundCalculator*",
+        "com.dogyun.kairos.order.domain.ReturnRefundPlan*",
+        "com.dogyun.kairos.settlement.domain.SettlementCalculator*",
+        "com.dogyun.kairos.settlement.domain.Settlement",
+        "com.dogyun.kairos.settlement.domain.Settlement\$*",
+    )
+    targetTests = listOf(
+        "com.dogyun.kairos.order.domain.*Test",
+        "com.dogyun.kairos.settlement.domain.*Test",
+    )
+    // Kotlin data class 가 만드는 equals/hashCode/toString/componentN/copy 는 돈 계산이 아니라 제외한다.
+    excludedMethods = listOf("equals", "hashCode", "toString", "component*", "copy", "copy\$default")
+    mutators = listOf("STRONGER")
+    outputFormats = listOf("HTML", "XML")
+    timestampedReports = false
+    threads = 4
+    jvmArgs = listOf("-Duser.timezone=Asia/Seoul")
+    // 측정 후 달성 점수를 내림해 고정한다. 떨어지면 ./gradlew pitest 가 실패한다.
+    mutationThreshold = 0
+    coverageThreshold = 0
 }
