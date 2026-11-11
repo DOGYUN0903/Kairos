@@ -262,4 +262,69 @@ class CommerceAuthorizationApiTest : CommerceTestSupport() {
         val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)))
         get("/api/v1/products/$productId/reviews").andExpect { status { isOk() } }
     }
+
+    @Test
+    fun 비로그인_반품_요청_정산_조회는_401() {
+        postIdem("/api/v1/orders/1/items/1/returns", null, mapOf("reason" to "CHANGE_OF_MIND")).andExpect { status { isUnauthorized() } }
+        get("/api/v1/returns/me").andExpect { status { isUnauthorized() } }
+        get("/api/v1/returns/1").andExpect { status { isUnauthorized() } }
+        delete("/api/v1/returns/1").andExpect { status { isUnauthorized() } }
+        get("/api/v1/seller/returns").andExpect { status { isUnauthorized() } }
+        patch("/api/v1/seller/returns/1/approve").andExpect { status { isUnauthorized() } }
+        get("/api/v1/seller/settlements").andExpect { status { isUnauthorized() } }
+        get("/api/v1/seller/settlements/1").andExpect { status { isUnauthorized() } }
+        get("/api/v1/admin/returns").andExpect { status { isUnauthorized() } }
+        get("/api/v1/admin/settlements").andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun 일반_회원의_판매자_반품_정산_API는_403() {
+        val token = newUserToken() // 판매자가 아닌 회원
+        get("/api/v1/seller/returns", token).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/returns/1", token).andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/returns/1/approve", token).andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/returns/1/reject", token, mapOf("rejectReason" to "x")).andExpect { status { isForbidden() } }
+        patch("/api/v1/seller/returns/1/receive", token).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/settlements", token).andExpect { status { isForbidden() } }
+        get("/api/v1/seller/settlements/1", token).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 판매자_토큰의_관리자_반품_정산_조정_API는_403() {
+        val sellerToken = newUserToken()
+        val sellerId = approvedSeller(sellerToken)
+        get("/api/v1/admin/returns", sellerToken).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/returns/1", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/returns/1/approve", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/returns/1/receive", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/returns/1/cancel", sellerToken).andExpect { status { isForbidden() } }
+        postIdem("/api/v1/admin/settlements/generate", sellerToken, mapOf("periodStart" to "2026-10-05")).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/settlements", sellerToken).andExpect { status { isForbidden() } }
+        get("/api/v1/admin/settlements/1", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/settlements/1/confirm", sellerToken).andExpect { status { isForbidden() } }
+        patch("/api/v1/admin/settlements/1/pay", sellerToken).andExpect { status { isForbidden() } }
+        postIdem("/api/v1/admin/sellers/$sellerId/settlement-adjustments", sellerToken, mapOf("amount" to 1000, "reason" to "x"))
+            .andExpect { status { isForbidden() } }
+        get("/api/v1/admin/sellers/$sellerId/settlement-adjustments", sellerToken).andExpect { status { isForbidden() } }
+        delete("/api/v1/admin/settlement-adjustments/1", sellerToken).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 다른_회원의_반품_철회는_404() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val owner = newUserToken()
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)))
+        val skuId = skuIdsOf(sellerToken, productId).first()
+        val order = deliveredOrder(owner, sellerToken, listOf(skuId to 1), 11000)
+        val orderId = order.get("orderId").asLong()
+        val itemId = order.get("sellerOrders").get(0).get("items").get(0).get("orderItemId").asLong()
+        val returnId = requestReturn(owner, orderId, itemId)
+
+        val other = newUserToken()
+        delete("/api/v1/returns/$returnId", other)
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("RETURN_NOT_FOUND") } }
+        get("/api/v1/returns/$returnId", other)
+            .andExpect { status { isNotFound() }; jsonPath("$.code") { value("RETURN_NOT_FOUND") } }
+    }
 }
