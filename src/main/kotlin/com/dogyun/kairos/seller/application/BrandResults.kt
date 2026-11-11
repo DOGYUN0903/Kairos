@@ -16,6 +16,9 @@ data class BrandDetail(
     val createdAt: LocalDateTime,
 )
 
+/** 공개 브랜드 목록의 한 줄(필터용). */
+data class BrandListItem(val brandId: Long, val name: String)
+
 data class BrandPublic(
     val brandId: Long,
     val name: String,

@@ -62,6 +62,16 @@ class BrandRepositoryImpl(
         return PageResult.of(toDomains(content), page, size, total)
     }
 
+    override fun findApprovedOrderByName(limit: Int): List<Brand> {
+        val brand = QBrandEntity.brandEntity
+        val content = queryFactory.selectFrom(brand)
+            .where(brand.brandStatus.eq(BrandStatus.APPROVED))
+            .orderBy(brand.name.asc(), brand.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+        return toDomains(content)
+    }
+
     override fun findAllByIds(ids: Collection<Long>): List<Brand> =
         if (ids.isEmpty()) emptyList() else toDomains(jpaRepository.findAllById(ids))
 

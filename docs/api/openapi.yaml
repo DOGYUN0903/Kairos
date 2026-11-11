@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.8.0
+  version: 0.9.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
@@ -860,6 +860,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/brands:
+    get:
+      tags: [Brand]
+      operationId: listBrands
+      summary: 공개 브랜드 목록 (승인된 브랜드, 승인 상태 판매자만, 이름순)
+      description: 상품 목록의 브랜드 필터용. 페이징 없이 최대 200개까지 이름 오름차순으로 준다.
+      security: []
+      responses:
+        '200':
+          description: 브랜드 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BrandListItem'
   /api/v1/brands/{brandId}:
     get:
       tags: [Brand]
@@ -5432,7 +5453,7 @@ components:
       default: LATEST
     ProductSummary:
       type: object
-      required: [productId, thumbnailUrl, brandName, name, originalPrice, salePrice, discountRate, soldOut, likeCount, reviewCount, averageRating]
+      required: [productId, thumbnailUrl, brandId, brandName, name, originalPrice, salePrice, discountRate, soldOut, likeCount, reviewCount, averageRating]
       properties:
         productId:
           type: integer
@@ -5440,6 +5461,9 @@ components:
         thumbnailUrl:
           type: string
           description: 대표 이미지 URL
+        brandId:
+          type: integer
+          format: int64
         brandName:
           type: string
         name:
@@ -5601,6 +5625,7 @@ components:
         - productId
         - brandId
         - brandName
+        - sellerName
         - categoryId
         - name
         - description
@@ -5618,6 +5643,9 @@ components:
         brandId:
           type: integer
           format: int64
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
         brandName:
           type: string
         categoryId:
@@ -5726,6 +5754,15 @@ components:
         sellerName:
           type: string
           description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
+    BrandListItem:
+      type: object
+      required: [brandId, name]
+      properties:
+        brandId:
+          type: integer
+          format: int64
+        name:
+          type: string
     BrandPublic:
       type: object
       required: [brandId, name]

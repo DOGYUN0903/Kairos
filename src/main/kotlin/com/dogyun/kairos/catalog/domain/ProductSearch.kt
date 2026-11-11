@@ -21,6 +21,7 @@ data class ProductSearchCondition(
 data class ProductListRow(
     val productId: Long,
     val mainFileId: Long,
+    val brandId: Long,
     val brandName: String,
     val name: String,
     val originalPrice: Long,

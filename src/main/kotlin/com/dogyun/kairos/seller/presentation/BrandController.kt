@@ -1,6 +1,7 @@
 package com.dogyun.kairos.seller.presentation
 
 import com.dogyun.kairos.common.presentation.ApiResponse
+import com.dogyun.kairos.seller.application.BrandListItem
 import com.dogyun.kairos.seller.application.BrandPublic
 import com.dogyun.kairos.seller.application.BrandQueryService
 import org.springframework.http.ResponseEntity
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/brands")
 class BrandController(private val brandQueryService: BrandQueryService) {
+
+    @GetMapping
+    fun list(): ResponseEntity<ApiResponse<List<BrandListItem>>> = ApiResponse.ok(brandQueryService.listPublic())
 
     @GetMapping("/{brandId}")
     fun get(@PathVariable brandId: Long): ResponseEntity<ApiResponse<BrandPublic>> =

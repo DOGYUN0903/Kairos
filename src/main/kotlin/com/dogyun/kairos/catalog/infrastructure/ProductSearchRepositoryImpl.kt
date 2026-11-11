@@ -40,7 +40,7 @@ class ProductSearchRepositoryImpl(
         val mainFileId = mainFileId()
         val soldOut = soldOut()
         val rows = exposedQuery()
-            .select(product.id, mainFileId, brand.name, product.name, product.originalPrice, product.salePrice, soldOut,
+            .select(product.id, mainFileId, brand.id, brand.name, product.name, product.originalPrice, product.salePrice, soldOut,
                 product.likeCount, product.reviewCount, product.ratingSum)
             .where(*where.toTypedArray())
             .orderBy(*orderBy(condition.sort))
@@ -51,6 +51,7 @@ class ProductSearchRepositoryImpl(
                 ProductListRow(
                     productId = tuple.get(product.id)!!,
                     mainFileId = tuple.get(mainFileId) ?: 0L,
+                    brandId = tuple.get(brand.id)!!,
                     brandName = tuple.get(brand.name)!!,
                     name = tuple.get(product.name)!!,
                     originalPrice = tuple.get(product.originalPrice)!!,

@@ -44,6 +44,8 @@ class BrandServiceTest {
         }
 
         override fun findAllByIds(ids: Collection<Long>): List<Brand> = store.values.filter { it.id!!.value in ids }
+        override fun findApprovedOrderByName(limit: Int): List<Brand> =
+            store.values.filter { it.status == BrandStatus.APPROVED }.sortedBy { it.name }.take(limit)
     }
 
     private class FakeSellerRepository : SellerRepository {
