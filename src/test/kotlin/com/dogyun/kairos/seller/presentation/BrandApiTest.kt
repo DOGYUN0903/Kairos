@@ -114,6 +114,7 @@ class BrandApiTest : CommerceTestSupport() {
         assertEquals("PENDING", mine.get("status").asString())
         assertEquals("키로스2", mine.get("name").asString())
         assertNotNull(mine.get("logoUrl").asString())
+        assertEquals(fileId, mine.get("logoFileId").asLong())
         val pending = json(get("/api/v1/admin/brands?status=PENDING", admin)).get("data")
         assertEquals(1, pending.get("totalElements").asInt())
         // 승인된 브랜드는 재신청할 수 없다.

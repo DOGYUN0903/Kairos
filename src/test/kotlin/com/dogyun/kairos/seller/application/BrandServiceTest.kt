@@ -151,6 +151,7 @@ class BrandServiceTest {
         val detail = service.listMine(me).single()
 
         assertEquals("http://files/a.png", detail.logoUrl)
+        assertEquals(10L, detail.logoFileId)
         assertEquals("PENDING", detail.status)
     }
 }

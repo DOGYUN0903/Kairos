@@ -9,6 +9,8 @@ data class BrandDetail(
     val name: String,
     val englishName: String?,
     val logoUrl: String?,
+    /** 재신청 시 로고 유지를 위해 내려준다. */
+    val logoFileId: Long?,
     val description: String?,
     val status: String,
     val rejectReason: String?,
@@ -45,6 +47,7 @@ internal fun toBrandDetails(brands: List<Brand>, imageFileReader: ImageFileReade
             name = it.name,
             englishName = it.englishName,
             logoUrl = it.logoFileId?.let(urls::get),
+            logoFileId = it.logoFileId,
             description = it.description,
             status = it.status.name,
             rejectReason = it.rejectReason,
