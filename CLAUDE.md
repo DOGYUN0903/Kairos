@@ -81,6 +81,8 @@ com.dogyun.kairos.{module}/
 - 애플리케이션 서비스 테스트는 Mock 라이브러리 대신 인메모리 Fake를 쓴다.
 - 테스트 이름은 한국어 백틱 또는 언더스코어 문장으로 쓴다(예: `제한_초과_주문은_거절된다`).
 - 로깅은 kotlin-logging(`private val log = KotlinLogging.logger {}`, 람다 메시지)을 쓴다.
+- 로그 레벨: error=지금 사람이 봐야 하는 것(금액 불일치, 데이터 손상 가능, 복구 불가), warn=자동 복구·재시도·대사로 해결될 것, info=작업 시작/종료 건수와 중요한 상태 전이, debug=개발자용 상세.
+- 레벨은 `application.yaml`(기본 INFO)과 `application-{local,prod,test}.yaml`로 정하고, 환경변수 `LOGGING_LEVEL_COM_DOGYUN_KAIROS=DEBUG`로 덮어쓴다.
 
 ## 커밋과 git
 - 커밋 메시지는 한국어 Conventional Commits(`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).

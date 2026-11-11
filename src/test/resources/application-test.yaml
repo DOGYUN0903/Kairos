@@ -22,3 +22,8 @@ kairos:
     start-date: 2026-10-05
   jobs:
     enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.dogyun.kairos: INFO

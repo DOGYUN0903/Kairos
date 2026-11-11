@@ -139,7 +139,7 @@ class PaymentReconciliationService(
         if (paymentKey == null) {
             // 현재 도달 불가: paymentKey 없는 주문(PG 미사용)은 현금 환불이 0원이라 여기까지 오지 않는다.
             // 무PG 결제수단을 추가하면 이 항목은 영원히 건너뛰어지므로 관리자 종결 경로가 필요하다. 그때까지 매 주기 WARN 으로 드러낸다.
-            log.warn { "PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId=$orderId, itemId=$itemId, refundAmount=$refundAmount" }
+            log.error { "PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId=$orderId, itemId=$itemId, refundAmount=$refundAmount" }
             return null
         }
         val found = paymentGateway.findFromPg(paymentKey)

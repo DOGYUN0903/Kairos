@@ -1,0 +1,6 @@
+# 운영용. SPRING_PROFILES_ACTIVE=prod 로 켠다(기본 활성화 아님).
+# 앱 로그는 INFO로 두어 작업 시작·결과 로그를 남긴다.
+logging:
+  level:
+    root: WARN
+    com.dogyun.kairos: INFO

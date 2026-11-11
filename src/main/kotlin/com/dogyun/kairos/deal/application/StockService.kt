@@ -30,7 +30,7 @@ class StockService(private val stockRepository: StockRepository) {
         stock.restore(quantity)
         stockRepository.save(stock)
         if (stock.remaining > stock.total) {
-            log.warn { "oversell detected: dealId=$dealId, remaining=${stock.remaining}, total=${stock.total}" }
+            log.error { "oversell detected: dealId=$dealId, remaining=${stock.remaining}, total=${stock.total}" }
         }
     }
 

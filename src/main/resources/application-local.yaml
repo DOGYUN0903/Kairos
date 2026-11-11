@@ -1,0 +1,6 @@
+# 로컬 개발용. SPRING_PROFILES_ACTIVE=local 로 켠다(기본 활성화 아님).
+logging:
+  level:
+    com.dogyun.kairos: DEBUG
+    # SQL이 필요하면 아래 주석을 푼다.
+    # org.hibernate.SQL: DEBUG

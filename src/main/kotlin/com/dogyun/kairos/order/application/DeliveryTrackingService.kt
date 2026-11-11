@@ -23,7 +23,7 @@ class DeliveryTrackingService(
             try {
                 poll(sellerOrderId)
             } catch (e: RuntimeException) {
-                log.error(e) { "배송 조회 처리에 실패했다: sellerOrderId=$sellerOrderId" }
+                log.warn(e) { "배송 조회 처리에 실패했다: sellerOrderId=$sellerOrderId" }
                 false
             }
         }
