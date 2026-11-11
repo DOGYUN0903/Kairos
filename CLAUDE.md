@@ -17,6 +17,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 
 ## 명령어
 - 테스트: `./gradlew test` (Docker 실행 필요, Testcontainers 사용)
+- 뮤테이션 테스트: `./gradlew pitest` (돈 계산 순수 클래스 대상, `check`/`test`와 별개, 1분 이내). 리포트는 `build/reports/pitest/index.html`(XML: `mutations.xml`)
 - 로컬 실행: `.env.example`을 `.env`로 복사해 값을 채운 뒤 `docker compose up -d`, `./gradlew bootRun`
 - 모니터링: `docker compose up -d` 후 Grafana(localhost:3000, 대시보드 "Kairos 타임딜"), Prometheus(localhost:9090). 메트릭은 관리 포트 8081, 로그는 `logs/kairos.log`(traceId 포함).
 - 설정값(DB, Redis, JWT 비밀키, 관리자 계정, `TOSS_SECRET_KEY`, `SWEETTRACKER_API_KEY`)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
@@ -79,6 +80,7 @@ com.dogyun.kairos.{module}/
 ## 코드 스타일
 - Lombok 사용 안 함. 값 객체는 Kotlin `value class`/`data class`로 만든다.
 - 애플리케이션 서비스 테스트는 Mock 라이브러리 대신 인메모리 Fake를 쓴다.
+- 돈 계산 클래스(`DiscountAllocator`, `CouponTerms`, `RefundCalculator`, `ReturnRefundCalculator`, `SettlementCalculator`, `Settlement`)를 바꾸면 `./gradlew pitest`를 돌려 임계값(`build.gradle.kts`의 `mutationThreshold`/`coverageThreshold`)을 지킨다.
 - 테스트 이름은 한국어 백틱 또는 언더스코어 문장으로 쓴다(예: `제한_초과_주문은_거절된다`).
 - 로깅은 kotlin-logging(`private val log = KotlinLogging.logger {}`, 람다 메시지)을 쓴다.
 - 로그 레벨: error=지금 사람이 봐야 하는 것(금액 불일치, 데이터 손상 가능, 복구 불가), warn=자동 복구·재시도·대사로 해결될 것, info=작업 시작/종료 건수와 중요한 상태 전이, debug=개발자용 상세.
