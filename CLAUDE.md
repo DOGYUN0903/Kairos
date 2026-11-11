@@ -72,7 +72,7 @@ com.dogyun.kairos.{module}/
 - OpenAPI가 바뀌면 `pnpm gen:api`로 `src/api/schema.d.ts`를 재생성해 **같은 커밋**에 넣는다(`check:api`가 build·CI를 막는다).
 - API 클라이언트(`src/api/client.ts`): 액세스 토큰은 메모리에만 둔다(storage 금지). 리프레시는 httpOnly 쿠키 + `X-Requested-With: kairos-web`. 401이면 reissue를 한 번만(단일 비행) 시도하고 `/auth/*`는 절대 재시도하지 않는다. 에러 메시지는 `src/api/errors.ts` 표로만 만든다.
 - 금액은 정수만. 계산·표시는 `src/lib/money.ts`로만 하고 나눗셈(`/`, `%`)은 거기서만 쓴다(ESLint가 막는다).
-- 모든 POST는 `useIdempotentSubmit`: 제출마다 새 `Idempotency-Key`, 중복 제출 가드, 생성 성공 뒤 `form.reset`.
+- `Idempotency-Key`는 생성 POST(회원가입, 판매자 신청, 브랜드·상품 등록, 변경 요청, 관리자 카테고리 생성)가 `useIdempotentSubmit`으로 제출마다 새 키를 보내고 중복 제출을 막는다(생성 성공 뒤 `form.reset`). 상태 전이 엔드포인트(승인·반려·중지·해제, 좋아요, 순서 변경)는 키 없이 이중 제출 가드 + 서버 상태 검사(409)에 기댄다. 서버가 키를 강제하는 경로는 `IdempotencyProperties.paths`뿐이다.
 - 로그인 `next` 파라미터는 `safeNext`(`features/auth/redirect.ts`)를 거친다(오픈 리다이렉트 방지). 가드는 클라이언트 레이아웃이며 `middleware`는 없다.
 - 데모 기능은 `features/demo`에만 두고 `NEXT_PUBLIC_DEMO_MODE`(빌드 타임) 리터럴 비교로 감싼다. 데모 백엔드는 demo 프로필에서만 동작하고 prod+demo는 기동 실패다. 번들에 실제 관리자 자격증명을 절대 넣지 않으며, `check:bundle`이 운영 번들에 데모 코드·계정이 없고 데모 빌드에는 있음을 확인한다.
 - `app/`은 조립만, 기능은 `features/`. 시안은 `design/`에 기록으로 두고 고치지 않는다. 핵심 화면은 시안 → 사용자 확인 → 구현, CRUD 화면은 시안의 디자인 토큰을 따른다.
