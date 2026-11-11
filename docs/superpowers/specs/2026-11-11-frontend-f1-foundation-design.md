@@ -1,6 +1,6 @@
 # 프론트엔드 F1 기반·C1 화면 설계
 
-> 작성일: 2026-11-11 · 상위: `2026-11-09-commerce-roadmap-design.md` 4장(화면), `2026-11-09-c1-seller-catalog-design.md` 9장 · 시안: `design/` (PR #5)
+> 작성일: 2026-11-11 · 빌더 체크 반영: 2026-11-11 · 상위: `2026-11-09-commerce-roadmap-design.md` 4장(화면), `2026-11-09-c1-seller-catalog-design.md` 9장 · 시안: `design/` (PR #5)
 
 ## 1. 의도
 
@@ -12,7 +12,7 @@ Kairos 백엔드는 C1~C4까지 API가 끝났고, 화면은 C1 시안(`design/*.
 
 ## 2. 목표와 비목표
 
-- 목표(F1): 프론트엔드 기반 수립, 인증(로그인·가입·토큰 갱신·로그아웃), C1 화면 전부(구매자 상품 목록·검색·상세·브랜드, 판매자 입점·브랜드·상품 등록·수정·SKU·판매 상태, 관리자 심사 4종·판매자 정지·카테고리 관리), 핵심 흐름 E2E, CLAUDE.md 프론트엔드 절 추가.
+- 목표(F1): **핵심 화면 3개 시안(로그인·가입, 판매자 대시보드, 관리자 대시보드) 작성과 사용자 확인(F1의 첫 작업, §4-1)**, 프론트엔드 기반 수립, 인증(로그인·가입·토큰 갱신·로그아웃), C1 화면 전부(구매자 상품 목록·검색·상세·브랜드, 판매자 입점·브랜드·상품 등록·수정·SKU·판매 상태, 관리자 심사 4종·판매자 정지·카테고리 관리), 핵심 흐름 E2E, CLAUDE.md 프론트엔드 절 추가.
 - 비목표(F1): 모바일 대응(최소 너비 1280px 데스크톱 전용, 사용자 결정), C2~C4 화면(F2~F4), SEO·SSR 최적화, i18n, 다크 모드, 디자인 시스템 문서 사이트, 핫딜 화면(C6; 시안의 핫딜 배너·내비 항목은 자리만 둔다), 저장소 이름 변경(`kairos`로 바꾸는 것은 나중 선택지, 사용자 결정).
 - 안티 목표(실패로 보는 것): 운영 빌드에 데모 전환 UI나 데모 계정 정보가 들어감, 리프레시 토큰이 JS에서 읽힘, 금액 계산을 부동소수점으로 함, OpenAPI가 바뀌었는데 프론트 빌드가 통과함, 같은 등록 버튼 두 번 눌러 상품이 두 개 생김.
 
@@ -38,6 +38,12 @@ Kairos 백엔드는 C1~C4까지 API가 끝났고, 화면은 C1 시안(`design/*.
 - shadcn/ui 컴포넌트(Button, Input, Select, Dialog, Tabs, Table, Badge, Toast 등)를 쓰되 CSS 변수를 위 토큰으로 바꿔 시안과 같은 모양으로 맞춘다. 시안의 `.chip-*`(상태 칩), `.console`(판매자·관리자 콘솔 레이아웃: 232px 사이드바 + 본문), `.site-header`/`.cat-nav`(구매자 헤더·카테고리 내비)는 공용 컴포넌트로 만든다.
 - 최소 터치 영역 44px, `:focus-visible` 아웃라인 2px navy, `aria-current`·`aria-pressed`·`aria-selected`·`role="switch"` 사용은 시안대로 유지한다(§13).
 - 시안의 구조를 바꿔야 하면(예: API 응답에 없는 필드) 이 문서 §9의 화면 설명에 적고, 시안 파일은 고치지 않는다. 시안은 기록이다.
+
+### 4-1. 시안이 없는 화면 (사용자 결정)
+
+- **F1의 첫 작업은 핵심 화면 3개의 시안이다**: 로그인·가입, 판매자 대시보드(`/seller`, 상태별 진입 포함), 관리자 대시보드(`/admin`). 기존 `design/`에 정적 HTML(`login.html`, `seller-dashboard.html`, `admin-dashboard.html`, 공용 `assets/kairos.css` 재사용)로 그리고 `design/index.html`에 링크를 추가한다. **사용자가 확인한 뒤**에 구현을 시작한다.
+- 단순 목록·폼 화면(입점 신청, 브랜드 목록·신청, 판매자 상품 상세, 관리자 카테고리·판매자 관리, 404·403·오류)은 시안 없이 기존 토큰·공용 컴포넌트(§4, §5)로 바로 만든다.
+- 이후 단계 정책: 각 단계(F2~F4)는 핵심 화면만 시안을 먼저 그리고 사용자 확인을 받으며, 단순 CRUD 화면은 디자인 시스템을 따라 바로 만든다.
 
 ## 5. 디렉터리 구조 (Claude 결정)
 
@@ -79,7 +85,6 @@ frontend/
       common/    (StatusChip, Money, EmptyState, ErrorState, PageSkeleton, Pagination, ImageUploader, ConfirmDialog)
     lib/
       money.ts   (원화 표시, 정수 계산, §12)  datetime.ts(KST LocalDateTime 표시)  query-keys.ts
-    middleware.ts                     # 리프레시 쿠키 없으면 /seller, /admin → /login (§8-3)
   e2e/                                # Playwright
     fixtures/ (계정 생성·로그인 헬퍼)  c1-seller-onboarding.spec.ts  c1-buyer-browse.spec.ts  auth.spec.ts
 ```
@@ -114,19 +119,23 @@ frontend/
 
 F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 고치고 `OpenApiContractTest`로 맞춘다.
 
-1. **`POST /auth/login`, `POST /auth/reissue`가 리프레시 토큰을 쿠키로도 내려준다.** `Set-Cookie: kairos_refresh=<token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600`(14일, `kairos.jwt.refresh-ttl`과 같은 값). `Secure`는 `prod` 프로필에서만(설정 `kairos.auth.cookie-secure`, 기본 false). 본문의 `refreshToken` 필드는 **그대로 유지**한다(perf k6 스크립트와 Swagger가 쓴다. 틀렸을 때 비용: 없앴다면 `perf/` 스크립트를 고쳐야 했다).
+1. **`POST /auth/login`, `POST /auth/reissue`가 리프레시 토큰을 쿠키로도 내려준다.** `Set-Cookie: kairos_refresh=<token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600`(14일, `kairos.jwt.refresh-ttl`과 같은 값). `Secure`는 설정 `kairos.auth.cookie-secure`(기본 false)로 켠다. 데모는 당분간 노트북 로컬에서만 돌리므로(사용자 결정) HTTPS 배포와 `Secure` 기본값은 배포 단계의 후속 결정으로 남긴다(§17). 본문의 `refreshToken` 필드는 **그대로 유지**한다(perf k6 스크립트와 Swagger가 쓴다. 틀렸을 때 비용: 없앴다면 `perf/` 스크립트를 고쳐야 했다).
 2. **`reissue`의 본문을 선택으로 바꾼다.** 본문 `refreshToken`이 없으면 쿠키 `kairos_refresh`를 쓴다. 둘 다 없으면 400 `INVALID_REQUEST`. 회전 규칙은 그대로다(새 토큰을 쿠키와 본문에 다시 내려줌).
 3. **`logout`이 쿠키를 지운다.** `Max-Age=0`으로 같은 이름·경로의 쿠키를 내린다. 액세스 토큰이 만료돼 401이어도 프론트는 메모리를 비우고 `/login`으로 보낸다(쿠키는 다음 reissue에서 Redis 불일치로 어차피 거부된다).
 4. **CSRF**: 쿠키로 인증되는 요청은 `reissue` 하나뿐이고 `SameSite=Strict`가 다른 사이트의 요청을 막는다. 추가로 쿠키 기반 reissue는 **`X-Requested-With: kairos-web` 헤더를 요구**한다(없으면 쿠키를 무시하고 본문만 본다). 커스텀 헤더는 단순 요청이 될 수 없어 CORS 없이 다른 출처에서 보낼 수 없다. 틀렸을 때 비용: 오래된 브라우저의 SameSite 미지원 — 헤더 검사가 두 번째 방어선이라 괜찮다. 다른 API는 Bearer 헤더로만 인증되므로 CSRF 대상이 아니다.
 5. **`GET /auth/me`(인증 필요) 추가**: `{memberId, email, name, role}`. 프론트가 액세스 토큰 페이로드를 직접 해석하지 않게 한다(토큰 구조는 계약이 아니다). 틀렸을 때 비용: 엔드포인트 하나. 이것을 빼면 프론트가 JWT를 디코딩해 `role`을 읽어야 하고, 이름은 가입 응답에 없어 헤더에 표시할 수 없다.
 6. **CORS 설정은 추가하지 않는다**(§7-2). 다른 출처에서 직접 호출할 일이 생기면 그때 `kairos.cors.allowed-origins`로 넣는다.
+7. **`SellerProductSummary` 확장** (Claude 결정, 빌더 체크 반영): `stockTotal`(ACTIVE SKU 재고 합), `createdAt`, `hasPendingChangeRequest`를 추가한다. 판매자 상품 목록 시안의 열을 채우기 위해서다. 틀렸을 때 비용: 목록 쿼리에 SKU 합계·변경 요청 존재 서브쿼리가 붙는다 — 인덱스 추가 금지 규율 안에서 QueryDSL 조인으로 하고, 느려지면 3-2에서 측정한다.
+8. **관리자 심사 큐 정렬 옵션** (Claude 결정): `GET /admin/sellers|brands|products`에 `sort=LATEST|OLDEST`(기본 `LATEST`, 기존 동작 유지)를 추가한다. 변경 요청 큐가 이미 가진 것과 같은 형태로 맞춘다. 틀렸을 때 비용: 파라미터 하나.
+9. **데모 프로필 시더·reseed** (§14). 운영 프로필과 무관하다.
 
 `SELLER`는 JWT 역할이 아니다(C1 스펙 2장). 프론트도 "판매자인지"를 역할이 아니라 `GET /seller/me`(404면 미신청)와 그 `status`로 판단한다.
 
 ### 7-4. 프론트 흐름
 
 - **부트스트랩**: 앱 로드 시 `AuthProvider`가 `POST /auth/reissue`(본문 없음, `X-Requested-With`)를 한 번 호출한다. 200이면 액세스 토큰을 메모리에 두고 `GET /auth/me`로 사용자 정보를 받는다. 401이면 비로그인. 이 동안은 헤더에 스켈레톤을 보이고 보호 페이지는 렌더하지 않는다.
-- **요청**: `client.ts` 미들웨어가 메모리 토큰을 `Authorization: Bearer`로 붙인다. 401(`UNAUTHORIZED`)이면 reissue를 **한 번만** 시도(동시 401은 한 Promise를 공유)하고 원 요청을 재시도한다. reissue도 실패하면 메모리를 비우고 로그인 페이지로 보낸다(`?next=` 유지).
+- **요청** (Claude 결정): `client.ts` 미들웨어가 메모리 토큰을 `Authorization: Bearer`로 붙인다. `/api/v1/auth/*`가 **아닌** 경로에서 401이 오면 reissue를 **정확히 한 번** 시도(동시 401은 한 Promise를 공유)하고 원 요청을 **한 번** 재시도한다. `/auth/*` 요청은 어떤 경우에도 재시도하지 않는다. reissue가 실패하면 메모리를 비우고 QueryClient를 초기화한 뒤 로그인 페이지로 보낸다(`?next=` 유지).
+- 공개 엔드포인트(`GET /products/**` 등)는 만료된 Bearer를 **무시하고 비로그인으로 처리**한다(`JwtAuthenticationFilter`는 무효 토큰에 아무것도 하지 않음). 그래서 상품 상세의 `liked`가 `null`로 올 수 있다. 이것은 허용한다: 다음 인증 요청의 401이 reissue를 일으키고, 그 뒤 쿼리를 invalidate하면 맞춰진다. 틀렸을 때 비용: 토큰 만료 직후 잠깐 좋아요 표시가 빈다.
 - **로그인**: 이메일·비밀번호 → 토큰 메모리 저장 → `/auth/me` → `next` 또는 역할 기본 페이지(ADMIN `/admin`, 그 외 `/`).
 - **로그아웃**: `POST /auth/logout` → 메모리 비움 → QueryClient 초기화 → `/`.
 - 새 탭·새로고침마다 부트스트랩이 돈다(토큰은 메모리에만). 탭 간 공유는 하지 않는다.
@@ -159,8 +168,8 @@ F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 �
 
 ### 8-3. 가드 구현 (Claude 결정)
 
-- `middleware.ts`는 `/seller/**`·`/admin/**`에 **리프레시 쿠키가 없으면** `/login?next=`로 보낸다. 쿠키가 프록시 덕분에 프론트 출처에 있어 가능하다. 역할은 쿠키로 알 수 없으므로 검사하지 않는다.
-- 역할·판매자 상태 검사는 **클라이언트 레이아웃**(`RequireRole`, `SellerGate`)이 `/auth/me`·`/seller/me` 결과로 한다. 최종 방어는 서버의 401/403/409다. 틀렸을 때 비용: 비관리자가 `/admin` 껍데기를 한순간 볼 수 있다 — 레이아웃이 사용자 정보가 올 때까지 본문을 그리지 않으므로 데이터는 새지 않는다.
+- Next `middleware`로 쿠키를 검사하지 **않는다**. 리프레시 쿠키는 `Path=/api/v1/auth`라 페이지 요청에 실리지 않고, 경로를 넓히면 쿠키의 노출 범위가 커진다. 프록시가 있어도 가드를 위해 쿠키 경로를 바꾸지 않는다.
+- 로그인·역할·판매자 상태 검사는 전부 **클라이언트 레이아웃**(`RequireAuth`, `RequireRole`, `SellerGate`)이 부트스트랩 결과(`/auth/me`)와 `/seller/me`로 한다. 비로그인이면 `/login?next=`로 보낸다. 데이터 보호는 서버의 401/403/409가 한다. 틀렸을 때 비용: 비로그인·비관리자가 `/admin` 껍데기(사이드바 없는 빈 레이아웃)를 한순간 볼 수 있다 — 레이아웃이 사용자 정보가 올 때까지 본문을 그리지 않으므로 데이터는 새지 않는다. E2E `auth.spec`은 "보호 페이지 접근 시 로그인으로"를 서버 리다이렉트가 아니라 클라이언트 이동으로 검증한다.
 
 ## 9. F1 화면 (C1)
 
@@ -177,14 +186,14 @@ F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 �
 
 - **입점 신청 `/seller/apply`**: `POST/PUT /seller/application`. 필드 회사명·사업자등록번호(10자리 숫자, 하이픈 자동 제거)·대표자명·연락처·은행·계좌번호·예금주. 409 `SELLER_BUSINESS_NUMBER_DUPLICATED` → 필드 에러, `SELLER_ALREADY_EXISTS` → `/seller`로. 상태별 화면은 §8-2.
 - **브랜드 `/seller/brands`**: `GET /seller/brands` 카드 목록(상태 칩 PENDING/APPROVED/REJECTED, 반려 사유), "브랜드 신청" 다이얼로그(`POST /seller/brands`: 이름, 영문명, 로고 `logoFileId`(ImageUploader), 소개), 반려 건 수정(`PUT /seller/brands/{id}`). 409 `BRAND_NAME_DUPLICATED` → 필드 에러.
-- **상품 관리 `/seller/products`**: 상단 상태 요약 5칸(전체/검수 대기/판매 중/일시 중지/반려·종료 — 서버에 집계 API가 없으므로 **현재 필터의 `totalElements`**만 숫자로 보이고, 나머지 칸은 상태 필터 버튼으로만 동작한다. 시안과 다른 점이며, 집계 API는 넣지 않는다. 틀렸을 때 비용: 데모에서 숫자가 덜 보인다 — 필요하면 F2에서 `GET /seller/products/summary`를 OpenAPI에 먼저 추가), `GET /seller/products?status&page&size` 표(이미지, 상품명, 브랜드, 판매가, 상태 칩 + "변경 요청 검수 중" 배지, 재고 합계, 등록일), 행 작업: 일시 중지/재개/종료(`POST …/pause|resume|end`, 종료는 ConfirmDialog "되돌릴 수 없음"), 판매가 수정(인라인 다이얼로그 `PUT …/price`, 정가 이하 검증 + 할인율 미리 보기).
+- **상품 관리 `/seller/products`**: 상단 상태 요약 5칸(전체/검수 대기/판매 중/일시 중지/반려·종료 — 집계 API는 넣지 않고 **현재 필터의 `totalElements`**만 숫자로 보이며, 나머지 칸은 상태 필터 버튼으로 동작한다. 틀렸을 때 비용: 데모에서 숫자가 덜 보인다 — 필요하면 F2에서 `GET /seller/products/summary`를 OpenAPI에 먼저 추가), `GET /seller/products?status&page&size` 표(이미지, 상품명, 브랜드, 판매가, 상태 칩 + "변경 요청 검수 중" 배지(`hasPendingChangeRequest`), 재고 합계(`stockTotal`), 등록일(`createdAt`) — 세 필드는 §7-3 (7)로 `SellerProductSummary`에 추가한다), 행 작업: 일시 중지/재개/종료(`POST …/pause|resume|end`, 종료는 ConfirmDialog "되돌릴 수 없음"), 판매가 수정(인라인 다이얼로그 `PUT …/price`, 정가 이하 검증 + 할인율 미리 보기).
 - **상품 등록 `/seller/products/new`**: `POST /seller/products`. 브랜드(APPROVED만 선택 가능, 없으면 브랜드 신청 안내), 소분류 선택(대분류 → 소분류 2단 셀렉트, `CATEGORY_NOT_LEAF` 방지), 상품명, 설명, 이미지 1~10장(ImageUploader: 선택 즉시 `POST /files/images` 업로드 → `fileId`·`url`, 첫 장이 대표, 드래그 순서 변경, 5MB·jpg/png/webp 클라이언트 검증 + 서버 `FILE_UNSUPPORTED_FORMAT`), 정가·판매가(할인율 힌트 = `floor((정가 − 판매가) × 100 / 정가)` 정수 계산), 옵션 축 0~2개(축 이름 + 값 태그 입력), SKU 미리 보기 표(축 값의 데카르트 곱을 클라이언트에서 만들어 보여주되 **재고·추가 금액은 등록 후** 상품 상세에서 입력한다 — 등록 API는 재고를 받지 않는다. 시안의 SKU 표 입력란은 등록 화면에서는 읽기 전용 미리 보기로 바뀐다). 제출 후 "검수 대기" 안내와 상세로 이동.
 - **상품 상세(판매자) `/seller/products/[id]`**: `GET /seller/products/{id}`. 현재 내용, 상태 칩, 반려 사유, SKU 표 편집(행마다 `PUT …/skus/{skuId}`: 추가 금액·재고·판매 여부 토글, 행 단위 저장), 판매가 수정, 판매 상태 버튼, 대기 중 변경 요청 카드(내용 요약 + "철회" `DELETE …/change-requests/{id}`), "내용 수정(재검수)" → `/edit`.
 - **상품 수정(변경 요청) `/seller/products/[id]/edit`**: `POST /seller/products/{id}/change-requests`(상품명·설명·카테고리·이미지·옵션·정가 — `ChangeRequestDetail` 기준). 등록 폼을 재사용하되 초기값을 현재 내용으로 채우고, 옵션 축 변경 시 "사라지는 조합은 단종, 새 조합은 재고 0" 경고를 띄운다. 409 `CHANGE_REQUEST_ALREADY_PENDING` → 상세로 보내 철회를 안내.
 
 ### 9-3. 관리자 (`design/admin-review.html`)
 
-- **검수 `/admin/review`**: 탭 4개(판매자·브랜드·상품·변경 요청, 각 탭 대기 수는 `?status=PENDING&size=1`의 `totalElements`로 가져온다). 좌측 큐(`GET /admin/sellers|brands|products|change-requests?status&page&size`, 기본 `PENDING`/`PENDING_REVIEW`, 정렬 오래된 순), 우측 상세 카드(선택 행, URL `?tab=&id=`로 유지). 승인·반려: 판매자 승인은 **수수료율(bp) 입력** 다이얼로그(`ApproveSellerRequest.commissionRateBp`, 기본값 1000 = 10%), 반려는 사유 필수(`reason`). 변경 요청 상세는 `GET /admin/change-requests/{id}`와 `GET /admin/products/{id}`를 나란히 두고 **변경 전·후 diff**(바뀐 필드만 강조, 이미지 신규 표시, 옵션 변경 시 SKU 영향: 유지/신규/단종을 옵션 값 ID로 계산해 표시). 처리 후 큐에서 제거하고 다음 행 선택.
+- **검수 `/admin/review`**: 탭 4개(판매자·브랜드·상품·변경 요청, 각 탭 대기 수는 `?status=PENDING&size=1`의 `totalElements`로 가져온다). 좌측 큐(`GET /admin/sellers|brands|products|change-requests?status&page&size`, 기본 `PENDING`/`PENDING_REVIEW`, 정렬 **오래된 순**(`sort=OLDEST`, §7-3 (8); 기본은 최신순 유지)), 우측 상세 카드(선택 행, URL `?tab=&id=`로 유지). 승인·반려: 판매자 승인은 **수수료율(bp) 입력** 다이얼로그(`ApproveSellerRequest.commissionRateBp`, 기본값 1000 = 10%), 반려는 사유 필수(`reason`). 변경 요청 상세는 `GET /admin/change-requests/{id}`와 `GET /admin/products/{id}`를 나란히 두고 **변경 전·후 diff**(바뀐 필드만 강조, 이미지 신규 표시, 옵션 변경 시 SKU 영향: 유지/신규/단종을 옵션 값 ID로 계산해 표시). 처리 후 큐에서 제거하고 다음 행 선택.
 - **판매자 관리 `/admin/sellers`**: 상태 필터 전체, 정지(사유 필수)·해제. F1에 포함한다(검수 탭에서 APPROVED 판매자는 안 보이기 때문).
 - **카테고리 `/admin/categories`**: `GET /categories` 트리 편집. 대분류·소분류 추가(`POST /admin/categories`), 이름·노출 순서 수정(`PUT`), 삭제(`DELETE`, 409 `CATEGORY_HAS_PRODUCTS`/`CATEGORY_HAS_CHILDREN` → 토스트 메시지, 삭제 전 ConfirmDialog). 순서 변경은 `displayOrder` 숫자 입력(드래그 정렬은 하지 않는다).
 - **대시보드 `/admin`**: 대기 건수 4개 카드 + 바로 가기. 통계 API는 없으므로 그 이상은 두지 않는다.
@@ -227,9 +236,10 @@ F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 �
 
 ### 14-1. 방식 (Claude 결정)
 
-- **백엔드**: Spring 프로필 `demo`에서만 뜨는 `DemoDataInitializer`(ApplicationRunner, `AdminInitializer`와 같은 자리)가 시작 시 **고정 계정**(구매자 `buyer@kairos.demo`, 판매자 `seller@kairos.demo`, 관리자는 `.env`의 관리자)과 기본 데이터(카테고리 트리, 승인된 판매자·브랜드, 판매 중 상품 20개, 검수 대기 건 몇 개)를 **없을 때만** 만든다. 재생성은 `POST /api/v1/demo/reseed`(ADMIN, `@Profile("demo")` 컨트롤러)로 데모 데이터를 지우고 다시 만든다. 비밀번호는 `KAIROS_DEMO_PASSWORD` env로 주입한다(커밋하지 않음).
+- **백엔드**: Spring 프로필 `demo`에서만 뜨는 `DemoDataInitializer`(ApplicationRunner, `AdminInitializer`와 같은 자리)가 시작 시 **고정 계정**(구매자 `buyer@kairos.demo`, 판매자 `seller@kairos.demo`, **데모 전용 관리자 `admin@kairos.demo`**(ADMIN 역할))과 기본 데이터(카테고리 트리, 승인된 판매자·브랜드, 판매 중 상품 20개, 검수 대기 건 몇 개)를 **없을 때만** 만든다. 실제 관리자(`KAIROS_ADMIN_EMAIL`/`KAIROS_ADMIN_PASSWORD`)는 데모 전환에 쓰지 않으며 어떤 번들에도 들어가지 않는다. 세 데모 계정의 비밀번호는 `KAIROS_DEMO_PASSWORD` 하나로 주입한다(커밋하지 않음).
+- **재생성 `POST /api/v1/demo/reseed`**(ADMIN, `@Profile("demo")` 컨트롤러)는 **삭제 없는 멱등 보충**이다: 없는 데모 데이터만 다시 만들고(소프트 딜리트·UNIQUE 규칙을 그대로 지킨다), 있는 것은 건드리지 않는다. 시작 시 시더와 같은 코드를 부른다. 데이터를 지우고 싶으면 로컬 DB 볼륨을 지운다. E2E는 고유 이름의 데이터를 스스로 만들고 reseed 결과에 **의존하지 않는다**. 틀렸을 때 비용: 데모 중 망가뜨린 데이터(예: 데모 상품을 판매 종료)는 되돌아오지 않는다 — 데모 상품을 몇 개 더 넉넉히 두고, 필요하면 "데모 데이터 초기화"는 DB 리셋으로 안내한다.
 - `demo` 프로필이 아니면 컨트롤러 빈 자체가 없어 `/api/v1/demo/**`는 404다. `application-prod.yaml`은 `demo`를 활성화하지 않고, 기동 시 `prod`와 `demo`가 동시에 활성이면 **기동을 실패**시킨다(한 줄 검사). OpenAPI에는 `Demo` 태그로 문서화하고 "demo 프로필에서만 존재"를 적는다(SDD).
-- **프론트**: `NEXT_PUBLIC_DEMO_MODE=true`일 때만 `features/demo`가 번들에 포함된다(`process.env` 상수 조건으로 트리 셰이킹). 화면 하단에 얇은 바: "구매자 / 판매자 / 관리자로 전환"(해당 데모 계정으로 로그인 호출 — 비밀번호는 `NEXT_PUBLIC_DEMO_PASSWORD`로 **데모 배포에서만** 주입), "데모 데이터 재생성"(관리자로 전환 뒤 reseed). 운영 빌드는 두 변수를 두지 않는다. 틀렸을 때 비용: 데모 비밀번호가 데모 서버의 클라이언트 번들에 들어간다 — 데모 계정은 데모 DB에만 있고 권한이 데모 데이터에 한정되므로 수용한다. 운영에 이 변수를 넣는 실수는 CI에서 `NEXT_PUBLIC_DEMO_MODE`가 설정된 빌드를 `prod` 타깃으로 배포하지 못하게 막는다(F1에서는 `.env.example` 주석과 README 경고까지, 배포 파이프라인은 배포 단계에서).
+- **프론트**: `NEXT_PUBLIC_DEMO_MODE=true`일 때만 `features/demo`가 번들에 포함된다(`process.env` 상수 조건으로 트리 셰이킹). 화면 하단에 얇은 바: "구매자 / 판매자 / 관리자로 전환"(해당 데모 계정 `*@kairos.demo`로 로그인 호출 — 비밀번호는 `NEXT_PUBLIC_DEMO_PASSWORD`로 **데모 빌드에서만** 주입), "데모 데이터 보충"(데모 관리자로 전환 뒤 reseed). 운영 빌드는 두 변수를 두지 않는다. 틀렸을 때 비용: 데모 비밀번호가 데모 빌드의 클라이언트 번들에 들어간다 — 데모 계정은 demo 프로필 DB에만 있고 실제 관리자 계정과 분리되므로 수용한다. "운영 번들에 계정 문자열 없음" 테스트(§19)는 유지한다. 운영에 이 변수를 넣는 실수는 CI에서 `NEXT_PUBLIC_DEMO_MODE`가 설정된 빌드를 `prod` 타깃으로 배포하지 못하게 막는다(F1에서는 `.env.example` 주석과 README 경고까지, 배포 파이프라인은 배포 단계에서).
 - 대안으로 검토한 "SQL 시드 스크립트"는 FK·해시 비밀번호·파일 레코드를 손으로 맞춰야 해서 깨지기 쉽다. 도메인 코드로 만들면 규칙(상태 전이, 이미지 소유)을 그대로 지킨다.
 
 ### 14-2. 이미지
@@ -252,8 +262,8 @@ F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 �
 ## 16. 테스트 (사용자 결정: E2E는 핵심 흐름만)
 
 - **단위(Vitest + Testing Library)**: `money.ts`(포맷·할인율·안전 정수), `errors.ts`(코드 → 배치), SKU 조합 생성·옵션 변경 영향 계산, Zod 스키마(OpenAPI 제약과 같은지), `useIdempotentSubmit`(같은 시도 같은 키, 수정 후 새 키), `client.ts` 401 → 단일 reissue → 재시도(fetch mock). 테스트 이름은 백엔드처럼 한국어 문장.
-- **E2E(Playwright, 실제 백엔드)**: 백엔드는 `local,demo` 프로필로 떠 있어야 한다(`BACKEND_URL` + `KAIROS_DEMO_PASSWORD`). 각 spec은 고유 이메일로 회원을 새로 만들어 서로 간섭하지 않는다. 흐름 3개만:
-  1. `auth.spec`: 가입 → 로그인 → 새로고침 뒤 로그인 유지(쿠키 reissue) → 로그아웃 → 보호 페이지 접근 시 로그인으로.
+- **E2E(Playwright, 실제 백엔드)**: 백엔드는 `local,demo` 프로필로 떠 있어야 한다(`BACKEND_URL` + `KAIROS_DEMO_PASSWORD`). 각 spec은 고유 이메일·고유 이름(브랜드명·사업자번호)으로 데이터를 새로 만들어 서로 간섭하지 않고, reseed 상태에 의존하지 않는다. 관리자 작업은 데모 관리자 계정으로 한다. 흐름 3개만:
+  1. `auth.spec`: 가입 → 로그인 → 새로고침 뒤 로그인 유지(쿠키 reissue) → 로그아웃 → 보호 페이지 접근 시 클라이언트 가드가 로그인으로 보냄(§8-3) → 비관리자 `/admin` 접근 시 `/forbidden`.
   2. `c1-seller-onboarding.spec`: 입점 신청 → 관리자 승인(수수료 입력) → 브랜드 신청 → 승인 → 상품 등록(이미지 업로드 포함, 옵션 2축) → 관리자 승인 → 구매자 목록·상세에 보임 → SKU 재고 0 → 품절 표시 → 판매 일시 중지 → 목록에서 사라짐.
   3. `c1-buyer-browse.spec`: 데모 데이터 기준 필터·정렬·검색·페이지가 URL과 결과에 반영되고 뒤로 가기로 복원된다.
 - **계약**: `pnpm check:api`(§6). 백엔드 `OpenApiContractTest`가 구현 ↔ 스펙을, 이 검사가 스펙 ↔ 프론트 타입을 묶는다.
@@ -266,6 +276,7 @@ F1 백엔드 작업은 **이것뿐**이다. `docs/api/openapi.yaml`을 먼저 �
 - **F3 (C3 혜택·후기)**: 쿠폰 발급·보유·주문 적용, 포인트 잔액·내역·주문 사용, 후기 작성(이미지)·내 후기·판매자 답글·상품 상세 후기 탭, 좋아요 목록. 새 시안 필요.
 - **F4 (C4 반품·정산)**: 반품 요청·철회·내역, 판매자 반품 처리·정산 조회(명세), 관리자 반품·정산 생성·확정·지급·조정. 새 시안 필요.
 - 모바일 대응, 핫딜(C6) 화면, 프론트 성능 측정은 별도.
+- **후속 결정(배포 단계)**: 데모는 당분간 노트북 로컬에서만 돌린다(사용자 결정). 데모 서버 배포, HTTPS, 리프레시 쿠키 `Secure` 기본값, 데모 빌드 배포 차단 규칙은 배포를 결정할 때 정한다.
 
 ## 18. CLAUDE.md 프론트엔드 절 (F1 마지막 작업)
 
@@ -278,10 +289,11 @@ F1의 마지막 작업은 `CLAUDE.md`에 `## 프론트엔드` 절을 추가하�
 
 ## 19. 완료 기준 (F1)
 
-- §7-3 백엔드 변경이 OpenAPI → 구현 → 계약 테스트 순서로 끝나고 기존 테스트가 통과한다. 쿠키 reissue, 헤더 없는 쿠키 reissue 거부, logout 쿠키 삭제, `/auth/me`가 통합 테스트로 검증된다.
+- 핵심 화면 3개 시안이 `design/`에 있고 사용자가 확인했다(§4-1).
+- §7-3 백엔드 변경(쿠키 인증, `/auth/me`, `SellerProductSummary` 확장, 심사 큐 정렬, demo 시더)이 OpenAPI → 구현 → 계약 테스트 순서로 끝나고 기존 테스트가 통과한다. 쿠키 reissue, 헤더 없는 쿠키 reissue 거부, logout 쿠키 삭제, `/auth/me`가 통합 테스트로 검증된다.
 - `pnpm check:api`·`lint`·`typecheck`·`test`·`build`가 통과하고, CI 워크플로가 같은 것을 돌린다.
 - §9의 모든 화면이 실제 백엔드로 동작하고, §16의 E2E 3개가 로컬에서 통과한다.
-- `NEXT_PUBLIC_DEMO_MODE` 없이 빌드한 번들에 데모 코드·계정 문자열이 없다(빌드 산출물 grep 검사 1건을 테스트에 둔다). `prod`+`demo` 동시 활성 시 백엔드 기동 실패 테스트.
+- `NEXT_PUBLIC_DEMO_MODE` 없이 빌드한 번들에 데모 코드·`@kairos.demo` 계정 문자열이 없고, 어떤 빌드에도 실제 관리자 계정 값이 없다(빌드 산출물 grep 검사를 테스트에 둔다). `prod`+`demo` 동시 활성 시 백엔드 기동 실패 테스트.
 - 키보드만으로 상품 등록과 검수 승인이 가능하다(E2E 2번 흐름 일부를 키보드로).
 - README에 프론트 실행 방법, CLAUDE.md에 §18 절.
 
