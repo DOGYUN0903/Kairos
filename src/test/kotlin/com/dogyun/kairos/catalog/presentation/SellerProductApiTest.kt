@@ -240,4 +240,36 @@ class SellerProductApiTest : CommerceTestSupport() {
         assertEquals("ENDED", sellerProductDetail(token, toEnd).get("status").asString())
         assertEquals(8000, sellerProductDetail(token, toPause).get("salePrice").asLong())
     }
+
+    @Test
+    fun 판매자_상품_목록은_ACTIVE_SKU_재고_합과_등록일과_대기_변경_요청_여부를_준다() {
+        val token = newUserToken()
+        approvedSeller(token)
+        val categoryId = leafCategory()
+        val fileIds = listOf(uploadImage(token), uploadImage(token))
+        val productId = registerProduct(token, approvedBrand(token), categoryId, fileIds)
+        approveProduct(productId)
+        val skuIds = skuIdsOf(token, productId)
+        patch("/api/v1/seller/products/$productId/skus/${skuIds[0]}", token, mapOf("extraPrice" to 0, "stock" to 3, "onSale" to true))
+            .andExpect { status { isOk() } }
+        // onSale=false 여도 ACTIVE 면 재고 합에 들어간다.
+        patch("/api/v1/seller/products/$productId/skus/${skuIds[1]}", token, mapOf("extraPrice" to 0, "stock" to 4, "onSale" to false))
+            .andExpect { status { isOk() } }
+        fun row(): JsonNode = json(get("/api/v1/seller/products", token).andExpect { status { isOk() } }).get("data").get("content").get(0)
+
+        val before = row()
+
+        assertEquals(7, before.get("stockTotal").asInt())
+        assertEquals(false, before.get("hasPendingChangeRequest").asBoolean())
+        assertTrue(Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?""").matches(before.get("createdAt").asString()))
+        val changeRequestId = json(
+            post(
+                "/api/v1/seller/products/$productId/change-requests", token,
+                mapOf("content" to productContent(categoryId, fileIds, name = "새 티셔츠"), "originalPrice" to 10000),
+            ).andExpect { status { isCreated() } },
+        ).get("data").get("changeRequestId").asLong()
+        assertEquals(true, row().get("hasPendingChangeRequest").asBoolean())
+        delete("/api/v1/seller/products/$productId/change-requests/$changeRequestId", token).andExpect { status { isNoContent() } }
+        assertEquals(false, row().get("hasPendingChangeRequest").asBoolean())
+    }
 }

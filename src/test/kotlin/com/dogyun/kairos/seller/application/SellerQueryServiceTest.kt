@@ -1,5 +1,6 @@
 package com.dogyun.kairos.seller.application
 
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.BusinessNumber
 import com.dogyun.kairos.seller.domain.Seller
@@ -22,7 +23,7 @@ class SellerQueryServiceTest {
             val saved = Seller.restore(
                 id, seller.memberId, seller.companyName, seller.businessNumber, seller.representativeName,
                 seller.phone, seller.settlementAccount, seller.commissionRateBp, seller.status,
-                seller.rejectReason, seller.suspendReason,
+                seller.rejectReason, seller.suspendReason, createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
             )
             store[id.value] = saved
             return saved
@@ -32,7 +33,7 @@ class SellerQueryServiceTest {
         override fun findAllByIds(ids: Collection<SellerId>): List<Seller> = ids.mapNotNull { store[it.value] }
         override fun findByMemberId(memberId: Long): Seller? = store.values.firstOrNull { it.memberId == memberId }
         override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean = false
-        override fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller> =
+        override fun findPage(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<Seller> =
             PageResult.of(emptyList(), page, size, 0)
     }
 

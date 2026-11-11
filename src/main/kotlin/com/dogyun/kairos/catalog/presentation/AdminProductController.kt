@@ -4,6 +4,7 @@ import com.dogyun.kairos.catalog.application.AdminProductSummary
 import com.dogyun.kairos.catalog.application.ProductAdminService
 import com.dogyun.kairos.catalog.application.SellerProductDetail
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.common.security.LoginMember
@@ -25,10 +26,11 @@ class AdminProductController(private val productAdminService: ProductAdminServic
     @GetMapping
     fun list(
         @RequestParam(required = false) status: ProductStatus?,
+        @RequestParam(defaultValue = "LATEST") sort: ListOrder,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ResponseEntity<ApiResponse<PageResponse<AdminProductSummary>>> =
-        ApiResponse.ok(PageResponse.from(productAdminService.listForAdmin(status, page, size)))
+        ApiResponse.ok(PageResponse.from(productAdminService.listForAdmin(status, sort, page, size)))
 
     @GetMapping("/{productId}")
     fun get(@PathVariable productId: Long): ResponseEntity<ApiResponse<SellerProductDetail>> =

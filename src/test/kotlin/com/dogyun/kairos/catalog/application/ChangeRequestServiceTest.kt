@@ -17,6 +17,7 @@ import com.dogyun.kairos.catalog.domain.ProductStatus
 import com.dogyun.kairos.catalog.domain.SkuStatus
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.security.SellerPrincipal
 import java.time.Clock
 import java.time.LocalDateTime
@@ -64,6 +65,7 @@ class ChangeRequestServiceTest {
     private class FakeSellerReader : SellerReader {
         override fun findBrand(brandId: Long): BrandSnapshot? = null
         override fun getBrandNames(brandIds: Collection<Long>): Map<Long, String> = brandIds.associateWith { "키로스" }
+        override fun getSellerNames(sellerIds: Collection<Long>): Map<Long, String> = sellerIds.associateWith { "판매자$it" }
     }
 
     private class FakeImageFileReader(private val files: Map<Long, ImageFileRef>) : ImageFileReader {
@@ -90,7 +92,7 @@ class ChangeRequestServiceTest {
     )
     private val categoryQueryService = CategoryQueryService(categories)
     private val service = ChangeRequestService(products, changeRequests, categoryQueryService, files)
-    private val adminService = ChangeRequestAdminService(products, changeRequests, categoryQueryService, histories, files, clock)
+    private val adminService = ChangeRequestAdminService(products, changeRequests, categoryQueryService, histories, files, FakeSellerReader(), clock)
     private val query = ProductQueryService(products, changeRequests, FakeSellerReader(), files)
 
     private val root: Long = requireNotNull(categories.save(Category.root("패션", 1)).id).value
@@ -360,12 +362,12 @@ class ChangeRequestServiceTest {
         val secondRequest = submitSame(second)
         adminService.reject(firstRequest, "사유", reviewerId)
 
-        val pending = adminService.listForAdmin(ChangeRequestStatus.PENDING, 0, 20)
-        val all = adminService.listForAdmin(null, 0, 20)
+        val pending = adminService.listForAdmin(ChangeRequestStatus.PENDING, ListOrder.LATEST, 0, 20)
+        val all = adminService.listForAdmin(null, ListOrder.LATEST, 0, 20)
 
         assertEquals(listOf(secondRequest), pending.content.map { it.changeRequestId })
         assertEquals(listOf(secondRequest, firstRequest), all.content.map { it.changeRequestId })
         assertEquals("새 티셔츠", all.content.first().name)
-        assertCode(ErrorCode.INVALID_REQUEST) { adminService.listForAdmin(null, 0, 101) }
+        assertCode(ErrorCode.INVALID_REQUEST) { adminService.listForAdmin(null, ListOrder.LATEST, 0, 101) }
     }
 }

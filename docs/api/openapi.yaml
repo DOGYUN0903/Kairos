@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.6.0
+  version: 0.7.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
@@ -522,7 +522,7 @@ paths:
     get:
       tags: [Admin Seller]
       operationId: listAdminSellers
-      summary: 판매자 심사 목록 (ADMIN, 최신 등록순)
+      summary: 판매자 심사 목록 (ADMIN, `sort` 기본 최신순)
       parameters:
         - name: status
           in: query
@@ -531,6 +531,7 @@ paths:
             $ref: '#/components/schemas/SellerStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 판매자 목록
@@ -864,7 +865,7 @@ paths:
     get:
       tags: [Admin Brand]
       operationId: listAdminBrands
-      summary: 브랜드 심사 목록 (ADMIN, 최신 등록순)
+      summary: 브랜드 심사 목록 (ADMIN, `sort` 기본 최신순)
       parameters:
         - name: status
           in: query
@@ -873,6 +874,7 @@ paths:
             $ref: '#/components/schemas/BrandStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 브랜드 목록
@@ -1616,7 +1618,7 @@ paths:
     get:
       tags: [Admin Product]
       operationId: listAdminProducts
-      summary: 상품 심사 목록 (ADMIN, 최신 등록순, status 필터)
+      summary: 상품 심사 목록 (ADMIN, `sort` 기본 최신순, status 필터)
       parameters:
         - name: status
           in: query
@@ -1625,6 +1627,7 @@ paths:
             $ref: '#/components/schemas/ProductStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 상품 목록
@@ -1807,7 +1810,7 @@ paths:
     get:
       tags: [Admin Change Request]
       operationId: listChangeRequests
-      summary: 변경 요청 목록 (ADMIN, 최신순, status 필터)
+      summary: 변경 요청 목록 (ADMIN, `sort` 기본 최신순, status 필터)
       parameters:
         - name: status
           in: query
@@ -1816,6 +1819,7 @@ paths:
             $ref: '#/components/schemas/ChangeRequestStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 변경 요청 목록
@@ -4262,6 +4266,15 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    QueueSort:
+      name: sort
+      in: query
+      required: false
+      description: 심사 큐 정렬. LATEST 는 id 내림차순(최신 등록순), OLDEST 는 id 오름차순(오래된 대기 건 먼저).
+      schema:
+        type: string
+        enum: [LATEST, OLDEST]
+        default: LATEST
     ProductId:
       name: productId
       in: path
@@ -4877,8 +4890,11 @@ components:
           type: string
     SellerDetail:
       type: object
-      required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status]
+      required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status, createdAt]
       properties:
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 신청 일시 (KST LocalDateTime, 오프셋 없음)
         sellerId:
           type: integer
           format: int64
@@ -4957,8 +4973,11 @@ components:
           format: int64
     BrandDetail:
       type: object
-      required: [brandId, sellerId, name, status]
+      required: [brandId, sellerId, name, status, createdAt]
       properties:
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 신청 일시 (KST LocalDateTime, 오프셋 없음)
         brandId:
           type: integer
           format: int64
@@ -5306,8 +5325,14 @@ components:
             $ref: '#/components/schemas/OptionRequest'
     ChangeRequestSummary:
       type: object
-      required: [changeRequestId, productId, sellerId, name, originalPrice, status]
+      required: [changeRequestId, productId, sellerId, name, originalPrice, status, requestedAt, sellerName]
       properties:
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 요청 일시 (KST LocalDateTime, 오프셋 없음)
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
         changeRequestId:
           type: integer
           format: int64
@@ -5591,7 +5616,7 @@ components:
           description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
     SellerProductSummary:
       type: object
-      required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut]
+      required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut, stockTotal, createdAt, hasPendingChangeRequest]
       properties:
         productId:
           type: integer
@@ -5610,9 +5635,19 @@ components:
           $ref: '#/components/schemas/ProductStatus'
         soldOut:
           type: boolean
+        stockTotal:
+          type: integer
+          format: int32
+          description: ACTIVE SKU 재고 합
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 등록 일시 (KST LocalDateTime, 오프셋 없음)
+        hasPendingChangeRequest:
+          type: boolean
+          description: 심사 대기 중인 변경 요청이 있는지
     AdminProductSummary:
       type: object
-      required: [productId, sellerId, brandName, name, thumbnailUrl, originalPrice, salePrice, status]
+      required: [productId, sellerId, brandName, name, thumbnailUrl, originalPrice, salePrice, status, createdAt, sellerName]
       properties:
         productId:
           type: integer
@@ -5634,6 +5669,12 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/ProductStatus'
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 등록 일시 (KST LocalDateTime, 오프셋 없음)
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
     BrandPublic:
       type: object
       required: [brandId, name]

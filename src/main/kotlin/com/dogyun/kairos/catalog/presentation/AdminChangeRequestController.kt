@@ -4,6 +4,7 @@ import com.dogyun.kairos.catalog.application.ChangeRequestAdminService
 import com.dogyun.kairos.catalog.application.ChangeRequestDetail
 import com.dogyun.kairos.catalog.application.ChangeRequestSummary
 import com.dogyun.kairos.catalog.domain.ChangeRequestStatus
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.common.security.LoginMember
@@ -25,10 +26,11 @@ class AdminChangeRequestController(private val changeRequestAdminService: Change
     @GetMapping
     fun list(
         @RequestParam(required = false) status: ChangeRequestStatus?,
+        @RequestParam(defaultValue = "LATEST") sort: ListOrder,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ResponseEntity<ApiResponse<PageResponse<ChangeRequestSummary>>> =
-        ApiResponse.ok(PageResponse.from(changeRequestAdminService.listForAdmin(status, page, size)))
+        ApiResponse.ok(PageResponse.from(changeRequestAdminService.listForAdmin(status, sort, page, size)))
 
     @GetMapping("/{changeRequestId}")
     fun get(@PathVariable changeRequestId: Long): ResponseEntity<ApiResponse<ChangeRequestDetail>> =

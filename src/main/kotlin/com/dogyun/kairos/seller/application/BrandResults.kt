@@ -1,6 +1,7 @@
 package com.dogyun.kairos.seller.application
 
 import com.dogyun.kairos.seller.domain.Brand
+import java.time.LocalDateTime
 
 data class BrandDetail(
     val brandId: Long,
@@ -11,6 +12,8 @@ data class BrandDetail(
     val description: String?,
     val status: String,
     val rejectReason: String?,
+    /** 신청 일시. */
+    val createdAt: LocalDateTime,
 )
 
 data class BrandPublic(
@@ -42,6 +45,7 @@ internal fun toBrandDetails(brands: List<Brand>, imageFileReader: ImageFileReade
             description = it.description,
             status = it.status.name,
             rejectReason = it.rejectReason,
+            createdAt = requireNotNull(it.createdAt) { "저장소에서 읽은 브랜드에는 신청 일시가 있어야 합니다" },
         )
     }
 }

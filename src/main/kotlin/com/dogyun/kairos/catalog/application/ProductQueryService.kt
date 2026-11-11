@@ -49,12 +49,16 @@ class ProductQueryService(
         )
     }
 
-    /** 브랜드명과 대표 이미지 URL 을 상품 목록 단위로 한 번씩 조회한다. */
+    /** 브랜드명·대표 이미지 URL·대기 변경 요청 여부를 상품 목록 단위로 한 번씩 조회한다. */
     private fun toSummaries(products: List<Product>): List<SellerProductSummary> {
         val brandNames = sellerReader.getBrandNames(products.map { it.brandId }.toSet())
         val urls = imageFileReader.findImages(products.map { it.content.imageFileIds.first() }).mapValues { it.value.url }
+        val pendingProductIds = changeRequestRepository.findPendingProductIds(products.mapNotNull { it.id?.value })
         return products.map {
-            toSellerProductSummary(it, brandNames[it.brandId].orEmpty(), urls[it.content.imageFileIds.first()].orEmpty())
+            toSellerProductSummary(
+                it, brandNames[it.brandId].orEmpty(), urls[it.content.imageFileIds.first()].orEmpty(),
+                hasPendingChangeRequest = requireNotNull(it.id).value in pendingProductIds,
+            )
         }
     }
 

@@ -11,6 +11,7 @@ import com.dogyun.kairos.catalog.domain.ProductReviewTarget
 import com.dogyun.kairos.catalog.domain.ProductStatus
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,6 +27,8 @@ data class AdminProductSummary(
     val originalPrice: Long,
     val salePrice: Long,
     val status: String,
+    val createdAt: LocalDateTime,
+    val sellerName: String,
 )
 
 /** 관리자의 상품 심사. 승인·반려할 때마다 심사 이력을 한 건 남긴다. */
@@ -51,11 +54,12 @@ class ProductAdminService(
     }
 
     @Transactional(readOnly = true)
-    fun listForAdmin(status: ProductStatus?, page: Int, size: Int): PageResult<AdminProductSummary> {
+    fun listForAdmin(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<AdminProductSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = productRepository.findPageByStatus(status, page, size)
+        val result = productRepository.findPageByStatus(status, order, page, size)
         val products = result.content
         val brandNames = sellerReader.getBrandNames(products.map { it.brandId }.toSet())
+        val sellerNames = sellerReader.getSellerNames(products.map { it.sellerId }.toSet())
         val urls = imageFileReader.findImages(products.map { it.content.imageFileIds.first() }).mapValues { it.value.url }
         val summaries = products.map {
             val thumbnailId = it.content.imageFileIds.first()
@@ -68,6 +72,8 @@ class ProductAdminService(
                 originalPrice = it.originalPrice,
                 salePrice = it.salePrice,
                 status = it.status.name,
+                createdAt = requireNotNull(it.createdAt) { "저장소에서 읽은 상품에는 등록 일시가 있어야 합니다" },
+                sellerName = sellerNames[it.sellerId] ?: DELETED_SELLER_NAME,
             )
         }
         return PageResult(summaries, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
@@ -100,5 +106,6 @@ class ProductAdminService(
 
     private companion object {
         const val MAX_SIZE = 100
+        const val DELETED_SELLER_NAME = "(삭제된 판매자)"
     }
 }

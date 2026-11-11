@@ -11,6 +11,7 @@ import com.dogyun.kairos.catalog.domain.ProductReviewTarget
 import com.dogyun.kairos.catalog.domain.ProductStatus
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import java.time.Clock
 import java.time.LocalDateTime
@@ -31,6 +32,7 @@ class ProductAdminServiceTest {
             val saved = Product.restore(
                 id, product.sellerId, product.brandId, product.content, product.originalPrice, product.salePrice,
                 product.status, product.rejectReason, product.onSaleAt, product.salesCount, product.skus,
+                createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
             )
             store[id.value] = saved
             return saved
@@ -43,8 +45,8 @@ class ProductAdminServiceTest {
         override fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product> =
             page(store.values.filter { it.sellerId == sellerId && (status == null || it.status == status) }, page, size)
 
-        override fun findPageByStatus(status: ProductStatus?, page: Int, size: Int): PageResult<Product> =
-            page(store.values.filter { status == null || it.status == status }, page, size)
+        override fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product> =
+            page(store.values.filter { status == null || it.status == status }.let { if (order == ListOrder.OLDEST) it.reversed() else it }, page, size)
 
         override fun findAllBySkuIds(skuIds: Collection<Long>): List<Product> =
             store.values.filter { product -> product.skus.any { it.id?.value in skuIds } }
@@ -75,6 +77,7 @@ class ProductAdminServiceTest {
     private class FakeSellerReader : SellerReader {
         override fun findBrand(brandId: Long): BrandSnapshot? = null
         override fun getBrandNames(brandIds: Collection<Long>): Map<Long, String> = brandIds.associateWith { "키로스" }
+        override fun getSellerNames(sellerIds: Collection<Long>): Map<Long, String> = sellerIds.associateWith { "판매자$it" }
     }
 
     private class FakeImageFileReader : ImageFileReader {
@@ -188,13 +191,27 @@ class ProductAdminServiceTest {
         pendingProduct("둘째")
         service.approve(first, reviewerId)
 
-        val onSale = service.listForAdmin(ProductStatus.ON_SALE, 0, 20)
-        val all = service.listForAdmin(null, 0, 20)
+        val onSale = service.listForAdmin(ProductStatus.ON_SALE, ListOrder.LATEST, 0, 20)
+        val all = service.listForAdmin(null, ListOrder.LATEST, 0, 20)
 
         assertEquals(listOf("첫째"), onSale.content.map { it.name })
         assertEquals("키로스", onSale.content.single().brandName)
         assertEquals("http://files/100.png", onSale.content.single().thumbnailUrl)
         assertEquals(2, all.totalElements)
-        assertCode(ErrorCode.INVALID_REQUEST) { service.listForAdmin(null, 0, 101) }
+        assertCode(ErrorCode.INVALID_REQUEST) { service.listForAdmin(null, ListOrder.LATEST, 0, 101) }
+    }
+
+    @Test
+    fun 목록은_OLDEST면_오래된_순이고_행에_등록일과_판매자명을_채운다() {
+        pendingProduct("첫째")
+        pendingProduct("둘째")
+
+        val oldest = service.listForAdmin(null, ListOrder.OLDEST, 0, 20).content
+        val latest = service.listForAdmin(null, ListOrder.LATEST, 0, 20).content
+
+        assertEquals(listOf("첫째", "둘째"), oldest.map { it.name })
+        assertEquals(listOf("둘째", "첫째"), latest.map { it.name })
+        assertEquals(LocalDateTime.of(2026, 11, 9, 9, 0), oldest.first().createdAt)
+        assertEquals("판매자${oldest.first().sellerId}", oldest.first().sellerName)
     }
 }

@@ -1,5 +1,6 @@
 package com.dogyun.kairos.seller.domain
 
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 
 interface SellerRepository {
@@ -9,6 +10,6 @@ interface SellerRepository {
     fun findByMemberId(memberId: Long): Seller?
     fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean
 
-    /** status 가 null 이면 전체. 최신 등록순. */
-    fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller>
+    /** status 가 null 이면 전체. id 기준 정렬(LATEST 내림차순, OLDEST 오름차순). */
+    fun findPage(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<Seller>
 }

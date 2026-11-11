@@ -11,6 +11,7 @@ import com.dogyun.kairos.catalog.domain.ProductReviewResult
 import com.dogyun.kairos.catalog.domain.ProductReviewTarget
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,6 +26,7 @@ class ChangeRequestAdminService(
     private val categoryQueryService: CategoryQueryService,
     private val historyRepository: ProductReviewHistoryRepository,
     private val imageFileReader: ImageFileReader,
+    private val sellerReader: SellerReader,
     private val clock: Clock,
 ) {
 
@@ -57,11 +59,21 @@ class ChangeRequestAdminService(
     }
 
     @Transactional(readOnly = true)
-    fun listForAdmin(status: ChangeRequestStatus?, page: Int, size: Int): PageResult<ChangeRequestSummary> {
+    fun listForAdmin(status: ChangeRequestStatus?, order: ListOrder, page: Int, size: Int): PageResult<ChangeRequestSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = changeRequestRepository.findPage(status, page, size)
+        val result = changeRequestRepository.findPage(status, order, page, size)
+        val sellerNames = sellerReader.getSellerNames(result.content.map { it.sellerId }.toSet())
         val summaries = result.content.map {
-            ChangeRequestSummary(requireNotNull(it.id), it.productId, it.sellerId, it.content.name, it.originalPrice, it.status.name)
+            ChangeRequestSummary(
+                changeRequestId = requireNotNull(it.id),
+                productId = it.productId,
+                sellerId = it.sellerId,
+                name = it.content.name,
+                originalPrice = it.originalPrice,
+                status = it.status.name,
+                requestedAt = requireNotNull(it.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
+                sellerName = sellerNames[it.sellerId] ?: DELETED_SELLER_NAME,
+            )
         }
         return PageResult(summaries, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
     }
@@ -105,5 +117,6 @@ class ChangeRequestAdminService(
 
     private companion object {
         const val MAX_SIZE = 100
+        const val DELETED_SELLER_NAME = "(삭제된 판매자)"
     }
 }

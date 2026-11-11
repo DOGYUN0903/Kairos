@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.BusinessNumber
 import com.dogyun.kairos.seller.domain.Seller
@@ -25,7 +26,7 @@ class SellerServiceTest {
             val saved = Seller.restore(
                 id, seller.memberId, seller.companyName, seller.businessNumber, seller.representativeName,
                 seller.phone, seller.settlementAccount, seller.commissionRateBp, seller.status,
-                seller.rejectReason, seller.suspendReason,
+                seller.rejectReason, seller.suspendReason, createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
             )
             store[id.value] = saved
             return saved
@@ -37,7 +38,7 @@ class SellerServiceTest {
         override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean =
             store.values.any { it.businessNumber == businessNumber }
 
-        override fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller> {
+        override fun findPage(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<Seller> {
             val all = store.values.filter { status == null || it.status == status }.sortedByDescending { it.id?.value }
             return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
         }
@@ -146,9 +147,9 @@ class SellerServiceTest {
         service.apply(2L, command("100-00-00002"))
         repository.findByMemberId(1L)!!.also { it.approve(0); repository.save(it) }
 
-        val all = queryService.listForAdmin(null, 0, 20)
+        val all = queryService.listForAdmin(null, ListOrder.LATEST, 0, 20)
         assertEquals(listOf(2L, 1L), all.content.map { it.memberId })
-        assertEquals(listOf(1L), queryService.listForAdmin(SellerStatus.APPROVED, 0, 20).content.map { it.memberId })
-        assertCode(ErrorCode.INVALID_REQUEST) { queryService.listForAdmin(null, 0, 101) }
+        assertEquals(listOf(1L), queryService.listForAdmin(SellerStatus.APPROVED, ListOrder.LATEST, 0, 20).content.map { it.memberId })
+        assertCode(ErrorCode.INVALID_REQUEST) { queryService.listForAdmin(null, ListOrder.LATEST, 0, 101) }
     }
 }

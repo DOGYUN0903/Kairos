@@ -1,5 +1,6 @@
 package com.dogyun.kairos.seller.presentation
 
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.presentation.ApiResponse
 import com.dogyun.kairos.common.presentation.PageResponse
 import com.dogyun.kairos.common.security.LoginMember
@@ -24,10 +25,11 @@ class AdminBrandController(private val brandAdminService: BrandAdminService) {
     @GetMapping
     fun list(
         @RequestParam(required = false) status: BrandStatus?,
+        @RequestParam(defaultValue = "LATEST") sort: ListOrder,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
     ): ResponseEntity<ApiResponse<PageResponse<BrandDetail>>> =
-        ApiResponse.ok(PageResponse.from(brandAdminService.listForAdmin(status, page, size)))
+        ApiResponse.ok(PageResponse.from(brandAdminService.listForAdmin(status, sort, page, size)))
 
     @PostMapping("/{brandId}/approve")
     fun approve(

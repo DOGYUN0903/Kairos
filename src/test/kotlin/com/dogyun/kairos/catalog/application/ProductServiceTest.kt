@@ -34,6 +34,7 @@ class ProductServiceTest {
         override fun findBrand(brandId: Long): BrandSnapshot? = brands[brandId]
         override fun getBrandNames(brandIds: Collection<Long>): Map<Long, String> =
             brands.filterKeys { it in brandIds }.mapValues { it.value.name }
+        override fun getSellerNames(sellerIds: Collection<Long>): Map<Long, String> = emptyMap()
     }
 
     private class FakeImageFileReader(private val files: Map<Long, ImageFileRef>) : ImageFileReader {

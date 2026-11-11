@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.domain
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import java.time.LocalDateTime
 
 class Seller(
     val id: SellerId?,
@@ -15,6 +16,8 @@ class Seller(
     status: SellerStatus,
     rejectReason: String?,
     suspendReason: String?,
+    /** 신청 일시. 읽기 전용이며 저장소에서 읽어 온 애그리거트에만 값이 있다. */
+    val createdAt: LocalDateTime? = null,
 ) {
     var companyName: String = companyName
         private set
@@ -117,9 +120,10 @@ class Seller(
             status: SellerStatus,
             rejectReason: String?,
             suspendReason: String?,
+            createdAt: LocalDateTime? = null,
         ) = Seller(
             id, memberId, companyName, businessNumber, representativeName, phone,
-            settlementAccount, commissionRateBp, status, rejectReason, suspendReason,
+            settlementAccount, commissionRateBp, status, rejectReason, suspendReason, createdAt,
         )
     }
 }

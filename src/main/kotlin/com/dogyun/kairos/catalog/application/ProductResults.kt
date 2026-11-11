@@ -76,6 +76,8 @@ data class ChangeRequestSummary(
     val name: String,
     val originalPrice: Long,
     val status: String,
+    val requestedAt: LocalDateTime,
+    val sellerName: String,
 )
 
 data class SellerProductSummary(
@@ -86,6 +88,10 @@ data class SellerProductSummary(
     val salePrice: Long,
     val status: String,
     val soldOut: Boolean,
+    /** ACTIVE SKU 재고 합. */
+    val stockTotal: Int,
+    val createdAt: LocalDateTime,
+    val hasPendingChangeRequest: Boolean,
 )
 
 internal fun toSellerProductDetail(
@@ -146,7 +152,12 @@ internal fun skuDisplayName(skuValueIds: List<Long>, orderedValueIds: List<Long>
     return (known + unknown).joinToString(" / ")
 }
 
-internal fun toSellerProductSummary(product: Product, brandName: String, thumbnailUrl: String) = SellerProductSummary(
+internal fun toSellerProductSummary(
+    product: Product,
+    brandName: String,
+    thumbnailUrl: String,
+    hasPendingChangeRequest: Boolean,
+) = SellerProductSummary(
     productId = requireNotNull(product.id).value,
     name = product.content.name,
     thumbnailUrl = thumbnailUrl,
@@ -154,4 +165,7 @@ internal fun toSellerProductSummary(product: Product, brandName: String, thumbna
     salePrice = product.salePrice,
     status = product.status.name,
     soldOut = product.soldOut,
+    stockTotal = product.activeSkus.sumOf { it.stock },
+    createdAt = requireNotNull(product.createdAt) { "저장소에서 읽은 상품에는 등록 일시가 있어야 합니다" },
+    hasPendingChangeRequest = hasPendingChangeRequest,
 )

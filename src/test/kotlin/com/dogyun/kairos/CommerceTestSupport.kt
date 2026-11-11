@@ -113,12 +113,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun delete(path: String, token: String? = null): ResultActionsDsl =
         mockMvc.delete(path) { prepare(token, null) }
 
-    /** 판매자 신청 → 관리자 승인(수수료율 1000bp)까지 마치고 sellerId 를 돌려준다. */
-    protected fun approvedSeller(token: String, businessNumber: String = randomBusinessNumber()): Long {
+    /** 판매자 신청만 하고(PENDING) sellerId 를 돌려준다. */
+    protected fun appliedSeller(token: String, businessNumber: String = randomBusinessNumber(), companyName: String = "키로스상사"): Long {
         val created = post(
             "/api/v1/seller/application", token,
             mapOf(
-                "companyName" to "키로스상사",
+                "companyName" to companyName,
                 "businessNumber" to businessNumber,
                 "representativeName" to "홍길동",
                 "phone" to "010-1234-5678",
@@ -127,7 +127,12 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
                 "holder" to "홍길동",
             ),
         ).andExpect { status { isCreated() } }
-        val sellerId = json(created).get("data").get("sellerId").asLong()
+        return json(created).get("data").get("sellerId").asLong()
+    }
+
+    /** 판매자 신청 → 관리자 승인(수수료율 1000bp)까지 마치고 sellerId 를 돌려준다. */
+    protected fun approvedSeller(token: String, businessNumber: String = randomBusinessNumber(), companyName: String = "키로스상사"): Long {
+        val sellerId = appliedSeller(token, businessNumber, companyName)
         post("/api/v1/admin/sellers/$sellerId/approve", adminToken(), mapOf("commissionRateBp" to 1000))
             .andExpect { status { isOk() } }
         return sellerId

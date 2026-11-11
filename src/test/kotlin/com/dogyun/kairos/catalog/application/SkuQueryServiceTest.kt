@@ -19,6 +19,7 @@ class SkuQueryServiceTest {
     private class FakeSellerReader : SellerReader {
         override fun findBrand(brandId: Long): BrandSnapshot? = null
         override fun getBrandNames(brandIds: Collection<Long>): Map<Long, String> = brandIds.associateWith { "브랜드$it" }
+        override fun getSellerNames(sellerIds: Collection<Long>): Map<Long, String> = emptyMap()
     }
 
     private class FakeImageFileReader : ImageFileReader {
