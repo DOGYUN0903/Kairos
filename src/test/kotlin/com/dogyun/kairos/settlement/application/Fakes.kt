@@ -120,12 +120,11 @@ class FakeSettlementAdjustmentRepository(var now: () -> LocalDateTime) : Settlem
 
     override fun findBySettlementId(settlementId: Long) = rows.values.filter { it.settlementId == settlementId && it.id !in deleted }
     override fun findSellerIdsWithUnattached(createdBefore: LocalDateTime): Set<Long> =
-        rows.values.filter { attachable(it, createdBefore) }.map { it.sellerId }.toSet()
+        rows.values.filter { attachable(it, createdBefore)}.map { it.sellerId }.toSet()
     override fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<SettlementAdjustment> {
         val all = rows.values.filter { it.sellerId == sellerId && it.id !in deleted }.sortedByDescending { it.id }
         return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
     }
-    override fun delete(a: SettlementAdjustment) { deleted += a.id!! }
     override fun deleteUnattachedManual(id: Long): Boolean {
         val a = rows[id] ?: return false
         if (id in deleted || a.settlementId != null || a.type != AdjustmentType.MANUAL) return false

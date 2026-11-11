@@ -101,7 +101,7 @@ class SettlementRepositoryImplTest : CommerceTestSupport() {
         val after = assertNotNull(adjustmentRepository.save(SettlementAdjustment.manual(1L, 700, "후", null, 99L)).id)
         val other = assertNotNull(adjustmentRepository.save(SettlementAdjustment.manual(2L, 900, "다른 판매자", null, 99L)).id)
         val deleted = adjustmentRepository.save(SettlementAdjustment.manual(1L, 100, "삭제", null, 99L))
-        adjustmentRepository.delete(deleted)
+        assertTrue(adjustmentRepository.deleteUnattachedManual(assertNotNull(deleted.id)))
         val carryOver = assertNotNull(adjustmentRepository.save(SettlementAdjustment.carryOver(1L, -300, 77L)).id)
         val boundary = LocalDateTime.of(2026, 11, 9, 0, 0)
         jdbcTemplate.update("update settlement_adjustment set created_at = ? where id = ?", boundary.minusSeconds(1), before)
@@ -133,7 +133,7 @@ class SettlementRepositoryImplTest : CommerceTestSupport() {
     fun 조정_소프트_삭제와_페이지_조회() {
         val a = adjustmentRepository.save(SettlementAdjustment.manual(1L, 1, "a", 5L, 99L))
         val b = adjustmentRepository.save(SettlementAdjustment.manual(1L, 2, "b", null, 99L))
-        adjustmentRepository.delete(a)
+        assertTrue(adjustmentRepository.deleteUnattachedManual(assertNotNull(a.id)))
 
         val page = adjustmentRepository.findPageBySellerId(1L, 0, 10)
 

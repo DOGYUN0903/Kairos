@@ -7,12 +7,14 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.LocalDateTime
 
 @Repository
 @Transactional(readOnly = true)
 class SettlementAdjustmentRepositoryImpl(
     private val jpaRepository: SettlementAdjustmentJpaRepository,
+    private val clock: Clock,
 ) : SettlementAdjustmentRepository {
 
     /** 새 조정만 저장한다(`saveAndFlush`: `source_settlement_id` UNIQUE 위반이 즉시 올라온다). 정산에 붙이기는 [attach]뿐이다. */
@@ -45,14 +47,7 @@ class SettlementAdjustmentRepositoryImpl(
     }
 
     @Transactional
-    override fun delete(a: SettlementAdjustment) {
-        val entity = jpaRepository.findById(requireNotNull(a.id)).orElse(null) ?: return
-        entity.softDelete()
-        jpaRepository.saveAndFlush(entity)
-    }
-
-    @Transactional
-    override fun deleteUnattachedManual(id: Long): Boolean = jpaRepository.softDeleteUnattachedManual(id, LocalDateTime.now()) == 1
+    override fun deleteUnattachedManual(id: Long): Boolean = jpaRepository.softDeleteUnattachedManual(id, LocalDateTime.now(clock)) == 1
 
     private fun toDomain(e: SettlementAdjustmentEntity) = SettlementAdjustment(
         e.id, e.sellerId, e.settlementId, e.adjustmentType, e.amount, e.reason,

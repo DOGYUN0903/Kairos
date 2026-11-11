@@ -264,6 +264,17 @@ class PaymentReconciliationServiceTest {
     }
 
     @Test
+    fun RETURN_REFUNDING_항목의_결제에_paymentKey가_없으면_PG를_부르지_않고_건너뛴다() {
+        val (order, itemId, _) = returnRefunding()
+        f.paymentGateway.payments[order.id!!] = f.paymentGateway.get(order.id!!).copy(paymentKey = null)
+
+        assertEquals(0, service.reconcileCancels())
+
+        assertTrue(f.paymentGateway.cancelCalls.isEmpty())
+        assertEquals(OrderItemStatus.RETURN_REFUNDING, f.reload(order).findItem(itemId).status)
+    }
+
+    @Test
     fun PG에_취소가_없으면_같은_멱등_키로_다시_취소한다() {
         val (order, itemId, refund) = returnRefunding()
         f.pgDone("pay-${order.id}")

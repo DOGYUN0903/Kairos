@@ -133,7 +133,13 @@ class PaymentReconciliationService(
 
     /** PG 에 이 항목의 취소가 있으면 그 결과를, 없으면 같은 멱등 키로 다시 취소해 얻은 결과를 돌려준다. 확인할 수 없으면 null. */
     private fun refundOutcome(orderId: Long, itemId: Long, refundAmount: Long): PgOutcome? {
-        val paymentKey = paymentGateway.get(orderId).paymentKey ?: return null
+        val paymentKey = paymentGateway.get(orderId).paymentKey
+        if (paymentKey == null) {
+            // 현재 도달 불가: paymentKey 없는 주문(PG 미사용)은 현금 환불이 0원이라 여기까지 오지 않는다.
+            // 무PG 결제수단을 추가하면 이 항목은 영원히 건너뛰어지므로 관리자 종결 경로가 필요하다. 그때까지 매 주기 WARN 으로 드러낸다.
+            log.warn("PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId={}, itemId={}, refundAmount={}", orderId, itemId, refundAmount)
+            return null
+        }
         val found = paymentGateway.findFromPg(paymentKey)
         // 조회가 일시적으로 실패한 것일 수 있다(NOT_FOUND 만 PG 에 취소가 없다는 확실한 답이다). 취소를 다시 부르다 거절되면 환불이 되돌려지므로 이번 주기는 건너뛴다.
         if (found is PgOutcome.Unknown || (found is PgOutcome.Failed && found.code != "NOT_FOUND")) return null
