@@ -405,3 +405,6 @@ table { border-collapse: collapse; width: 100%; }
 .timeline li.is-done::before { background: var(--navy); border-color: var(--navy); }
 .timeline li span:last-child { font-variant-numeric: tabular-nums; color: var(--text-2); }
 .timeline li:not(.is-done) span:last-child { color: var(--text-3); }
+.countdown--sm { display: flex; align-items: baseline; justify-content: center; gap: 8px; text-align: center; }
+.countdown--sm .label { display: inline; }
+.countdown--sm strong { font-size: 18px; letter-spacing: .3px; }
