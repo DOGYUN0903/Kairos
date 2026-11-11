@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useCreateCategory, useUpdateCategory } from "@/features/admin/categories/api";
 import { categorySchema, type CategoryValues } from "@/features/admin/categories/schemas";
 import { toast } from "@/hooks/use-toast";
+import { useIdempotentSubmit } from "@/hooks/useIdempotentSubmit";
 
 export type CategoryDialogState =
   | { mode: "create"; parentId: number | null; parentName?: string; initial: CategoryValues }
@@ -31,12 +32,10 @@ function CategoryForm({ state, onClose }: { state: CategoryDialogState; onClose:
   const update = useUpdateCategory();
   const form = useForm<CategoryValues>({ resolver: zodResolver(categorySchema), defaultValues: state.initial });
   const { register, formState } = form;
-  const pending = create.isPending || update.isPending;
 
-  const submit = form.handleSubmit(async (values) => {
-    if (pending) return;
+  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
     try {
-      if (state.mode === "create") await create.mutateAsync({ parentId: state.parentId, values });
+      if (state.mode === "create") await create.mutateAsync({ parentId: state.parentId, values, key });
       else await update.mutateAsync({ id: state.id, values });
       toast({ title: state.mode === "create" ? "카테고리를 추가했습니다." : "카테고리를 수정했습니다." });
       form.reset();
@@ -58,7 +57,7 @@ function CategoryForm({ state, onClose }: { state: CategoryDialogState; onClose:
         <DialogTitle>{titleOf(state)}</DialogTitle>
         <DialogDescription>{state.mode === "edit" ? "이름과 표시 순서를 바꿉니다." : "이름과 표시 순서를 정합니다. 작은 숫자가 먼저 보입니다."}</DialogDescription>
       </DialogHeader>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <div className="field">
           <label htmlFor="cat-name">이름</label>
           <input id="cat-name" className="input" maxLength={60} autoComplete="off" aria-invalid={formState.errors.name ? "true" : undefined} {...register("name")} />
@@ -70,8 +69,8 @@ function CategoryForm({ state, onClose }: { state: CategoryDialogState; onClose:
           {formState.errors.displayOrder && <p role="alert" className="field-error">{formState.errors.displayOrder.message}</p>}
         </div>
         <DialogFooter>
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={pending}>취소</button>
-          <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "저장 중…" : "저장"}</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>취소</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? "저장 중…" : "저장"}</button>
         </DialogFooter>
       </form>
     </>

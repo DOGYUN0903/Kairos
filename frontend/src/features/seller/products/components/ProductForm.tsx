@@ -75,15 +75,19 @@ function fromDetail(d: SellerProductDetail): ProductFormInput {
   };
 }
 
-export type ProductFormProps =
+export type ProductFormProps = (
   | { mode: "create"; initial?: undefined }
   /** 판매 중·일시 중지: 변경 요청(정가 포함, 재검수). */
   | { mode: "change-request"; initial: SellerProductDetail }
   /** 검수 대기·반려: 내용 직접 수정(가격 제외, 다시 검수 대기). */
-  | { mode: "edit"; initial: SellerProductDetail };
+  | { mode: "edit"; initial: SellerProductDetail }
+) & {
+  /** 제출 성공 뒤 상세로 떠나는 중임을 부모에 알린다(새 상세가 와도 "검수 중" 안내로 바꾸지 않도록). */
+  leavingRef?: { current: boolean };
+};
 
 /** 상품 등록·변경 요청·직접 수정 폼. 브랜드·판매가는 등록 때만 입력한다(이후 판매가는 상세의 "판매가 수정"). */
-export function ProductForm({ mode, initial }: ProductFormProps) {
+export function ProductForm({ mode, initial, leavingRef }: ProductFormProps) {
   const router = useRouter();
   const qc = useQueryClient();
   const setBanner = useSellerBanner();
@@ -104,6 +108,7 @@ export function ProductForm({ mode, initial }: ProductFormProps) {
       const detailPath = `/seller/products/${initial.productId}`;
       // 상세로 먼저 이동한 뒤 무효화한다. 수정 화면에서 먼저 새 상세를 받으면 "검수 중인 변경 요청" 안내가 잠깐 보인다.
       const leave = () => {
+        if (leavingRef) leavingRef.current = true;
         router.push(detailPath);
         void invalidateProduct();
       };

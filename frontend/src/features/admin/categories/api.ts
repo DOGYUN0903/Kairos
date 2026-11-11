@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { api, unwrap } from "@/api/client";
+import { IDEMPOTENCY_HEADER } from "@/api/idempotency";
 import type { components } from "@/api/schema";
 import { resolveError } from "@/api/errors";
 import { sortTree, type CategoryNode } from "@/features/admin/categories/tree";
@@ -39,8 +40,10 @@ function useGuard() {
 export function useCreateCategory() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ parentId, values }: { parentId: number | null; values: CategoryValues }) =>
-      unwrap<components["schemas"]["CreateCategoryResponse"]>(await api.POST("/api/v1/admin/categories", { body: { parentId, ...values } })),
+    mutationFn: async ({ parentId, values, key }: { parentId: number | null; values: CategoryValues; key: string }) =>
+      unwrap<components["schemas"]["CreateCategoryResponse"]>(
+        await api.POST("/api/v1/admin/categories", { body: { parentId, ...values }, headers: { [IDEMPOTENCY_HEADER]: key } }),
+      ),
     onSettled: invalidate,
   });
 }
