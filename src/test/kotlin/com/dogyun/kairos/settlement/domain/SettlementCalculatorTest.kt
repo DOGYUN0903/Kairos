@@ -3,6 +3,7 @@ package com.dogyun.kairos.settlement.domain
 import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class SettlementCalculatorTest {
     private val at = LocalDateTime.of(2026, 11, 17, 10, 0)
@@ -84,5 +85,16 @@ class SettlementCalculatorTest {
         val s = source(items = listOf(item(1, amount = 12_345, coupon = 345, issuer = "SELLER"), item(2, ordered = false, amount = 9, fee = 100)))
 
         assertEquals(SettlementCalculator.line(s), SettlementCalculator.line(s))
+    }
+
+    @Test
+    fun 수수료는_기준_0원과_수수료율_0_10000bp_경계를_받고_범위_밖은_거절한다() {
+        assertEquals(0, SettlementCalculator.commission(0, 1_000))
+        assertEquals(0, SettlementCalculator.commission(9_999, 0))
+        assertEquals(9_999, SettlementCalculator.commission(9_999, 10_000))
+        assertEquals(999, SettlementCalculator.commission(9_999, 1_000)) // 999.9 → 999 (버림)
+        assertFailsWith<IllegalStateException> { SettlementCalculator.commission(-1, 1_000) }
+        assertFailsWith<IllegalStateException> { SettlementCalculator.commission(1_000, -1) }
+        assertFailsWith<IllegalStateException> { SettlementCalculator.commission(1_000, 10_001) }
     }
 }

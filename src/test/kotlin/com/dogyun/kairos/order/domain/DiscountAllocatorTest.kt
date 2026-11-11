@@ -167,4 +167,100 @@ class DiscountAllocatorTest {
         assertEquals(17_700, DiscountAllocator.maxUsablePoints(59_000, 20_000, policy))
         assertEquals(2_340, DiscountAllocator.maxUsablePoints(59_000, 2_345, policy))
     }
+
+    @Test
+    fun 항목_금액은_판매가_더하기_옵션가_곱하기_수량이다() {
+        val a = DiscountAllocator.allocate(
+            listOf(line(1, 10_000, quantity = 2, skuId = 11, extra = 1_500)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.RATE, value = 10_000), 0, 0, policy,
+        )
+        assertEquals(23_000, a.cartCouponDiscount) // (10,000 + 1,500) × 2, 100% 할인
+    }
+
+    @Test
+    fun 배분_나머지는_판매자_다음_SKU_순서의_마지막_항목에_얹는다() {
+        // 판매자 순서(1 < 2)와 SKU 순서(99 > 5)가 반대다. 정렬 기준은 판매자가 먼저다.
+        val bySeller = DiscountAllocator.allocate(
+            listOf(line(1, 10_000, skuId = 99), line(2, 10_000, skuId = 5)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.FIXED, value = 10_001), 0, 0, policy,
+        )
+        assertEquals(5_000, bySeller.lines.getValue(99).cartCouponAllocated)
+        assertEquals(5_001, bySeller.lines.getValue(5).cartCouponAllocated)
+
+        // 같은 판매자 안에서는 SKU 오름차순이라 SKU 가 큰 항목이 마지막이다.
+        val bySku = DiscountAllocator.allocate(
+            listOf(line(1, 10_000, skuId = 12), line(1, 10_000, skuId = 11)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.FIXED, value = 10_001), 0, 0, policy,
+        )
+        assertEquals(5_000, bySku.lines.getValue(11).cartCouponAllocated)
+        assertEquals(5_001, bySku.lines.getValue(12).cartCouponAllocated)
+    }
+
+    @Test
+    fun 마지막_항목_잔액보다_나머지가_크면_앞쪽_항목으로_넘긴다() {
+        // 5 / 5 / 1원에 10원 할인: 버림 4, 4, 0 → 나머지 2 중 1은 마지막(여유 1), 1은 가운데로.
+        val a = DiscountAllocator.allocate(
+            listOf(line(1, 5, skuId = 11), line(2, 5, skuId = 21), line(3, 1, skuId = 31)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.FIXED, value = 10), 0, 0, policy,
+        )
+        assertEquals(listOf(4L, 5L, 1L), listOf(11L, 21L, 31L).map { a.lines.getValue(it).cartCouponAllocated })
+    }
+
+    @Test
+    fun 정률_장바구니_할인이_0원이면_모든_항목_배분이_0이다() {
+        val a = DiscountAllocator.allocate(
+            listOf(line(1, 5_000, skuId = 11), line(2, 4_000, skuId = 21)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.RATE, value = 1), 0, 0, policy, // 9,000 × 0.01% = 0.9 → 0
+        )
+        assertEquals(0, a.cartCouponDiscount)
+        assertEquals(0, a.lines.getValue(11).cartCouponAllocated)
+        assertEquals(0, a.lines.getValue(21).cartCouponAllocated)
+    }
+
+    @Test
+    fun 잔액이_정확히_1000P이고_전부_쓰면_허용한다() {
+        val a = DiscountAllocator.allocate(listOf(b1), emptyMap(), null, 1_000, 1_000, policy)
+        assertEquals(1_000, a.pointsUsed)
+        assertEquals(1_000, a.lines.getValue(21).pointsAllocated)
+        assertEquals(1_000, DiscountAllocator.maxUsablePoints(30_000, 1_000, policy))
+        assertEquals(0, DiscountAllocator.maxUsablePoints(-100, 5_000, policy))
+    }
+
+    @Test
+    fun 쿠폰_대상이_맞으면_판매자_쿠폰과_상품_쿠폰을_적용한다() {
+        val bySeller = productCoupon(1, CouponIssuer.SELLER, CouponDiscountType.FIXED, 1_000, target = CouponTarget.SELLER, sellerId = 2)
+        assertEquals(1_000, DiscountAllocator.allocate(listOf(b1), mapOf(21L to bySeller), null, 0, 0, policy).productCouponDiscount)
+        val byProduct = productCoupon(2, CouponIssuer.SELLER, CouponDiscountType.FIXED, 700, target = CouponTarget.PRODUCT, productId = 1021)
+        assertEquals(700, DiscountAllocator.allocate(listOf(b1), mapOf(21L to byProduct), null, 0, 0, policy).productCouponDiscount)
+        assertEquals(false, bySeller.appliesTo(productId = 1021, sellerId = 3))
+        assertEquals(false, byProduct.appliesTo(productId = 1022, sellerId = 2))
+    }
+
+    @Test
+    fun 대상_금액이_0_이하면_할인은_0원이다() {
+        val fixed = productCoupon(1, CouponIssuer.PLATFORM, CouponDiscountType.FIXED, 1_000)
+        assertEquals(0, fixed.discountFor(0))
+        assertEquals(0, fixed.discountFor(-1))
+        assertEquals(500, fixed.discountFor(500))
+        val rate = productCoupon(2, CouponIssuer.PLATFORM, CouponDiscountType.RATE, 1_000)
+        assertEquals(0, rate.discountFor(-10_000))
+    }
+
+    @Test
+    fun 앞쪽으로_넘기는_나머지는_각_항목의_남은_여유까지만_얹는다() {
+        // 5 / 5 / 3원에 12원 할인: 버림 4, 4, 2 → 나머지 2 중 마지막은 여유 1만, 남은 1은 가운데로.
+        val a = DiscountAllocator.allocate(
+            listOf(line(1, 5, skuId = 11), line(2, 5, skuId = 21), line(3, 3, skuId = 31)), emptyMap(),
+            cartCoupon(type = CouponDiscountType.FIXED, value = 12), 0, 0, policy,
+        )
+        assertEquals(listOf(4L, 5L, 3L), listOf(11L, 21L, 31L).map { a.lines.getValue(it).cartCouponAllocated })
+    }
+
+    @Test
+    fun 대상_ID가_비어_있는_판매자_상품_쿠폰은_어디에도_적용되지_않는다() {
+        val noSeller = productCoupon(1, CouponIssuer.SELLER, CouponDiscountType.FIXED, 1_000, target = CouponTarget.SELLER)
+        val noProduct = productCoupon(2, CouponIssuer.SELLER, CouponDiscountType.FIXED, 1_000, target = CouponTarget.PRODUCT)
+        assertEquals(false, noSeller.appliesTo(productId = 1021, sellerId = 2))
+        assertEquals(false, noProduct.appliesTo(productId = 1021, sellerId = 2))
+    }
 }

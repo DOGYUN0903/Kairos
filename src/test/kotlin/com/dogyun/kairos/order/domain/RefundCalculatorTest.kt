@@ -356,4 +356,26 @@ class RefundCalculatorTest {
         assertEquals(0, plan.shippingFeeReturned)
         assertEquals(30_000, plan.refundAmount)
     }
+
+    @Test
+    fun 이미_취소한_항목이나_배송이_시작된_판매자_주문의_항목은_취소_계획을_거절한다() {
+        val o = paidOrder(line(1, 30_000), line(2, 30_000))
+        o.cancel(o.itemIdOf(1), CancelActor.SELLER)
+        assertCode(ErrorCode.ORDER_ITEM_NOT_CANCELABLE) { o.planCancel(o.itemIdOf(1), CancelActor.BUYER, POLICY) }
+
+        val so2 = o.sellerOrders.first { it.sellerId == 2L }.id!!
+        o.ship(so2, "04", "T2", NOW)
+        assertCode(ErrorCode.ORDER_ITEM_NOT_CANCELABLE) { o.planCancel(o.itemIdOf(2), CancelActor.BUYER, POLICY) }
+    }
+
+    @Test
+    fun 같은_판매자의_다른_항목이_남아_있으면_구매자_배송비를_환불하지_않고_모두_비면_환불한다() {
+        val o = paidOrder(line(1, 10_000, skuId = 11), line(1, 10_000, skuId = 12), line(1, 10_000, skuId = 13))
+        assertEquals(0, o.cancel(o.itemIdOf(1, 1)).shippingFeeRefund)
+        assertEquals(0, o.planCancel(o.itemIdOf(1, 0), CancelActor.BUYER, POLICY).shippingFeeRefund)
+        o.cancel(o.itemIdOf(1, 2))
+        val last = o.planCancel(o.itemIdOf(1, 0), CancelActor.BUYER, POLICY)
+        assertEquals(3_000, last.shippingFeeRefund)
+        assertEquals(13_000, last.refundAmount)
+    }
 }

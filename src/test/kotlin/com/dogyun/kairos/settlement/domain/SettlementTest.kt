@@ -129,4 +129,13 @@ class SettlementTest {
         assertFailsWith<IllegalArgumentException> { SettlementAdjustment.carryOver(7, 0, 42) }
         assertTrue(SettlementAdjustment(1, 7, 5, AdjustmentType.MANUAL, 1, "r", null, null, 1, null).applied)
     }
+
+    @Test
+    fun 다른_판매자의_주문이_섞이면_생성을_거절한다() {
+        val other = SettlementSource(9, 8, 109, "K9", LocalDateTime.of(2026, 11, 17, 10, 0), 1000, 0, 0, emptyList())
+        assertFailsWith<IllegalStateException> { Settlement.generate(7, period, listOf(other), 0) }
+        val g = Settlement.generate(8, period, listOf(other), 0)
+        assertEquals(8, g.sellerId)
+        assertNull(g.id)
+    }
 }

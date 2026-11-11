@@ -178,4 +178,30 @@ class ReturnRefundCalculatorTest {
         assertEquals(0, plan.outboundFeeRecovered)
         assertEquals(27_000, plan.refundAmount)
     }
+
+    @Test
+    fun 다른_항목이_RETURN_REFUNDING이면_RETURN_INVALID_STATE_TRANSITION() {
+        val o = deliveredOrder(line(1, 30_000, skuId = 11), line(1, 30_000, skuId = 12))
+        val a = o.itemIdOf(1, 0)
+        val b = o.itemIdOf(1, 1)
+        o.withReturn(a, ReturnReason.DEFECTIVE, ReturnStatus.REFUNDING)
+        o.withReturn(b, ReturnReason.DEFECTIVE)
+
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { o.plan(b) }
+    }
+
+    @Test
+    fun 같은_판매자의_다른_항목이_취소돼_비면_불량_반품에서_구매자_배송비를_돌려준다() {
+        val o = paidOrder(line(1, 10_000, skuId = 11), line(1, 10_000, skuId = 12))
+        o.cancel(o.itemIdOf(1, 0))
+        o.deliverAll()
+        val b = o.itemIdOf(1, 1)
+        o.withReturn(b, ReturnReason.DEFECTIVE)
+
+        val plan = o.plan(b)
+
+        assertEquals(3_000, plan.shippingFeeRefund)
+        assertEquals(13_000, plan.refundAmount)
+        assertEquals(3_000, plan.sellerBorneFee)
+    }
 }
