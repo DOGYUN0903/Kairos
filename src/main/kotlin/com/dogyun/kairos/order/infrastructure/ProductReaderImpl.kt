@@ -25,6 +25,7 @@ class ProductReaderImpl(private val skuQueryService: SkuQueryService) : ProductR
                 salePrice = sku.salePrice,
                 extraPrice = sku.extraPrice,
                 sellerId = sku.sellerId,
+                thumbnailUrl = sku.thumbnailUrl,
                 available = sku.availability == SkuAvailability.AVAILABLE,
             )
         }

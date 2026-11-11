@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.presentation
 import com.dogyun.kairos.CommerceTestSupport
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class OrderQuoteApiTest : CommerceTestSupport() {
 
@@ -85,5 +86,75 @@ class OrderQuoteApiTest : CommerceTestSupport() {
             jsonPath("$.code") { value("COUPON_NOT_FOUND") }
         }
         assertEquals("AVAILABLE", couponStatus(couponId))
+    }
+
+    private fun plainQuote(vararg skus: Pair<String, Long>): tools.jackson.databind.JsonNode {
+        val user = newUserToken()
+        return json(
+            post("/api/v1/orders/quote", user, quoteBody(skus.map { it.second to 1 }, emptyList(), null, 0)).andExpect { status { isOk() } },
+        ).get("data")
+    }
+
+    @Test
+    fun 판매자_두_명_5만원_미만이면_판매자마다_구매자_부담_배송비_3000원이다() {
+        val b = skuOf(20_000)
+        val c = skuOf(20_000)
+
+        val quote = plainQuote(b, c)
+
+        val sellerQuotes = quote.get("sellerQuotes")
+        assertEquals(2, sellerQuotes.size())
+        sellerQuotes.forEach {
+            assertEquals(3_000L, it.get("shippingFee").asLong())
+            assertEquals("BUYER", it.get("shippingFeePayer").asText())
+        }
+        assertEquals(6_000L, quote.get("buyerShippingFee").asLong())
+        assertEquals(46_000L, quote.get("totalAmount").asLong())
+    }
+
+    @Test
+    fun 오만원_이상이면_배송비는_플랫폼_부담이다() {
+        val quote = plainQuote(skuOf(30_000), skuOf(30_000))
+
+        val sellerQuotes = quote.get("sellerQuotes")
+        assertEquals(2, sellerQuotes.size())
+        sellerQuotes.forEach { assertEquals("PLATFORM", it.get("shippingFeePayer").asText()) }
+        assertEquals(0L, quote.get("buyerShippingFee").asLong())
+    }
+
+    @Test
+    fun 판매자별_합계가_전체와_맞는다() {
+        val quote = plainQuote(skuOf(20_000), skuOf(15_000))
+
+        val sellerQuotes = quote.get("sellerQuotes").toList()
+        assertEquals(quote.get("itemsAmount").asLong(), sellerQuotes.sumOf { it.get("itemsAmount").asLong() })
+        assertEquals(
+            quote.get("buyerShippingFee").asLong(),
+            sellerQuotes.filter { it.get("shippingFeePayer").asText() == "BUYER" }.sumOf { it.get("shippingFee").asLong() },
+        )
+        sellerQuotes.forEach { assertTrue(it.get("sellerName").asText().isNotBlank()) }
+    }
+
+    @Test
+    fun 견적_항목에_표시용_상품_정보가_있다() {
+        val (_, sku) = skuOf(20_000)
+        val quote = plainQuote("" to sku)
+
+        val line = quote.get("items").single()
+        assertTrue(line.get("productName").asText().isNotBlank())
+        assertTrue(line.get("brandName").asText().isNotBlank())
+        assertTrue(line.get("optionDisplayName").asText().isNotBlank())
+        assertTrue(line.get("thumbnailUrl").asText().isNotEmpty())
+        assertEquals(20_000L, line.get("unitPrice").asLong())
+        assertEquals(quote.get("sellerQuotes").single().get("sellerId").asLong(), line.get("sellerId").asLong())
+        assertTrue(line.get("productId").asLong() > 0)
+    }
+
+    @Test
+    fun 견적에_무료배송_기준과_기본_배송비가_있다() {
+        val quote = plainQuote(skuOf(20_000))
+
+        assertEquals(50_000L, quote.get("freeShippingThreshold").asLong())
+        assertEquals(3_000L, quote.get("baseShippingFee").asLong())
     }
 }

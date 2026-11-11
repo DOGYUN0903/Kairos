@@ -3107,6 +3107,20 @@ export interface components {
         QuoteLine: {
             /** Format: int64 */
             skuId: number;
+            /** Format: int64 */
+            productId: number;
+            productName: string;
+            brandName: string;
+            optionDisplayName: string;
+            /** @description 상품 대표 이미지 URL. 이미지가 없으면 빈 문자열 */
+            thumbnailUrl: string;
+            /**
+             * Format: int64
+             * @description 판매가 + 옵션 추가금
+             */
+            unitPrice: number;
+            /** Format: int64 */
+            sellerId: number;
             /** Format: int32 */
             quantity: number;
             /** Format: int64 */
@@ -3120,8 +3134,33 @@ export interface components {
             /** Format: int64 */
             paidAmount: number;
         };
+        SellerQuote: {
+            /** Format: int64 */
+            sellerId: number;
+            sellerName: string;
+            /**
+             * Format: int64
+             * @description 이 판매자 항목의 상품 금액 합(쿠폰·포인트 차감 전)
+             */
+            itemsAmount: number;
+            /** Format: int64 */
+            shippingFee: number;
+            /** @enum {string} */
+            shippingFeePayer: "BUYER" | "PLATFORM";
+        };
         OrderQuote: {
             items: components["schemas"]["QuoteLine"][];
+            sellerQuotes: components["schemas"]["SellerQuote"][];
+            /**
+             * Format: int64
+             * @description 상품 합계가 이 금액 이상이면 배송비는 플랫폼 부담
+             */
+            freeShippingThreshold: number;
+            /**
+             * Format: int64
+             * @description 판매자별 기본 배송비
+             */
+            baseShippingFee: number;
             /** Format: int64 */
             itemsAmount: number;
             /** Format: int64 */

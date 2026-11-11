@@ -150,9 +150,10 @@ class FakeProductReader : ProductReader {
         salePrice: Long = 9_000,
         extraPrice: Long = 0,
         available: Boolean = true,
+        thumbnailUrl: String = "https://img.test/sku$skuId.jpg",
     ) {
         skus[skuId] = OrderableSkuInfo(
-            skuId, 100L + skuId, "티셔츠$skuId", "브랜드", "블랙 / M", salePrice, extraPrice, sellerId, available,
+            skuId, 100L + skuId, "티셔츠$skuId", "브랜드", "블랙 / M", salePrice, extraPrice, sellerId, thumbnailUrl, available,
         )
     }
 

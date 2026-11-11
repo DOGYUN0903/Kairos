@@ -18,6 +18,8 @@ data class OrderableSkuInfo(
     val salePrice: Long,
     val extraPrice: Long,
     val sellerId: Long,
+    /** 상품 대표 이미지. 이미지가 없으면 빈 문자열. */
+    val thumbnailUrl: String,
     /** 지금 주문할 수 있는 상태(AVAILABLE)인가. */
     val available: Boolean,
 )

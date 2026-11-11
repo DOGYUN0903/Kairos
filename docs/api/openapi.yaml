@@ -6291,9 +6291,28 @@ components:
           default: 0
     QuoteLine:
       type: object
-      required: [skuId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
+      required: [skuId, productId, productName, brandName, optionDisplayName, thumbnailUrl, unitPrice, sellerId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
       properties:
         skuId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        brandName:
+          type: string
+        optionDisplayName:
+          type: string
+        thumbnailUrl:
+          type: string
+          description: 상품 대표 이미지 URL. 이미지가 없으면 빈 문자열
+        unitPrice:
+          type: integer
+          format: int64
+          description: 판매가 + 옵션 추가금
+        sellerId:
           type: integer
           format: int64
         quantity:
@@ -6314,14 +6333,45 @@ components:
         paidAmount:
           type: integer
           format: int64
+    SellerQuote:
+      type: object
+      required: [sellerId, sellerName, itemsAmount, shippingFee, shippingFeePayer]
+      properties:
+        sellerId:
+          type: integer
+          format: int64
+        sellerName:
+          type: string
+        itemsAmount:
+          type: integer
+          format: int64
+          description: 이 판매자 항목의 상품 금액 합(쿠폰·포인트 차감 전)
+        shippingFee:
+          type: integer
+          format: int64
+        shippingFeePayer:
+          type: string
+          enum: [BUYER, PLATFORM]
     OrderQuote:
       type: object
-      required: [items, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
+      required: [items, sellerQuotes, freeShippingThreshold, baseShippingFee, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/QuoteLine'
+        sellerQuotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SellerQuote'
+        freeShippingThreshold:
+          type: integer
+          format: int64
+          description: 상품 합계가 이 금액 이상이면 배송비는 플랫폼 부담
+        baseShippingFee:
+          type: integer
+          format: int64
+          description: 판매자별 기본 배송비
         itemsAmount:
           type: integer
           format: int64

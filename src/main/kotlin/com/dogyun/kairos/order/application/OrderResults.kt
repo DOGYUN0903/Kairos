@@ -15,6 +15,15 @@ data class PlaceOrderResult(
 
 data class QuoteLine(
     val skuId: Long,
+    val productId: Long,
+    val productName: String,
+    val brandName: String,
+    val optionDisplayName: String,
+    /** 이미지가 없으면 빈 문자열 */
+    val thumbnailUrl: String,
+    /** 판매가 + 옵션 추가금 */
+    val unitPrice: Long,
+    val sellerId: Long,
     val quantity: Int,
     val lineAmount: Long,
     val productCouponDiscount: Long,
@@ -23,9 +32,21 @@ data class QuoteLine(
     val paidAmount: Long,
 )
 
+data class SellerQuote(
+    val sellerId: Long,
+    val sellerName: String,
+    val itemsAmount: Long,
+    val shippingFee: Long,
+    /** BUYER | PLATFORM */
+    val shippingFeePayer: String,
+)
+
 /** 주문 금액 미리보기. place 와 같은 계산이며 아무것도 저장하지 않는다. */
 data class OrderQuote(
     val items: List<QuoteLine>,
+    val sellerQuotes: List<SellerQuote>,
+    val freeShippingThreshold: Long,
+    val baseShippingFee: Long,
     val itemsAmount: Long,
     val productCouponDiscount: Long,
     val cartCouponDiscount: Long,
