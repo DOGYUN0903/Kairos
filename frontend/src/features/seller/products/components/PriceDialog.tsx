@@ -12,7 +12,7 @@ import { priceSchema, type PriceFormInput, type PriceFormValues } from "@/featur
 import { useIdempotentSubmit } from "@/hooks/useIdempotentSubmit";
 import { discountRate, parseWon } from "@/lib/money";
 
-export function PriceDialog({ product, onClose }: { product: SellerProductSummary; onClose: () => void }) {
+export function PriceDialog({ product, onClose }: { product: Pick<SellerProductSummary, "productId" | "name">; onClose: () => void }) {
   // 목록 요약에는 정가가 없어 상세를 불러온다.
   const detail = useSellerProduct(product.productId);
   return (

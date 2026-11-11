@@ -101,3 +101,59 @@ export const priceSchema = (originalPrice: number) =>
 
 export type PriceFormInput = z.input<ReturnType<typeof priceSchema>>;
 export type PriceFormValues = z.output<ReturnType<typeof priceSchema>>;
+
+/** 0 이상 정수 입력(추가 금액·재고). */
+const nonNegInt = (message: string) =>
+  z.string().transform((s, ctx) => {
+    const n = parseWon(s);
+    if (n === null) {
+      ctx.addIssue({ code: "custom", message });
+      return z.NEVER;
+    }
+    return n;
+  });
+
+export const STOCK_MAX = 2_147_483_647; // int32
+
+/** SKU 행 편집(추가 금액·재고·판매 여부). */
+export const skuSchema = z.object({
+  extraPrice: nonNegInt("추가 금액은 0원 이상의 정수로 입력해 주세요."),
+  stock: nonNegInt("재고는 0 이상의 정수로 입력해 주세요.").refine((n) => n <= STOCK_MAX, "재고가 너무 큽니다."),
+  onSale: z.boolean(),
+});
+export type SkuFormInput = z.input<typeof skuSchema>;
+export type SkuFormValues = z.output<typeof skuSchema>;
+
+type CurrentOption = components["schemas"]["ProductOption"];
+
+/**
+ * 폼의 옵션(이름만)을 변경 요청 옵션으로 바꾼다. 이름이 같은 기존 옵션·값은 ID 를 유지해 SKU 가 남는다.
+ * 축 이름을 바꾸면 새 옵션으로 취급되어 그 축의 기존 SKU 는 모두 단종된다(skuImpact 로 미리 보여 준다).
+ */
+export function toChangeOptions(
+  options: { name: string; values: string[] }[],
+  current: CurrentOption[],
+): { optionId: number | null; name: string; values: { valueId: number | null; name: string }[] }[] {
+  return options.map((o) => {
+    const prev = current.find((c) => c.name === o.name.trim());
+    return {
+      optionId: prev?.optionId ?? null,
+      name: o.name.trim(),
+      values: o.values.map((v) => ({ valueId: prev?.values.find((pv) => pv.name === v.trim())?.valueId ?? null, name: v.trim() })),
+    };
+  });
+}
+
+export function toContentRequest(v: ProductFormValues, current: CurrentOption[]): components["schemas"]["ProductContentRequest"] {
+  return {
+    name: v.name,
+    description: v.description,
+    categoryId: v.categoryId,
+    imageFileIds: v.images.map((i) => i.fileId),
+    options: toChangeOptions(v.options, current),
+  };
+}
+
+export function toChangeRequest(v: ProductFormValues, current: CurrentOption[]): components["schemas"]["SubmitChangeRequestRequest"] {
+  return { originalPrice: v.originalPrice, content: toContentRequest(v, current) };
+}

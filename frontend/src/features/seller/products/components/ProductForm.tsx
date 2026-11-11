@@ -11,16 +11,24 @@ import { applyFormError } from "@/features/auth/apply-form-error";
 import { FormNotice } from "@/features/auth/components/FormNotice";
 import { useSellerBanner } from "@/features/seller/gate/banner";
 import { useSellerCapabilities } from "@/features/seller/gate/useSellerCapabilities";
-import { useRegisterProduct } from "@/features/seller/products/api";
+import {
+  useCreateChangeRequest,
+  useEditProductContent,
+  useRegisterProduct,
+  type SellerProductDetail,
+} from "@/features/seller/products/api";
 import { BrandSelect } from "@/features/seller/products/components/BrandSelect";
 import { CategorySelect } from "@/features/seller/products/components/CategorySelect";
 import { OptionAxesEditor } from "@/features/seller/products/components/OptionAxesEditor";
+import { SkuImpactNotice } from "@/features/seller/products/components/SkuImpactNotice";
 import { SkuPreviewTable } from "@/features/seller/products/components/SkuPreviewTable";
 import {
   DESCRIPTION_MAX,
   IMAGES_MAX,
   NAME_MAX,
   productSchema,
+  toChangeRequest,
+  toContentRequest,
   toRegisterRequest,
   type ProductFormInput,
   type ProductFormValues,
@@ -47,18 +55,66 @@ const Req = () => (
   </span>
 );
 
-/** 상품 등록 폼. 수정(변경 요청)은 Task 12 에서 mode 를 넓힌다. */
-export function ProductForm({ mode }: { mode: "create" }) {
+function fromDetail(d: SellerProductDetail): ProductFormInput {
+  return {
+    brandId: d.brandId,
+    categoryId: d.categoryId,
+    name: d.name,
+    description: d.description,
+    images: d.images.map((i) => ({ fileId: i.fileId, url: i.url })),
+    originalPrice: String(d.originalPrice),
+    salePrice: String(d.salePrice),
+    options: d.options.map((o) => ({ name: o.name, values: o.values.map((v) => v.name) })),
+  };
+}
+
+export type ProductFormProps =
+  | { mode: "create"; initial?: undefined }
+  /** 판매 중·일시 중지: 변경 요청(정가 포함, 재검수). */
+  | { mode: "change-request"; initial: SellerProductDetail }
+  /** 검수 대기·반려: 내용 직접 수정(가격 제외, 다시 검수 대기). */
+  | { mode: "edit"; initial: SellerProductDetail };
+
+/** 상품 등록·변경 요청·직접 수정 폼. 브랜드·판매가는 등록 때만 입력한다(이후 판매가는 상세의 "판매가 수정"). */
+export function ProductForm({ mode, initial }: ProductFormProps) {
   const router = useRouter();
   const qc = useQueryClient();
   const setBanner = useSellerBanner();
   const { canManage } = useSellerCapabilities();
   const register_ = useRegisterProduct();
-  const form = useForm<ProductFormInput, unknown, ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: EMPTY });
+  const productId = initial?.productId ?? 0;
+  const changeRequest = useCreateChangeRequest(productId);
+  const editContent = useEditProductContent(productId);
+  const isCreate = mode === "create";
+  const defaults = initial ? fromDetail(initial) : EMPTY;
+  const form = useForm<ProductFormInput, unknown, ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: defaults });
   const { register, control, formState, watch } = form;
   const { errors } = formState;
 
   const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
+    if (initial) {
+      try {
+        if (mode === "change-request") await changeRequest.mutateAsync({ body: toChangeRequest(values, initial.options), key });
+        else await editContent.mutateAsync(toContentRequest(values, initial.options));
+      } catch (e) {
+        if (e instanceof ApiError && e.code === "CHANGE_REQUEST_ALREADY_PENDING") {
+          toast({ variant: "destructive", title: "이미 검수 중인 변경 요청이 있습니다", description: "철회한 뒤 다시 요청할 수 있습니다." });
+          router.push(`/seller/products/${initial.productId}`);
+          return;
+        }
+        if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
+          setBanner("판매자 상태 때문에 처리할 수 없습니다.");
+          await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
+          return;
+        }
+        applyFormError(form, e);
+        return;
+      }
+      form.reset(form.getValues()); // 이후 같은 값 재제출에는 새 키가 쓰이도록 dirty 기준을 갱신
+      toast({ title: mode === "change-request" ? "변경 요청이 접수됐습니다" : "검수 대기 상태로 다시 제출됐습니다" });
+      router.push(`/seller/products/${initial.productId}`);
+      return;
+    }
     let productId: number;
     try {
       ({ productId } = await register_.mutateAsync({ body: toRegisterRequest(values), key }));
@@ -83,15 +139,31 @@ export function ProductForm({ mode }: { mode: "create" }) {
   const options = watch("options") ?? [];
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label={mode === "create" ? "상품 등록" : "상품 수정"}>
+    <form onSubmit={onSubmit} noValidate aria-label={isCreate ? "상품 등록" : mode === "change-request" ? "상품 변경 요청" : "상품 수정"}>
       <fieldset disabled={submitting || !canManage} className="flex flex-col gap-6">
+        {mode === "change-request" ? (
+          <div className="notice">
+            <div>
+              상품명, 설명, 이미지, 카테고리, 옵션 구성, 정가를 바꾸면 <strong>변경 요청</strong>으로 접수되어 재검수를 받습니다. 검수 중에도 기존 내용으로 계속
+              판매되며, 상품당 하나만 대기할 수 있습니다.
+            </div>
+          </div>
+        ) : mode === "edit" ? (
+          <div className="notice">
+            <div>
+              수정하면 다시 <strong>검수 대기</strong> 상태가 됩니다.
+              {initial?.status === "REJECTED" && initial.rejectReason && <span className="mt-1 block text-danger">반려 사유: {initial.rejectReason}</span>}
+            </div>
+          </div>
+        ) : (
         <div className="notice">
           <div>
             등록한 상품은 <strong>검수 대기</strong> 상태가 되며, 관리자가 승인하면 판매가 시작됩니다. 반려되면 사유를 확인하고 내용을 고쳐 다시 제출할 수
             있습니다.
           </div>
         </div>
-        {!canManage && <div className="notice notice-warn">정지 중에는 상품을 등록할 수 없습니다.</div>}
+        )}
+        {!canManage && <div className="notice notice-warn">정지 중에는 상품을 {isCreate ? "등록" : "수정"}할 수 없습니다.</div>}
         {errors.root?.server && <FormNotice message={errors.root.server.message} />}
 
         <section className="card" aria-labelledby="basic-h">
@@ -99,7 +171,17 @@ export function ProductForm({ mode }: { mode: "create" }) {
             기본 정보
           </h2>
           <div className="grid grid-cols-2 gap-4 p-5">
-            <BrandSelect error={errors.brandId?.message} {...register("brandId", { valueAsNumber: true })} />
+            {isCreate ? (
+              <BrandSelect error={errors.brandId?.message} {...register("brandId", { valueAsNumber: true })} />
+            ) : (
+              <div className="field">
+                <span className="text-[13px] font-medium">브랜드</span>
+                <p className="input flex items-center bg-surface text-text-2" aria-readonly>
+                  {initial?.brandName}
+                </p>
+                <span className="hint">브랜드는 바꿀 수 없습니다.</span>
+              </div>
+            )}
             <Controller
               control={control}
               name="categoryId"
@@ -187,17 +269,20 @@ export function ProductForm({ mode }: { mode: "create" }) {
                     inputMode="numeric"
                     autoComplete="off"
                     placeholder="0"
+                    readOnly={!isCreate && (name === "salePrice" || mode === "edit")}
                     aria-invalid={errors[name] ? true : undefined}
                     aria-describedby={errors[name] ? `p-${name}-err` : undefined}
                     {...register(name)}
                   />
                   <span className="text-sm text-text-2">원</span>
                 </div>
-                {errors[name] && (
+                {errors[name] ? (
                   <span id={`p-${name}-err`} className="field-error">
                     {errors[name]?.message}
                   </span>
-                )}
+                ) : !isCreate && (name === "salePrice" || mode === "edit") ? (
+                  <span className="hint">{name === "salePrice" ? "판매가는 상세 화면의 \"판매가 수정\"으로 바로 바꿉니다." : "검수 중에는 가격을 바꿀 수 없습니다."}</span>
+                ) : null}
               </div>
             ))}
             <p className="col-span-2 text-sm" aria-live="polite">
@@ -230,21 +315,26 @@ export function ProductForm({ mode }: { mode: "create" }) {
           </div>
         </section>
 
-        <SkuPreviewTable options={options} />
+        {/* 수정은 백엔드가 같은 규칙(값 ID 유지 → SKU 유지, 사라진 조합 → 단종)으로 반영하므로 제출 전에 영향을 보여 준다. */}
+        {initial ? (
+          <SkuImpactNotice initial={initial} options={options} />
+        ) : (
+          <SkuPreviewTable options={options} />
+        )}
 
-        <div className="notice notice-warn">
+        {isCreate && <div className="notice notice-warn">
           <div>
             등록 후 <strong>상품명, 설명, 이미지, 카테고리, 옵션 구성</strong>을 바꾸면 변경 요청으로 저장되어 재검수를 받습니다. 검수 중에는 기존 내용으로 계속
             판매됩니다.
           </div>
-        </div>
+        </div>}
 
         <div className="flex justify-end gap-2">
-          <Link className="btn btn-ghost" href="/seller/products">
+          <Link className="btn btn-ghost" href={initial ? `/seller/products/${initial.productId}` : "/seller/products"}>
             취소
           </Link>
           <button type="submit" className="btn btn-primary">
-            {submitting ? "등록 중…" : "검수 요청"}
+            {submitting ? "제출 중…" : mode === "change-request" ? "변경 요청" : mode === "edit" ? "다시 검수 요청" : "검수 요청"}
           </button>
         </div>
       </fieldset>

@@ -13,6 +13,10 @@ export type SellerProductSummary = components["schemas"]["SellerProductSummary"]
 export type SellerProductDetail = components["schemas"]["SellerProductDetail"];
 export type ProductStatus = components["schemas"]["ProductStatus"];
 export type RegisterProductRequest = components["schemas"]["RegisterProductRequest"];
+export type SellerSku = components["schemas"]["SellerSku"];
+export type UpdateSkuRequest = components["schemas"]["UpdateSkuRequest"];
+export type SubmitChangeRequestRequest = components["schemas"]["SubmitChangeRequestRequest"];
+export type ProductContentRequest = components["schemas"]["ProductContentRequest"];
 export type SellerProductPage = Omit<components["schemas"]["PageResponse"], "content"> & { content: SellerProductSummary[] };
 
 export const PAGE_SIZE = 20;
@@ -117,3 +121,62 @@ function useTransition(productId: number, kind: Transition) {
 export const usePause = (productId: number) => useTransition(productId, "pause");
 export const useResume = (productId: number) => useTransition(productId, "resume");
 export const useEnd = (productId: number) => useTransition(productId, "end");
+
+/** SKU 행 저장. PATCH 는 같은 값으로 다시 보내도 결과가 같다(멱등). */
+export function useUpdateSku(productId: number) {
+  return useRowMutation(
+    productId,
+    async ({ skuId, body }: { skuId: number; body: UpdateSkuRequest }) => {
+      await api.PATCH("/api/v1/seller/products/{productId}/skus/{skuId}", { params: { path: { productId, skuId } }, body });
+    },
+    "SKU를 저장했습니다.",
+  );
+}
+
+function useInvalidateProduct(productId: number) {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["seller", "products"] }),
+      qc.invalidateQueries({ queryKey: queryKeys.seller.product(productId) }),
+    ]);
+}
+
+/** 변경 요청 제출. 에러 처리는 폼이 한다(필드 에러·409 이동). */
+export function useCreateChangeRequest(productId: number) {
+  const invalidate = useInvalidateProduct(productId);
+  return useMutation({
+    mutationFn: async ({ body, key }: { body: SubmitChangeRequestRequest; key: string }) =>
+      unwrap<components["schemas"]["SubmitChangeRequestResponse"]>(
+        await api.POST("/api/v1/seller/products/{productId}/change-requests", {
+          params: { path: { productId } },
+          body,
+          headers: { [IDEMPOTENCY_HEADER]: key },
+        }),
+      ),
+    onSettled: invalidate,
+  });
+}
+
+/** 검수 대기·반려 상품의 내용 직접 수정(다시 검수 대기). PUT 이라 멱등. */
+export function useEditProductContent(productId: number) {
+  const invalidate = useInvalidateProduct(productId);
+  return useMutation({
+    mutationFn: async (body: ProductContentRequest) => {
+      await api.PUT("/api/v1/seller/products/{productId}", { params: { path: { productId } }, body });
+    },
+    onSettled: invalidate,
+  });
+}
+
+export function useWithdrawChangeRequest(productId: number) {
+  return useRowMutation(
+    productId,
+    async ({ changeRequestId }: { changeRequestId: number }) => {
+      await api.DELETE("/api/v1/seller/products/{productId}/change-requests/{changeRequestId}", {
+        params: { path: { productId, changeRequestId } },
+      });
+    },
+    "변경 요청을 철회했습니다.",
+  );
+}

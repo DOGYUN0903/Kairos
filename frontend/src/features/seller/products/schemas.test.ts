@@ -141,3 +141,22 @@ describe("priceSchema", () => {
     expect(priceSchema(10000).parse({ salePrice: "9,000" })).toEqual({ salePrice: 9000 });
   });
 });
+
+describe("skuSchema·toChangeOptions", () => {
+  it("추가_금액과_재고는_0_이상_정수", async () => {
+    const { skuSchema } = await import("@/features/seller/products/schemas");
+    expect(skuSchema.safeParse({ extraPrice: "1,000", stock: "0", onSale: true })).toMatchObject({ success: true, data: { extraPrice: 1000, stock: 0 } });
+    expect(skuSchema.safeParse({ extraPrice: "0", stock: "-1", onSale: true }).success).toBe(false);
+    expect(skuSchema.safeParse({ extraPrice: "1.5", stock: "1", onSale: true }).success).toBe(false);
+    expect(skuSchema.safeParse({ extraPrice: "", stock: "1", onSale: true }).success).toBe(false);
+  });
+
+  it("이름이_같은_옵션과_값은_기존_ID를_유지한다", async () => {
+    const { toChangeOptions } = await import("@/features/seller/products/schemas");
+    const current = [{ optionId: 1, name: "색상", values: [{ valueId: 11, name: "블랙" }, { valueId: 12, name: "화이트" }] }];
+    expect(toChangeOptions([{ name: "색상", values: ["블랙", "네이비"] }, { name: "사이즈", values: ["M"] }], current)).toEqual([
+      { optionId: 1, name: "색상", values: [{ valueId: 11, name: "블랙" }, { valueId: null, name: "네이비" }] },
+      { optionId: null, name: "사이즈", values: [{ valueId: null, name: "M" }] },
+    ]);
+  });
+});
