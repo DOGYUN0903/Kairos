@@ -596,6 +596,35 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
             }
         }
 
+    /**
+     * §8-8 불변식: 헤더 다섯 금액 == 라인 합(SQL sum), adjustment_amount == 붙은 조정 합,
+     * total == Σ line_amount + adjustment_amount, payable == max(total, 0), line_count == 라인 수.
+     */
+    protected fun assertSettlementInvariant(settlementId: Long) {
+        val h = jdbcTemplate.queryForMap("select * from settlement where id = ?", settlementId)
+        val l = jdbcTemplate.queryForMap(
+            "select coalesce(sum(sales_amount), 0) sales, coalesce(sum(seller_coupon_discount), 0) coupon, " +
+                "coalesce(sum(commission_amount), 0) commission, coalesce(sum(shipping_fee_owed), 0) shipping, " +
+                "coalesce(sum(return_fee_borne), 0) borne, coalesce(sum(line_amount), 0) amount, count(*) cnt " +
+                "from settlement_line where settlement_id = ?",
+            settlementId,
+        )
+        val adjustments = jdbcTemplate.queryForObject(
+            "select coalesce(sum(amount), 0) from settlement_adjustment where settlement_id = ?", Long::class.java, settlementId,
+        )!!
+        fun Map<String, Any?>.long(k: String) = (this[k] as Number).toLong()
+        val label = "settlementId=$settlementId"
+        assertEquals(l.long("sales"), h.long("sales_amount"), label)
+        assertEquals(l.long("coupon"), h.long("seller_coupon_discount"), label)
+        assertEquals(l.long("commission"), h.long("commission_amount"), label)
+        assertEquals(l.long("shipping"), h.long("shipping_fee_owed"), label)
+        assertEquals(l.long("borne"), h.long("return_fee_borne"), label)
+        assertEquals(adjustments, h.long("adjustment_amount"), label)
+        assertEquals(l.long("amount") + adjustments, h.long("total_amount"), label)
+        assertEquals(maxOf(h.long("total_amount"), 0L), h.long("payable_amount"), label)
+        assertEquals(l.long("cnt"), h.long("line_count"), label)
+    }
+
     companion object {
         val PNG_1X1: ByteArray = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",
