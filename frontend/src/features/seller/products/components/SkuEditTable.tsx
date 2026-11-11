@@ -10,7 +10,7 @@ const TD = "px-3.5 py-2.5 align-middle";
 
 /**
  * SKU 행 편집. 행마다 추가 금액·재고·판매 여부를 고치고 "저장"(바뀐 행만 활성)으로 바로 반영한다.
- * DISCONTINUED 행은 읽기 전용 "단종".
+ * DISCONTINUED 행은 읽기 전용 "단종"이며 기본으로 숨기고 "단종 n개 보기"로 펼친다.
  */
 export function SkuEditTable({
   skus,
@@ -21,6 +21,10 @@ export function SkuEditTable({
   onSave: (skuId: number, values: SkuFormValues) => Promise<void>;
   disabled?: boolean;
 }) {
+  const [showDiscontinued, setShowDiscontinued] = useState(false);
+  const discontinuedCount = skus.filter((s) => s.skuStatus === "DISCONTINUED").length;
+  const visible = showDiscontinued ? skus : skus.filter((s) => s.skuStatus !== "DISCONTINUED");
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -36,7 +40,7 @@ export function SkuEditTable({
           </tr>
         </thead>
         <tbody>
-          {skus.map((s) =>
+          {visible.map((s) =>
             s.skuStatus === "DISCONTINUED" ? (
               <tr key={s.skuId} className="border-b border-border text-text-3">
                 <th scope="row" className={`${TD} text-left font-normal`}>{s.displayName || "기본"}</th>
@@ -54,6 +58,18 @@ export function SkuEditTable({
           )}
         </tbody>
       </table>
+      {discontinuedCount > 0 && (
+        <div className="px-3.5 py-2.5">
+          <button
+            type="button"
+            className="text-xs text-text-2 underline"
+            aria-expanded={showDiscontinued}
+            onClick={() => setShowDiscontinued((v) => !v)}
+          >
+            {showDiscontinued ? "단종 숨기기" : `단종 ${discontinuedCount}개 보기`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

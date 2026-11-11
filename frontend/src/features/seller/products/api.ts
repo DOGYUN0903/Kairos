@@ -17,6 +17,7 @@ export type SellerSku = components["schemas"]["SellerSku"];
 export type UpdateSkuRequest = components["schemas"]["UpdateSkuRequest"];
 export type SubmitChangeRequestRequest = components["schemas"]["SubmitChangeRequestRequest"];
 export type ProductContentRequest = components["schemas"]["ProductContentRequest"];
+export type SellerChangeRequestDetail = components["schemas"]["SellerChangeRequestDetail"];
 export type SellerProductPage = Omit<components["schemas"]["PageResponse"], "content"> & { content: SellerProductSummary[] };
 
 export const PAGE_SIZE = 20;
@@ -133,7 +134,21 @@ export function useUpdateSku(productId: number) {
   );
 }
 
-function useInvalidateProduct(productId: number) {
+export function useSellerChangeRequest(productId: number, changeRequestId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.seller.changeRequest(productId, changeRequestId ?? 0),
+    queryFn: async () =>
+      unwrap<SellerChangeRequestDetail>(
+        await api.GET("/api/v1/seller/products/{productId}/change-requests/{changeRequestId}", {
+          params: { path: { productId, changeRequestId: changeRequestId ?? 0 } },
+        }),
+      ),
+    enabled: changeRequestId !== null,
+  });
+}
+
+/** 상품 목록·상세 무효화. 수정 폼은 상세로 이동한 뒤 호출한다(수정 화면이 먼저 다시 그려지지 않도록). */
+export function useInvalidateProduct(productId: number) {
   const qc = useQueryClient();
   return () =>
     Promise.all([
@@ -142,9 +157,8 @@ function useInvalidateProduct(productId: number) {
     ]);
 }
 
-/** 변경 요청 제출. 에러 처리는 폼이 한다(필드 에러·409 이동). */
+/** 변경 요청 제출. 에러 처리와 무효화는 폼이 한다(이동 후 무효화). */
 export function useCreateChangeRequest(productId: number) {
-  const invalidate = useInvalidateProduct(productId);
   return useMutation({
     mutationFn: async ({ body, key }: { body: SubmitChangeRequestRequest; key: string }) =>
       unwrap<components["schemas"]["SubmitChangeRequestResponse"]>(
@@ -154,18 +168,15 @@ export function useCreateChangeRequest(productId: number) {
           headers: { [IDEMPOTENCY_HEADER]: key },
         }),
       ),
-    onSettled: invalidate,
   });
 }
 
 /** 검수 대기·반려 상품의 내용 직접 수정(다시 검수 대기). PUT 이라 멱등. */
 export function useEditProductContent(productId: number) {
-  const invalidate = useInvalidateProduct(productId);
   return useMutation({
     mutationFn: async (body: ProductContentRequest) => {
       await api.PUT("/api/v1/seller/products/{productId}", { params: { path: { productId } }, body });
     },
-    onSettled: invalidate,
   });
 }
 

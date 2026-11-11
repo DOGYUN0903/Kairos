@@ -151,11 +151,15 @@ describe("skuSchema·toChangeOptions", () => {
     expect(skuSchema.safeParse({ extraPrice: "", stock: "1", onSale: true }).success).toBe(false);
   });
 
-  it("이름이_같은_옵션과_값은_기존_ID를_유지한다", async () => {
+  it("숨은_ID를_그대로_보내_이름을_바꿔도_유지되고_새_행만_null", async () => {
     const { toChangeOptions } = await import("@/features/seller/products/schemas");
-    const current = [{ optionId: 1, name: "색상", values: [{ valueId: 11, name: "블랙" }, { valueId: 12, name: "화이트" }] }];
-    expect(toChangeOptions([{ name: "색상", values: ["블랙", "네이비"] }, { name: "사이즈", values: ["M"] }], current)).toEqual([
-      { optionId: 1, name: "색상", values: [{ valueId: 11, name: "블랙" }, { valueId: null, name: "네이비" }] },
+    expect(
+      toChangeOptions([
+        { optionId: 1, name: " 컬러 ", values: ["검정", "네이비"], valueIds: [11, null] },
+        { name: "사이즈", values: ["M"] },
+      ]),
+    ).toEqual([
+      { optionId: 1, name: "컬러", values: [{ valueId: 11, name: "검정" }, { valueId: null, name: "네이비" }] },
       { optionId: null, name: "사이즈", values: [{ valueId: null, name: "M" }] },
     ]);
   });

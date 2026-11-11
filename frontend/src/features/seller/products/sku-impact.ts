@@ -15,7 +15,9 @@ const keyOf = (ids: number[]) => [...ids].sort((a, b) => a - b).join(",");
  * - 단종: 그 외 기존 SKU
  * - 신규: 새 조합(값 ID 가 null 이거나 기존 조합에 없음)
  */
-export function skuImpact(current: CurrentSkus, next: ChangeOption[]): { kept: string[]; added: string[]; discontinued: string[] } {
+export type SkuImpact = { kept: string[]; added: string[]; discontinued: string[]; renamed: { from: string; to: string }[] };
+
+export function skuImpact(current: CurrentSkus, next: ChangeOption[]): SkuImpact {
   const axes = next.filter((o) => o.values.length > 0);
   type Combo = { ids: (number | null)[]; names: string[] };
   const combos = axes.reduce<Combo[]>(
@@ -26,6 +28,7 @@ export function skuImpact(current: CurrentSkus, next: ChangeOption[]): { kept: s
   const existing = new Map(current.skus.map((s) => [keyOf(s.optionValueIds), s]));
   const keptIds = new Set<number>();
   const kept: string[] = [];
+  const renamed: { from: string; to: string }[] = [];
   const added: string[] = [];
   for (const c of combos) {
     const name = c.names.join(" / ");
@@ -34,10 +37,12 @@ export function skuImpact(current: CurrentSkus, next: ChangeOption[]): { kept: s
     if (match) {
       keptIds.add(match.skuId);
       kept.push(name);
+      // 값 ID 가 같으니 SKU 는 유지되고 표시 이름만 바뀐다.
+      if (match.displayName !== name) renamed.push({ from: match.displayName, to: name });
     } else {
       added.push(name);
     }
   }
   const discontinued = current.skus.filter((s) => !keptIds.has(s.skuId)).map((s) => s.displayName);
-  return { kept, added, discontinued };
+  return { kept, added, discontinued, renamed };
 }

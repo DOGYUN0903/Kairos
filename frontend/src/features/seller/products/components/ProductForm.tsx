@@ -14,6 +14,7 @@ import { useSellerCapabilities } from "@/features/seller/gate/useSellerCapabilit
 import {
   useCreateChangeRequest,
   useEditProductContent,
+  useInvalidateProduct,
   useRegisterProduct,
   type SellerProductDetail,
 } from "@/features/seller/products/api";
@@ -64,7 +65,13 @@ function fromDetail(d: SellerProductDetail): ProductFormInput {
     images: d.images.map((i) => ({ fileId: i.fileId, url: i.url })),
     originalPrice: String(d.originalPrice),
     salePrice: String(d.salePrice),
-    options: d.options.map((o) => ({ name: o.name, values: o.values.map((v) => v.name) })),
+    // 숨은 ID 를 행에 실어 두어 이름을 바꿔도 같은 옵션·값으로 보낸다.
+    options: d.options.map((o) => ({
+      optionId: o.optionId,
+      name: o.name,
+      values: o.values.map((v) => v.name),
+      valueIds: o.values.map((v) => v.valueId),
+    })),
   };
 }
 
@@ -85,6 +92,7 @@ export function ProductForm({ mode, initial }: ProductFormProps) {
   const productId = initial?.productId ?? 0;
   const changeRequest = useCreateChangeRequest(productId);
   const editContent = useEditProductContent(productId);
+  const invalidateProduct = useInvalidateProduct(productId);
   const isCreate = mode === "create";
   const defaults = initial ? fromDetail(initial) : EMPTY;
   const form = useForm<ProductFormInput, unknown, ProductFormValues>({ resolver: zodResolver(productSchema), defaultValues: defaults });
@@ -93,13 +101,19 @@ export function ProductForm({ mode, initial }: ProductFormProps) {
 
   const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
     if (initial) {
+      const detailPath = `/seller/products/${initial.productId}`;
+      // 상세로 먼저 이동한 뒤 무효화한다. 수정 화면에서 먼저 새 상세를 받으면 "검수 중인 변경 요청" 안내가 잠깐 보인다.
+      const leave = () => {
+        router.push(detailPath);
+        void invalidateProduct();
+      };
       try {
-        if (mode === "change-request") await changeRequest.mutateAsync({ body: toChangeRequest(values, initial.options), key });
-        else await editContent.mutateAsync(toContentRequest(values, initial.options));
+        if (mode === "change-request") await changeRequest.mutateAsync({ body: toChangeRequest(values), key });
+        else await editContent.mutateAsync(toContentRequest(values));
       } catch (e) {
         if (e instanceof ApiError && e.code === "CHANGE_REQUEST_ALREADY_PENDING") {
           toast({ variant: "destructive", title: "이미 검수 중인 변경 요청이 있습니다", description: "철회한 뒤 다시 요청할 수 있습니다." });
-          router.push(`/seller/products/${initial.productId}`);
+          leave();
           return;
         }
         if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
@@ -112,7 +126,7 @@ export function ProductForm({ mode, initial }: ProductFormProps) {
       }
       form.reset(form.getValues()); // 이후 같은 값 재제출에는 새 키가 쓰이도록 dirty 기준을 갱신
       toast({ title: mode === "change-request" ? "변경 요청이 접수됐습니다" : "검수 대기 상태로 다시 제출됐습니다" });
-      router.push(`/seller/products/${initial.productId}`);
+      leave();
       return;
     }
     let productId: number;

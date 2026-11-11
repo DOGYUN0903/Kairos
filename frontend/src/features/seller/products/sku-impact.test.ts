@@ -26,6 +26,7 @@ describe("skuImpact", () => {
       kept: ["블랙 / M", "블랙 / L", "화이트 / M", "화이트 / L"],
       added: [],
       discontinued: [],
+      renamed: [],
     });
   });
 
@@ -58,11 +59,26 @@ describe("skuImpact", () => {
   it("축_0개에서_1개로_가면_기존_단일_SKU는_단종", () => {
     const single = { options: [], skus: [{ skuId: 1, optionValueIds: [], displayName: "" }] };
     const r = skuImpact(single, [{ optionId: null, name: "색상", values: [{ valueId: null, name: "블랙" }] }]);
-    expect(r).toEqual({ kept: [], added: ["블랙"], discontinued: [""] });
+    expect(r).toEqual({ kept: [], added: ["블랙"], discontinued: [""], renamed: [] });
   });
 
   it("축_0개를_유지하면_단일_SKU는_kept", () => {
     const single = { options: [], skus: [{ skuId: 1, optionValueIds: [], displayName: "" }] };
-    expect(skuImpact(single, [])).toEqual({ kept: [""], added: [], discontinued: [] });
+    expect(skuImpact(single, [])).toEqual({ kept: [""], added: [], discontinued: [], renamed: [] });
+  });
+
+  it("값_ID를_유지한_채_이름만_바꾸면_renamed로_보고_단종하지_않는다", () => {
+    const next: ChangeOption[] = [
+      { ...keepAll[0]!, values: [{ valueId: 11, name: "검정" }, keepAll[0]!.values[1]!] },
+      keepAll[1]!,
+    ];
+    const r = skuImpact(current, next);
+    expect(r.discontinued).toEqual([]);
+    expect(r.added).toEqual([]);
+    expect(r.kept).toHaveLength(4);
+    expect(r.renamed).toEqual([
+      { from: "블랙 / M", to: "검정 / M" },
+      { from: "블랙 / L", to: "검정 / L" },
+    ]);
   });
 });

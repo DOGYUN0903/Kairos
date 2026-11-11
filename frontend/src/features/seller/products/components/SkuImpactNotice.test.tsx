@@ -13,12 +13,19 @@ const initial = {
 
 describe("SkuImpactNotice", () => {
   it("옵션이_그대로면_모두_유지", () => {
-    render(<SkuImpactNotice initial={initial} options={[{ name: "색상", values: ["블랙", "화이트"] }]} />);
+    render(<SkuImpactNotice initial={initial} options={[{ optionId: 1, name: "색상", values: ["블랙", "화이트"], valueIds: [11, 12] }]} />);
     expect(screen.getByText("유지 2 / 신규 0(재고 0) / 단종 0")).toBeInTheDocument();
   });
 
+  it("이름을_바꾸면_단종_신규가_아니라_이름_변경으로_보인다", () => {
+    render(<SkuImpactNotice initial={initial} options={[{ optionId: 1, name: "컬러", values: ["검정", "화이트"], valueIds: [11, 12] }]} />);
+    expect(screen.getByText("유지 2 / 신규 0(재고 0) / 단종 0")).toBeInTheDocument();
+    expect(screen.getByText("이름 변경 1")).toBeInTheDocument();
+    expect(screen.getByText("블랙 → 검정")).toBeInTheDocument();
+  });
+
   it("값을_빼고_추가하면_신규와_단종을_보여_준다_이미_단종된_SKU는_세지_않는다", () => {
-    render(<SkuImpactNotice initial={initial} options={[{ name: "색상", values: ["블랙", "네이비"] }]} />);
+    render(<SkuImpactNotice initial={initial} options={[{ optionId: 1, name: "색상", values: ["블랙", "네이비"], valueIds: [11, null] }]} />);
     expect(screen.getByText("유지 1 / 신규 1(재고 0) / 단종 1")).toBeInTheDocument();
     expect(screen.getByText("네이비")).toBeInTheDocument();
     expect(screen.getByText("화이트")).toBeInTheDocument();

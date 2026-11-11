@@ -31,6 +31,10 @@ const won = (label: string) =>
   });
 
 const optionSchema = z.object({
+  /** 숨은 필드: 기존 옵션이면 그 ID(이름을 바꿔도 유지), 새 축이면 null/없음. */
+  optionId: z.number().nullable().optional(),
+  /** 숨은 필드: values 와 같은 순서의 기존 값 ID(새 값은 null). */
+  valueIds: z.array(z.number().nullable()).optional(),
   name: z.string().trim().min(1, "옵션명을 입력해 주세요.").max(OPTION_NAME_MAX, `옵션명은 ${OPTION_NAME_MAX}자 이하로 입력해 주세요.`),
   values: z
     .array(z.string().trim().min(1, "옵션 값을 입력해 주세요.").max(OPTION_VALUE_MAX, `옵션 값은 ${OPTION_VALUE_MAX}자 이하로 입력해 주세요.`))
@@ -124,36 +128,32 @@ export const skuSchema = z.object({
 export type SkuFormInput = z.input<typeof skuSchema>;
 export type SkuFormValues = z.output<typeof skuSchema>;
 
-type CurrentOption = components["schemas"]["ProductOption"];
+type FormOption = { optionId?: number | null; name: string; values: string[]; valueIds?: (number | null)[] };
 
 /**
- * 폼의 옵션(이름만)을 변경 요청 옵션으로 바꾼다. 이름이 같은 기존 옵션·값은 ID 를 유지해 SKU 가 남는다.
- * 축 이름을 바꾸면 새 옵션으로 취급되어 그 축의 기존 SKU 는 모두 단종된다(skuImpact 로 미리 보여 준다).
+ * 폼의 옵션을 변경 요청 옵션으로 바꾼다. 행에 숨겨 둔 optionId·valueId 를 그대로 보내므로
+ * 이름을 바꿔도 SKU·재고·추가 금액이 유지되고, 새로 추가한 행만 null 이 된다.
  */
 export function toChangeOptions(
-  options: { name: string; values: string[] }[],
-  current: CurrentOption[],
+  options: FormOption[],
 ): { optionId: number | null; name: string; values: { valueId: number | null; name: string }[] }[] {
-  return options.map((o) => {
-    const prev = current.find((c) => c.name === o.name.trim());
-    return {
-      optionId: prev?.optionId ?? null,
-      name: o.name.trim(),
-      values: o.values.map((v) => ({ valueId: prev?.values.find((pv) => pv.name === v.trim())?.valueId ?? null, name: v.trim() })),
-    };
-  });
+  return options.map((o) => ({
+    optionId: o.optionId ?? null,
+    name: o.name.trim(),
+    values: o.values.map((v, j) => ({ valueId: o.valueIds?.[j] ?? null, name: v.trim() })),
+  }));
 }
 
-export function toContentRequest(v: ProductFormValues, current: CurrentOption[]): components["schemas"]["ProductContentRequest"] {
+export function toContentRequest(v: ProductFormValues): components["schemas"]["ProductContentRequest"] {
   return {
     name: v.name,
     description: v.description,
     categoryId: v.categoryId,
     imageFileIds: v.images.map((i) => i.fileId),
-    options: toChangeOptions(v.options, current),
+    options: toChangeOptions(v.options),
   };
 }
 
-export function toChangeRequest(v: ProductFormValues, current: CurrentOption[]): components["schemas"]["SubmitChangeRequestRequest"] {
-  return { originalPrice: v.originalPrice, content: toContentRequest(v, current) };
+export function toChangeRequest(v: ProductFormValues): components["schemas"]["SubmitChangeRequestRequest"] {
+  return { originalPrice: v.originalPrice, content: toContentRequest(v) };
 }

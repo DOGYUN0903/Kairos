@@ -49,8 +49,18 @@ describe("SkuEditTable", () => {
     expect(within(black).getByText("재고는 0 이상의 정수로 입력해 주세요.")).toBeInTheDocument();
   });
 
-  it("DISCONTINUED_행은_입력이_없다", () => {
+  it("DISCONTINUED_행은_기본으로_숨기고_토글로_본다", async () => {
     render(<SkuEditTable skus={skus} onSave={vi.fn()} />);
+    expect(screen.queryByRole("row", { name: /레드/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "단종 1개 보기" }));
+    expect(row("레드")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "단종 숨기기" }));
+    expect(screen.queryByRole("row", { name: /레드/ })).toBeNull();
+  });
+
+  it("DISCONTINUED_행은_입력이_없다", async () => {
+    render(<SkuEditTable skus={skus} onSave={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "단종 1개 보기" }));
     const red = row("레드");
     expect(within(red).queryByRole("textbox")).toBeNull();
     expect(within(red).queryByRole("switch")).toBeNull();

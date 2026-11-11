@@ -856,7 +856,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * 내 변경 요청 상세 (APPROVED·SUSPENDED 판매자)
+         * @description 요청한 내용·정가·상태·반려 사유. 남의 요청이나 다른 상품의 요청은 `CHANGE_REQUEST_NOT_FOUND`.
+         */
+        get: operations["getMyChangeRequest"];
         put?: never;
         post?: never;
         /** 변경 요청 철회 (APPROVED 판매자, PENDING 만) */
@@ -2575,6 +2579,30 @@ export interface components {
              * @description 대기 중인 변경 요청 ID. 없으면 null.
              */
             pendingChangeRequestId?: number | null;
+            /** @description 가장 최근 변경 요청(상태 무관). 없으면 null. */
+            latestChangeRequest?: components["schemas"]["LatestChangeRequest"] | null;
+        };
+        LatestChangeRequest: {
+            /** Format: int64 */
+            changeRequestId: number;
+            status: components["schemas"]["ChangeRequestStatus"];
+            requestedAt: components["schemas"]["LocalDateTime"];
+            rejectReason?: string | null;
+        };
+        SellerChangeRequestDetail: {
+            /** Format: int64 */
+            changeRequestId: number;
+            /** Format: int64 */
+            productId: number;
+            status: components["schemas"]["ChangeRequestStatus"];
+            requestedAt: components["schemas"]["LocalDateTime"];
+            rejectReason?: string | null;
+            /**
+             * Format: int64
+             * @description 요청한 정가
+             */
+            originalPrice: number;
+            content: components["schemas"]["ProductContentResult"];
         };
         /** @enum {string} */
         ChangeRequestStatus: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
@@ -5697,6 +5725,34 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+        };
+    };
+    getMyChangeRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: components["parameters"]["ProductId"];
+                changeRequestId: components["parameters"]["ChangeRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 변경 요청 상세 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["SellerChangeRequestDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["ChangeRequestNotFound"];
         };
     };
     withdrawChangeRequest: {

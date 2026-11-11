@@ -5,15 +5,16 @@ import type { SellerProductDetail } from "@/features/seller/products/api";
 import { toChangeOptions } from "@/features/seller/products/schemas";
 import { skuImpact } from "@/features/seller/products/sku-impact";
 
-type Axis = { name: string; values: string[] };
+type Axis = { optionId?: number | null; name: string; values: string[]; valueIds?: (number | null)[] };
 
 /** 옵션 변경이 SKU 에 주는 영향 미리 보기: 유지 n / 신규 n(재고 0) / 단종 n + 목록. */
 export function SkuImpactNotice({ initial, options }: { initial: SellerProductDetail; options: Axis[] }) {
   const impact = useMemo(() => {
     const active = initial.skus.filter((s) => s.skuStatus === "ACTIVE");
-    return skuImpact({ options: initial.options, skus: active }, toChangeOptions(options, initial.options));
+    return skuImpact({ options: initial.options, skus: active }, toChangeOptions(options));
   }, [initial, options]);
   const changed = impact.added.length > 0 || impact.discontinued.length > 0;
+  const renamed = impact.renamed;
 
   return (
     <section className="card" aria-labelledby="impact-h">
@@ -31,9 +32,22 @@ export function SkuImpactNotice({ initial, options }: { initial: SellerProductDe
         ) : (
           <div className={impact.discontinued.length > 0 ? "notice notice-warn" : "notice"} role="status">
             <div>
-              승인되면 SKU가 아래처럼 바뀝니다. 신규 SKU는 재고 0으로 시작하고, 단종된 SKU는 다시 판매할 수 없습니다. 옵션명이나 값 이름을 바꾸면 새 옵션으로
-              취급됩니다.
+              승인되면 SKU가 아래처럼 바뀝니다. 신규 SKU는 재고 0으로 시작하고, 단종된 SKU는 다시 판매할 수 없습니다. 기존 값의 이름만 바꾸면 SKU와 재고는
+              유지됩니다.
             </div>
+          </div>
+        )}
+        {renamed.length > 0 && (
+          <div>
+            <h3 className="mb-1 text-xs font-medium text-text-2">이름 변경 {renamed.length}</h3>
+            <p className="hint mb-1">재고·추가 금액·판매 여부는 그대로 유지됩니다.</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {renamed.map((r) => (
+                <li key={`${r.from}->${r.to}`} className="rounded-sm border border-border px-1.5 py-0.5 text-[12px]">
+                  {r.from || "기본"} → {r.to || "기본"}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         <ImpactList title="유지" items={impact.kept} />
