@@ -1,4 +1,13 @@
-// Task 9 에서 상품 목록으로 바뀐다.
+"use client";
+
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/common/PageSkeleton";
+import { ProductListPage } from "@/features/catalog/components/ProductListPage";
+
 export default function Home() {
-  return <div className="container py-10 text-2xl font-black">KAIROS</div>;
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ProductListPage />
+    </Suspense>
+  );
 }
