@@ -117,7 +117,8 @@ pitest {
     timestampedReports = false
     threads = 4
     jvmArgs = listOf("-Duser.timezone=Asia/Seoul")
-    // 측정 후 달성 점수를 내림해 고정한다. 떨어지면 ./gradlew pitest 가 실패한다.
-    mutationThreshold = 0
-    coverageThreshold = 0
+    // 측정값(뮤테이션 327/412 = 79%, 라인 297/299 = 99%)을 내림해 고정한다. 떨어지면 ./gradlew pitest 가 실패한다.
+    // 남은 생존 뮤턴트는 대부분 등가(방어용 check 불변식, Kotlin 인라인 stdlib 빈 컬렉션 분기, 중복 상태 가드)다.
+    mutationThreshold = 79
+    coverageThreshold = 99
 }
