@@ -4,3 +4,8 @@ logging:
   level:
     root: WARN
     com.dogyun.kairos: INFO
+
+# 운영은 HTTPS 전용이라 리프레시 토큰 쿠키에 Secure 를 붙인다(평문 전송 방지).
+kairos:
+  auth:
+    cookie-secure: true

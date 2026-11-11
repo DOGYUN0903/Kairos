@@ -147,7 +147,7 @@ paths:
         - name: X-Requested-With
           in: header
           required: false
-          description: 쿠키로 인증할 때 `kairos-web` 필수(CSRF 방어)
+          description: 쿠키 경로에서만 `kairos-web` 필수(CSRF 방어). 본문 refreshToken·액세스 토큰을 쓸 때는 필요 없다
           schema:
             type: string
       requestBody:
@@ -196,7 +196,7 @@ paths:
         - name: X-Requested-With
           in: header
           required: false
-          description: 쿠키로 인증할 때 `kairos-web` 필수(CSRF 방어)
+          description: 쿠키 경로에서만 `kairos-web` 필수(CSRF 방어). 본문 refreshToken·액세스 토큰을 쓸 때는 필요 없다
           schema:
             type: string
       responses:
