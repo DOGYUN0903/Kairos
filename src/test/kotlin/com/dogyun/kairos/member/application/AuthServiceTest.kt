@@ -133,4 +133,23 @@ class AuthServiceTest {
         assertNotNull(jwt.parseRefreshToken(token.refreshToken))
         assertEquals(Role.USER, jwt.parseAccessToken(token.accessToken)?.role)
     }
+
+    @Test
+    fun 저장된_리프레시_토큰으로_로그아웃하면_삭제된다() {
+        val token = authService.login(LoginCommand("user@kairos.com", "password1"))
+
+        authService.logoutByRefreshToken(token.refreshToken)
+
+        assertNull(store.find(memberId))
+    }
+
+    @Test
+    fun 회전된_옛_리프레시_토큰이나_잘못된_토큰으로_로그아웃하면_무시한다() {
+        val old = authService.login(LoginCommand("user@kairos.com", "password1"))
+        val current = authService.reissue(old.refreshToken)
+
+        listOf(old.refreshToken, current.accessToken, "garbage").forEach { authService.logoutByRefreshToken(it) }
+
+        assertEquals(current.refreshToken, store.find(memberId))
+    }
 }

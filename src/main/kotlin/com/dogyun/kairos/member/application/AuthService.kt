@@ -42,6 +42,15 @@ class AuthService(
         refreshTokenStore.delete(memberId)
     }
 
+    /**
+     * 쿠키로 받은 리프레시 토큰으로 로그아웃한다. 지금 저장된 토큰과 같을 때만 지운다.
+     * 회전된 옛 토큰(탈취됐을 수 있음)으로 현재 세션을 강제로 끊지 못하게 하려는 것이다. 다르면 아무것도 하지 않는다.
+     */
+    fun logoutByRefreshToken(refreshToken: String) {
+        val claims = jwtProvider.parseRefreshToken(refreshToken) ?: return
+        if (refreshTokenStore.find(claims.memberId) == refreshToken) refreshTokenStore.delete(claims.memberId)
+    }
+
     private fun issueTokens(member: Member): TokenResult {
         val memberId = member.id!!.value
         val refreshToken = jwtProvider.createRefreshToken(memberId)

@@ -1,6 +1,7 @@
 package com.dogyun.kairos.member.presentation
 
 import com.dogyun.kairos.IntegrationTestSupport
+import jakarta.servlet.http.Cookie
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -11,6 +12,8 @@ import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class AuthApiTest : IntegrationTestSupport() {
 
@@ -150,7 +153,7 @@ class AuthApiTest : IntegrationTestSupport() {
 
     @Test
     fun 토큰_없이_보호된_API를_호출하면_401_에러_응답이다() {
-        mockMvc.post("/api/v1/auth/logout").andExpect {
+        mockMvc.get("/api/v1/auth/me").andExpect {
             status { isUnauthorized() }
             jsonPath("$.code") { value("UNAUTHORIZED") }
             jsonPath("$.timestamp") { isNotEmpty() }
@@ -162,7 +165,7 @@ class AuthApiTest : IntegrationTestSupport() {
     fun 리프레시_토큰으로는_보호된_API를_호출할_수_없다() {
         val (_, refresh) = loginTokens(newEmail())
 
-        mockMvc.post("/api/v1/auth/logout") { header("Authorization", "Bearer $refresh") }
+        mockMvc.get("/api/v1/auth/me") { header("Authorization", "Bearer $refresh") }
             .andExpect { status { isUnauthorized() } }
     }
 
@@ -209,6 +212,148 @@ class AuthApiTest : IntegrationTestSupport() {
             status { isUnsupportedMediaType() }
             jsonPath("$.code") { value("INVALID_REQUEST") }
             jsonPath("$.timestamp") { exists() }
+        }
+    }
+
+    private fun cookieReissue(cookie: String?, requestedWith: String? = "kairos-web") =
+        mockMvc.post("/api/v1/auth/reissue") {
+            cookie?.let { cookie(Cookie("kairos_refresh", it)) }
+            requestedWith?.let { header("X-Requested-With", it) }
+        }
+
+    private fun MvcResult.setCookie(): String = requireNotNull(response.getHeader("Set-Cookie"))
+
+    @Test
+    fun 로그인_응답은_kairos_refresh_쿠키를_HttpOnly_SameSite_Strict_Path_auth_MaxAge_14일로_내려준다() {
+        val email = newEmail()
+        signUp(email)
+        val result = login(email).andExpect { status { isOk() } }.andReturn()
+
+        val header = result.setCookie()
+        val refresh = result.json("data.refreshToken")
+        assertTrue(header.startsWith("kairos_refresh=$refresh"), header)
+        listOf("HttpOnly", "SameSite=Strict", "Path=/api/v1/auth", "Max-Age=1209600").forEach {
+            assertTrue(header.contains(it), "$it 없음: $header")
+        }
+        assertFalse(header.contains("Secure"), header)
+    }
+
+    @Test
+    fun 본문_없이_쿠키와_X_Requested_With로_reissue하면_새_토큰과_새_쿠키를_받고_옛_쿠키는_401() {
+        val (_, oldRefresh) = loginTokens(newEmail())
+
+        val result = cookieReissue(oldRefresh).andExpect {
+            status { isOk() }
+            jsonPath("$.data.accessToken") { isNotEmpty() }
+        }.andReturn()
+        val newRefresh = result.json("data.refreshToken")
+        assertTrue(result.setCookie().startsWith("kairos_refresh=$newRefresh"))
+
+        cookieReissue(oldRefresh).andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("AUTH_INVALID_TOKEN") }
+        }
+        cookieReissue(newRefresh).andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun 헤더_없는_쿠키_reissue는_400_INVALID_REQUEST() {
+        val (_, refresh) = loginTokens(newEmail())
+
+        cookieReissue(refresh, requestedWith = null).andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_REQUEST") }
+        }
+        cookieReissue(refresh, requestedWith = "XMLHttpRequest").andExpect { status { isBadRequest() } }
+        cookieReissue(null).andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun 본문_refreshToken은_헤더_없이도_계속_동작한다() {
+        val (_, refresh) = loginTokens(newEmail())
+
+        val result = reissue(refresh).andExpect {
+            status { isOk() }
+            jsonPath("$.data.refreshToken") { isNotEmpty() }
+        }.andReturn()
+        assertTrue(result.setCookie().startsWith("kairos_refresh=${result.json("data.refreshToken")}"))
+    }
+
+    @Test
+    fun 액세스_토큰_없이_쿠키와_헤더만으로_logout하면_쿠키가_만료되고_이후_쿠키_reissue는_401() {
+        val (_, refresh) = loginTokens(newEmail())
+
+        val result = mockMvc.post("/api/v1/auth/logout") {
+            cookie(Cookie("kairos_refresh", refresh))
+            header("X-Requested-With", "kairos-web")
+        }.andExpect { status { isNoContent() } }.andReturn()
+        assertTrue(result.setCookie().contains("Max-Age=0"), result.setCookie())
+
+        cookieReissue(refresh).andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("AUTH_INVALID_TOKEN") }
+        }
+    }
+
+    @Test
+    fun 회전된_옛_쿠키로_logout해도_현재_리프레시_토큰은_살아있다() {
+        val (_, oldRefresh) = loginTokens(newEmail())
+        val current = reissue(oldRefresh).andReturn().json("data.refreshToken")
+
+        val result = mockMvc.post("/api/v1/auth/logout") {
+            cookie(Cookie("kairos_refresh", oldRefresh))
+            header("X-Requested-With", "kairos-web")
+        }.andExpect { status { isNoContent() } }.andReturn()
+        assertTrue(result.setCookie().contains("Max-Age=0"))
+
+        reissue(current).andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun 헤더_없는_쿠키_logout은_토큰을_지우지_않는다() {
+        val (_, refresh) = loginTokens(newEmail())
+
+        mockMvc.post("/api/v1/auth/logout") { cookie(Cookie("kairos_refresh", refresh)) }
+            .andExpect { status { isNoContent() } }
+
+        reissue(refresh).andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun 액세스_토큰으로_logout해도_쿠키가_만료된다() {
+        val (access, refresh) = loginTokens(newEmail())
+
+        val result = mockMvc.post("/api/v1/auth/logout") { header("Authorization", "Bearer $access") }
+            .andExpect { status { isNoContent() } }.andReturn()
+        assertTrue(result.setCookie().contains("Max-Age=0"))
+        reissue(refresh).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun 토큰도_쿠키도_없는_logout은_204() {
+        val result = mockMvc.post("/api/v1/auth/logout").andExpect { status { isNoContent() } }.andReturn()
+        assertTrue(result.setCookie().contains("Max-Age=0"))
+    }
+
+    @Test
+    fun auth_me는_memberId_email_name_role을_준다() {
+        val email = newEmail()
+        val (access, _) = loginTokens(email)
+
+        mockMvc.get("/api/v1/auth/me") { header("Authorization", "Bearer $access") }.andExpect {
+            status { isOk() }
+            jsonPath("$.data.memberId") { isNumber() }
+            jsonPath("$.data.email") { value(email) }
+            jsonPath("$.data.name") { value("홍길동") }
+            jsonPath("$.data.role") { value("USER") }
+        }
+    }
+
+    @Test
+    fun 비로그인_auth_me는_401() {
+        mockMvc.get("/api/v1/auth/me").andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
         }
     }
 }

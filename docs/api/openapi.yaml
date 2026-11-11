@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.5.0
+  version: 0.6.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
@@ -110,6 +110,11 @@ paths:
       responses:
         '200':
           description: 토큰 발급
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=<리프레시 토큰>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600` (Secure는 `kairos.auth.cookie-secure`로 켠다, 로컬은 끔). 본문 `refreshToken`은 기존 클라이언트(k6·Swagger) 호환용으로 유지한다."
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -136,9 +141,17 @@ paths:
       tags: [Auth]
       operationId: reissue
       summary: 토큰 재발급
+      description: "본문이 없으면 쿠키 `kairos_refresh`를 쓴다(헤더 `X-Requested-With: kairos-web` 필수). 둘 다 없으면 400 `INVALID_REQUEST`"
       security: []
+      parameters:
+        - name: X-Requested-With
+          in: header
+          required: false
+          description: 쿠키로 인증할 때 `kairos-web` 필수(CSRF 방어)
+          schema:
+            type: string
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -146,6 +159,11 @@ paths:
       responses:
         '200':
           description: 토큰 재발급
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=<리프레시 토큰>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600` (Secure는 `kairos.auth.cookie-secure`로 켠다, 로컬은 끔). 본문 `refreshToken`은 기존 클라이언트(k6·Swagger) 호환용으로 유지한다."
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -171,10 +189,41 @@ paths:
     post:
       tags: [Auth]
       operationId: logout
-      summary: 로그아웃 (USER)
+      summary: 로그아웃
+      description: "액세스 토큰 또는 쿠키(+헤더)로 회원을 찾아 리프레시 토큰을 지우고 쿠키를 만료시킨다. 둘 다 없어도 204. 쿠키로 찾을 때는 제시한 리프레시 토큰이 현재 저장된 토큰과 같을 때만 지운다(회전된 옛 토큰으로 강제 로그아웃 방지)."
+      security: []
+      parameters:
+        - name: X-Requested-With
+          in: header
+          required: false
+          description: 쿠키로 인증할 때 `kairos-web` 필수(CSRF 방어)
+          schema:
+            type: string
       responses:
         '204':
-          description: 로그아웃 완료 (본문 없음)
+          description: 로그아웃 완료 (본문 없음). `Set-Cookie`로 `kairos_refresh`를 만료(`Max-Age=0`)시킨다.
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=0`"
+              schema:
+                type: string
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: me
+      summary: 내 정보
+      responses:
+        '200':
+          description: 로그인한 회원 정보
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MeResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/admin/deals:
@@ -4755,10 +4804,24 @@ components:
           format: password
     ReissueRequest:
       type: object
-      required: [refreshToken]
       properties:
         refreshToken:
           type: string
+          description: 없으면 쿠키 `kairos_refresh`를 쓴다
+    MeResponse:
+      type: object
+      required: [memberId, email, name, role]
+      properties:
+        memberId:
+          type: integer
+          format: int64
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [USER, ADMIN]
     TokenResponse:
       type: object
       required: [accessToken, refreshToken]
