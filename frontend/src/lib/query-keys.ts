@@ -6,6 +6,7 @@ export const queryKeys = {
   },
   catalog: {
     categories: ["catalog", "categories"] as const,
+    brands: ["catalog", "brands"] as const,
     productsRoot: ["catalog", "products"] as const,
     products: (params?: Params) => ["catalog", "products", params ?? {}] as const,
     product: (id: number) => ["catalog", "product", id] as const,

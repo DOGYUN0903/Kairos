@@ -1,8 +1,8 @@
 "use client";
 
-import { X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useBrand } from "@/features/catalog/api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBrands } from "@/features/catalog/api";
 import { CategoryTree } from "@/features/catalog/components/CategoryTree";
 import type { CategoryNode } from "@/features/catalog/category-path";
 import type { ProductListParams } from "@/features/catalog/search-params";
@@ -11,7 +11,7 @@ import { parseWon } from "@/lib/money";
 type Props = {
   categories: CategoryNode[];
   params: ProductListParams;
-  /** 브랜드 페이지처럼 브랜드가 고정된 화면이면 브랜드 칩을 숨긴다. */
+  /** 브랜드 페이지처럼 브랜드가 고정된 화면이면 브랜드 필터를 숨긴다. */
   fixedBrandId?: number;
   hasFilter: boolean;
   categoryHref: (categoryId: number | undefined) => string;
@@ -19,13 +19,37 @@ type Props = {
   onReset: () => void;
 };
 
-function ActiveBrand({ brandId, onClear }: { brandId: number; onClear: () => void }) {
-  const { data } = useBrand(brandId);
+/** 브랜드 단일 선택(API 가 brandId 하나만 받는다). "전체"는 브랜드 필터 해제. */
+function BrandFilter({ brandId, onChange }: { brandId: number | undefined; onChange: (brandId: number | undefined) => void }) {
+  const { data, isPending, isError, refetch } = useBrands();
   return (
-    <button type="button" onClick={onClear} className="btn btn-ghost btn-sm" aria-label={`브랜드 필터 해제: ${data?.name ?? brandId}`}>
-      {data?.name ?? `브랜드 ${brandId}`}
-      <X className="h-3.5 w-3.5" aria-hidden />
-    </button>
+    <div className="border-t border-border py-4">
+      <h2 id="brand-h" className="mb-2 text-[13px] font-bold">
+        브랜드
+      </h2>
+      {isPending ? (
+        <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+      ) : isError ? (
+        <div role="alert" className="text-xs text-text-2">
+          브랜드를 불러오지 못했습니다.{" "}
+          <button type="button" className="underline" onClick={() => void refetch()}>
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <div role="radiogroup" aria-labelledby="brand-h" className="flex max-h-56 flex-col overflow-y-auto">
+          {[{ brandId: undefined, name: "전체" }, ...data].map((b) => (
+            <label key={b.brandId ?? "all"} className="flex min-h-[36px] cursor-pointer items-center gap-2">
+              <input type="radio" name="brandId" checked={b.brandId === brandId} onChange={() => onChange(b.brandId)} />
+              {b.name}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -78,19 +102,14 @@ function PriceForm({ params, onChange }: Pick<Props, "params" | "onChange">) {
 }
 
 export function FilterPanel({ categories, params, fixedBrandId, hasFilter, categoryHref, onChange, onReset }: Props) {
-  const showBrand = params.brandId !== undefined && params.brandId !== fixedBrandId;
+  const showBrand = fixedBrandId === undefined;
   return (
     <aside aria-label="필터" className="sticky top-24 self-start">
       <div className="pb-4">
         <h2 className="mb-2 text-[13px] font-bold">카테고리</h2>
         <CategoryTree categories={categories} categoryId={params.categoryId} hrefFor={categoryHref} />
       </div>
-      {showBrand && params.brandId !== undefined && (
-        <div className="border-t border-border py-4">
-          <h2 className="mb-2 text-[13px] font-bold">브랜드</h2>
-          <ActiveBrand brandId={params.brandId} onClear={() => onChange({ brandId: undefined })} />
-        </div>
-      )}
+      {showBrand && <BrandFilter brandId={params.brandId} onChange={(brandId) => onChange({ brandId })} />}
       <div className="border-t border-border py-4">
         <h2 id="price-h" className="mb-2 text-[13px] font-bold">
           가격대

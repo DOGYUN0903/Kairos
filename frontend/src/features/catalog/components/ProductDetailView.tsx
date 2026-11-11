@@ -146,6 +146,8 @@ function PurchasePanel({ product }: { product: ProductDetail }) {
       </div>
 
       <dl className="mt-5 grid grid-cols-[72px_1fr] gap-y-1.5 text-xs text-text-2">
+        <dt className="font-medium">판매자</dt>
+        <dd>{product.sellerName}</dd>
         <dt className="font-medium">상품 번호</dt>
         <dd>{product.productId}</dd>
       </dl>

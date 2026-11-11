@@ -25,7 +25,11 @@ export function ProductCard({ product }: { product: ProductSummary }) {
         </div>
       </Link>
       <div className="pt-2.5">
-        <p className={cn("text-xs font-bold", product.soldOut ? "text-text-3" : "text-foreground")}>{product.brandName}</p>
+        <p className={cn("text-xs font-bold", product.soldOut ? "text-text-3" : "text-foreground")}>
+          <Link href={`/brands/${product.brandId}`} className="hover:underline">
+            {product.brandName}
+          </Link>
+        </p>
         <p className="mt-0.5 line-clamp-2 text-sm text-text-2">
           <Link href={href} className={cn("hover:underline", product.soldOut && "text-text-3")}>
             {product.name}

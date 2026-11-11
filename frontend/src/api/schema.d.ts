@@ -362,6 +362,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 공개 브랜드 목록 (승인된 브랜드, 승인 상태 판매자만, 이름순)
+         * @description 상품 목록의 브랜드 필터용. 페이징 없이 최대 200개까지 이름 오름차순으로 준다.
+         */
+        get: operations["listBrands"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/brands/{brandId}": {
         parameters: {
             query?: never;
@@ -2622,6 +2642,8 @@ export interface components {
             productId: number;
             /** @description 대표 이미지 URL */
             thumbnailUrl: string;
+            /** Format: int64 */
+            brandId: number;
             brandName: string;
             name: string;
             /** Format: int64 */
@@ -2718,6 +2740,8 @@ export interface components {
             productId: number;
             /** Format: int64 */
             brandId: number;
+            /** @description 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)" */
+            sellerName: string;
             brandName: string;
             /** Format: int64 */
             categoryId: number;
@@ -2782,6 +2806,11 @@ export interface components {
             createdAt: components["schemas"]["LocalDateTime"];
             /** @description 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)" */
             sellerName: string;
+        };
+        BrandListItem: {
+            /** Format: int64 */
+            brandId: number;
+            name: string;
         };
         BrandPublic: {
             /** Format: int64 */
@@ -4626,6 +4655,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listBrands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 브랜드 목록 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["BrandListItem"][];
+                    };
                 };
             };
         };

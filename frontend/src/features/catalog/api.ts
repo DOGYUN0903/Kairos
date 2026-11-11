@@ -13,6 +13,7 @@ import { queryKeys } from "@/lib/query-keys";
 export type CategoryNode = components["schemas"]["CategoryNode"];
 export type ProductSummary = components["schemas"]["ProductSummary"];
 export type ProductDetail = components["schemas"]["ProductDetail"];
+export type BrandListItem = components["schemas"]["BrandListItem"];
 export type BrandPublic = components["schemas"]["BrandPublic"];
 export type ProductPage = components["schemas"]["PageResponse"] & { content?: ProductSummary[] };
 
@@ -43,6 +44,15 @@ export function useProduct(productId: number) {
       unwrap<ProductDetail>(await api.GET("/api/v1/products/{productId}", { params: { path: { productId } } })),
     enabled: status !== "loading",
     retry: noRetryOn404,
+  });
+}
+
+/** 목록 필터용 공개 브랜드 목록(이름순, 최대 200). */
+export function useBrands() {
+  return useQuery({
+    queryKey: queryKeys.catalog.brands,
+    queryFn: async () => unwrap<BrandListItem[]>(await api.GET("/api/v1/brands")),
+    staleTime: 5 * 60_000,
   });
 }
 
