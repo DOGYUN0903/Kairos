@@ -6,6 +6,7 @@ import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductOption
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.catalog.domain.Sku
 import com.dogyun.kairos.catalog.domain.SkuId
 import com.dogyun.kairos.common.domain.ListOrder
@@ -51,8 +52,13 @@ internal class FakeProductRepository : ProductRepository {
     override fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product? =
         store[id.value]?.takeIf { it.sellerId == sellerId }
 
-    override fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product> {
-        val all = store.values.filter { it.sellerId == sellerId && (status == null || it.status == status) }.reversed()
+    override fun findPageBySellerId(sellerId: Long, filter: SellerProductFilter, page: Int, size: Int): PageResult<Product> {
+        val all = store.values.filter {
+            it.sellerId == sellerId &&
+                (filter.status == null || it.status == filter.status) &&
+                (filter.brandId == null || it.brandId == filter.brandId) &&
+                (filter.keyword == null || it.content.name.contains(filter.keyword))
+        }.reversed()
         return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
     }
 

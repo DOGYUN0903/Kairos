@@ -9,6 +9,7 @@ import com.dogyun.kairos.catalog.domain.ProductReviewHistoryRepository
 import com.dogyun.kairos.catalog.domain.ProductReviewResult
 import com.dogyun.kairos.catalog.domain.ProductReviewTarget
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.ListOrder
@@ -42,8 +43,8 @@ class ProductAdminServiceTest {
         override fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product? =
             store[id.value]?.takeIf { it.sellerId == sellerId }
 
-        override fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product> =
-            page(store.values.filter { it.sellerId == sellerId && (status == null || it.status == status) }, page, size)
+        override fun findPageBySellerId(sellerId: Long, filter: SellerProductFilter, page: Int, size: Int): PageResult<Product> =
+            page(store.values.filter { it.sellerId == sellerId && (filter.status == null || it.status == filter.status) }, page, size)
 
         override fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product> =
             page(store.values.filter { status == null || it.status == status }.let { if (order == ListOrder.OLDEST) it.reversed() else it }, page, size)

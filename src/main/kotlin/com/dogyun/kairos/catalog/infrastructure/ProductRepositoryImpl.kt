@@ -7,6 +7,7 @@ import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductOption
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.catalog.domain.Sku
 import com.dogyun.kairos.catalog.domain.SkuId
 import com.dogyun.kairos.common.domain.ListOrder
@@ -45,10 +46,20 @@ class ProductRepositoryImpl(
     override fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product? =
         productJpaRepository.findByIdAndSellerId(id.value, sellerId)?.let { toDomains(listOf(it)).single() }
 
-    override fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product> {
+    override fun findPageBySellerId(sellerId: Long, filter: SellerProductFilter, page: Int, size: Int): PageResult<Product> {
         val product = QProductEntity.productEntity
-        return findPage(listOfNotNull(product.sellerId.eq(sellerId), status?.let { product.productStatus.eq(it) }), ListOrder.LATEST, page, size)
+        val where = listOfNotNull(
+            product.sellerId.eq(sellerId),
+            filter.status?.let { product.productStatus.eq(it) },
+            filter.brandId?.let { product.brandId.eq(it) },
+            filter.keyword?.let { product.name.like("%${escapeLike(it)}%", LIKE_ESCAPE) },
+        )
+        return findPage(where, ListOrder.LATEST, page, size)
     }
+
+    /** LIKE 와일드카드(%, _)와 이스케이프 문자를 글자 그대로 찾게 한다. */
+    private fun escapeLike(s: String): String =
+        s.replace("$LIKE_ESCAPE", "$LIKE_ESCAPE$LIKE_ESCAPE").replace("%", "$LIKE_ESCAPE%").replace("_", "${LIKE_ESCAPE}_")
 
     override fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product> {
         val product = QProductEntity.productEntity
@@ -205,4 +216,8 @@ class ProductRepositoryImpl(
     )
 
     private fun parseValueIds(joined: String): List<Long> = if (joined.isEmpty()) emptyList() else joined.split("|").map(String::toLong)
+
+    private companion object {
+        const val LIKE_ESCAPE = '!'
+    }
 }

@@ -1410,6 +1410,20 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/ProductStatus'
+        - name: keyword
+          in: query
+          required: false
+          description: 상품명 부분 일치(앞뒤 공백 제거, 비면 무시). 최대 100자, 넘으면 `INVALID_REQUEST`.
+          schema:
+            type: string
+            maxLength: 100
+        - name: brandId
+          in: query
+          required: false
+          description: 내 브랜드로 좁힌다. 남의 브랜드 ID 면 빈 결과.
+          schema:
+            type: integer
+            format: int64
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
       responses:
@@ -5699,7 +5713,7 @@ components:
           description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
     SellerProductSummary:
       type: object
-      required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut, stockTotal, createdAt, hasPendingChangeRequest]
+      required: [productId, name, thumbnailUrl, brandName, originalPrice, salePrice, status, rejectReason, soldOut, stockTotal, createdAt, hasPendingChangeRequest]
       properties:
         productId:
           type: integer
@@ -5711,11 +5725,18 @@ components:
           description: 대표 이미지 URL
         brandName:
           type: string
+        originalPrice:
+          type: integer
+          format: int64
+          description: 정가(원)
         salePrice:
           type: integer
           format: int64
         status:
           $ref: '#/components/schemas/ProductStatus'
+        rejectReason:
+          type: [string, 'null']
+          description: 반려 사유(REJECTED 일 때). 없으면 null.
         soldOut:
           type: boolean
         stockTotal:

@@ -45,6 +45,11 @@ class SellerProductApiTest : CommerceTestSupport() {
         assertEquals("티셔츠", page.get("content").get(0).get("name").asString())
         assertTrue(page.get("content").get(0).get("thumbnailUrl").asString().contains("/files/"))
         assertEquals(0, json(get("/api/v1/seller/products?status=ON_SALE", token)).get("data").get("totalElements").asInt())
+        assertTrue(page.get("content").get(0).get("originalPrice").asLong() > 0)
+        assertTrue(page.get("content").get(0).get("rejectReason").isNull)
+        assertEquals(1, json(get("/api/v1/seller/products?keyword=티셔", token)).get("data").get("totalElements").asInt())
+        assertEquals(0, json(get("/api/v1/seller/products?keyword=nothing", token)).get("data").get("totalElements").asInt())
+        assertEquals(0, json(get("/api/v1/seller/products?brandId=999999", token)).get("data").get("totalElements").asInt())
     }
 
     @Test

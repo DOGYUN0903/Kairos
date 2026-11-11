@@ -8,7 +8,7 @@ interface ProductRepository {
     fun save(product: Product): Product
     fun findById(id: ProductId): Product?
     fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product?
-    fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product>
+    fun findPageBySellerId(sellerId: Long, filter: SellerProductFilter, page: Int, size: Int): PageResult<Product>
     /** [order] 는 id 기준(LATEST 내림차순, OLDEST 오름차순). */
     fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product>
     /** SKU 가 속한 상품(DISCONTINUED SKU 포함). 없는 SKU ID 는 무시하고 같은 상품은 한 번만 돌려준다. */

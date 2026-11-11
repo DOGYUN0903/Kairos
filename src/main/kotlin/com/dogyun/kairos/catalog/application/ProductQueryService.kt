@@ -5,6 +5,7 @@ import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
@@ -36,9 +37,18 @@ class ProductQueryService(
     fun findProductRef(productId: Long): ProductRefResult? =
         productRepository.findById(ProductId(productId))?.let { ProductRefResult(productId, it.sellerId) }
 
-    fun listMine(seller: SellerPrincipal, status: ProductStatus?, page: Int, size: Int): PageResult<SellerProductSummary> {
+    fun listMine(
+        seller: SellerPrincipal,
+        status: ProductStatus?,
+        page: Int,
+        size: Int,
+        keyword: String? = null,
+        brandId: Long? = null,
+    ): PageResult<SellerProductSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = productRepository.findPageBySellerId(seller.sellerId, status, page, size)
+        val trimmed = keyword?.trim()?.takeIf { it.isNotEmpty() }
+        if (trimmed != null && trimmed.length > MAX_KEYWORD_LENGTH) throw DomainException(ErrorCode.INVALID_REQUEST)
+        val result = productRepository.findPageBySellerId(seller.sellerId, SellerProductFilter(status, trimmed, brandId), page, size)
         return PageResult(
             content = toSummaries(result.content),
             page = result.page,
@@ -64,5 +74,6 @@ class ProductQueryService(
 
     private companion object {
         const val MAX_SIZE = 100
+        const val MAX_KEYWORD_LENGTH = 100
     }
 }
