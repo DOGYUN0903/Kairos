@@ -21,6 +21,7 @@
 - 서버가 `Idempotency-Key`를 강제하는 요청(장바구니 담기, 주문 생성, 결제 승인, 항목 취소 3종)은 반드시 키를 보낸다. 키 규칙: **응답을 받지 못한 시도(네트워크 오류·5xx)만 같은 키, 서버가 답한 뒤(2xx·4xx)의 다음 제출은 새 키**.
 - 데모 전용 코드는 `src/features/demo`에만 두고 `process.env.NEXT_PUBLIC_DEMO_MODE === "true"` 리터럴 비교로 감싼다. 어떤 번들에도 `KAIROS_ADMIN`·토스 시크릿 키가 없어야 한다.
 - `design/`의 기존 시안 파일은 고치지 않는다(새 파일 추가와 `index.html` 링크 추가, `kairos.css`에 클래스 **추가**만 허용).
+- 구매자 전용 페이지(`/cart`, `/checkout*`, `/my/orders/**`)는 각 `page.tsx`에서 `RequireAuth`로 감싼다(`(store)/layout.tsx`에는 가드가 없다).
 - 프론트 테스트 이름은 한국어. 순수 로직은 `.ts` + `.test.ts`(Vitest), 화면 흐름은 E2E. 각 프론트 태스크의 검증: `cd frontend && pnpm lint && pnpm typecheck && pnpm test`.
 - 의존성을 추가하면 커밋 본문에 이유를 쓴다. claude.ai Artifact·Claude Design·Figma 토큰 사용 금지.
 
@@ -83,7 +84,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 - Produces: Task 7~11이 따르는 화면 구조. 시안 속 데이터는 스펙의 실제 필드로만 채운다(API에 없는 값을 그리지 않는다).
 
 - [ ] **Step 1: 기존 시안과 `kairos.css`를 읽고 공용 구조(`.site-header`, `.cat-nav`, `.console`, `.chip-*`, `.pagination`, 버튼·폼 클래스)를 파악한다**
-- [ ] **Step 2: `user-cart.html`** — 판매자 2명 묶음(각 묶음에 판매자명·묶음 선택·배송비 줄), 항목 행(체크박스, 이미지, 브랜드, 상품명, 옵션, 단가, 수량, 금액, 삭제), 구매 불가 항목 1개(흐림 + "판매 중지" + 삭제만), 오른쪽 고정 요약(상품 금액, 배송비 "3,000원 × 2", 결제 예정 금액, "8,000원 더 담으면 무료배송", 주문하기). 같은 파일 아래에 "무료배송 달성" 요약과 "빈 장바구니" 상태를 구분선과 제목으로 함께 그린다.
+- [ ] **Step 2: `user-cart.html`** — 판매자 2명 묶음(각 묶음에 판매자명·묶음 선택·배송비 줄), 항목 행(체크박스, 이미지, 브랜드, 상품명, 옵션, 단가, 수량, 금액, 삭제), 구매 불가 항목 1개(흐림 + "판매 중지" + 삭제만), 상단에 전체 선택·"선택 삭제", 오른쪽 고정 요약(상품 금액, 배송비 "3,000원 × 2", 결제 예정 금액, "8,000원 더 담으면 무료배송", 주문하기). 같은 파일 아래에 "무료배송 달성" 요약과 "빈 장바구니" 상태를 구분선과 제목으로 함께 그린다.
 - [ ] **Step 3: `user-checkout.html`** — 왼쪽: 배송지 폼(수령인, 연락처, 우편번호 + "주소 검색", 주소, 상세 주소, 배송 메모, "최근 배송지 불러오기"), 판매자별 주문 상품. 오른쪽: 결제 금액(상품 금액, 배송비, 결제 금액)과 "○○원 결제하기". 상태 그림: "금액이 변경되었습니다" 안내 배너, **모의 결제창** 다이얼로그 2종(일반: 주문명·금액·결제·닫기 / 데모: "시연용" 표시가 붙은 결과 선택 4개 — 정상 승인, 카드사 거절, 응답 없음(실제로는 승인됨), 응답 없음(승인 안 됨)).
 - [ ] **Step 4: `user-order-detail.html`** — 상태 헤더(결제 완료 기준) + 상태 변형 3개(결제 대기: 남은 시간 "12:34"와 결제하기 / 결제 확인 중 / 취소), 판매자 주문 카드 2개(하나는 배송 준비 중 + 항목 "취소" 버튼, 하나는 배송 완료 + 택배사·송장 + "구매 확정"), 항목 상태 칩(주문 완료, 취소 확인 중, 취소 + 환불액), 결제 요약(상품 금액, 배송비, 결제 금액, 환불 금액, 배송비 차감, 남은 결제 금액), 배송지. **항목 취소 창**: 환불 예정 내역(항목 금액 30,000원, 배송비 차감 −3,000원, 환불 예정 27,000원), 차감 사유 한 줄, 사유 입력, 취소하기.
 - [ ] **Step 5: `user-order-list.html`** — 주문 카드 4개(결제 대기 + 결제하기, 배송 중 1 · 배송 준비 1, 구매 확정, 취소), 페이지네이션, 빈 상태.
@@ -114,10 +115,10 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `ProductReader.findThumbnailUrls(productIds: Collection<Long>): Map<Long, String>` — 없는·삭제된 상품은 빠진다
 
 - [ ] **Step 1: OpenAPI에 위 경로·스키마를 추가한다.** `cancel-preview` 설명에 "실제 취소와 같은 계산(`RefundCalculator`), 아무것도 바꾸지 않는다. 미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다"를 적는다.
-- [ ] **Step 2: 실패하는 테스트 작성 — `OrderCancelPreviewApiTest`** (기존 `OrderCancelApiTest`의 주문 준비 헬퍼를 재사용). 테스트와 단언:
+- [ ] **Step 2: 실패하는 테스트 작성 — `OrderCancelPreviewApiTest`** (`OrderCancelApiTest`의 헬퍼는 private이라 `CommerceTestSupport`의 `paidOrder`·`postIdem`·`cancelItem`을 쓴다). 테스트와 단언:
   - `무료배송_주문에서_한_판매자_항목을_취소하면_배송비_3000원이_차감된_27000원이_미리보인다` — 판매자 B 30,000 + C 30,000 결제 후 C 항목: `paidAmount=30000, shippingFeeDeducted=3000, shippingFeeRefund=0, shippingFeeReturned=0, refundAmount=27000`
   - `남은_금액이_정확히_5만원이면_차감하지_않는다` — 50,000 + 10,000에서 10,000 항목: `shippingFeeDeducted=0, refundAmount=10000`
-  - `이미_차감된_뒤의_취소는_다시_차감하지_않는다` — 30,000 ×3 주문에서 첫 항목 실제 취소 후 둘째 미리보기: `shippingFeeDeducted=0`
+  - `이미_차감된_뒤의_취소는_다시_차감하지_않는다` — 20,000 ×3 주문(6만 원, 판매자 3명)에서 첫 항목 실제 취소(환불 17,000, 차감 3,000) 후 둘째 미리보기: `shippingFeeDeducted=0, refundAmount=20000`
   - `마지막_항목_취소는_앞서_차감한_배송비를_돌려준다` — 30,000 + 30,000에서 하나 실제 취소 후 나머지: `shippingFeeReturned=3000, refundAmount=33000`
   - `구매자가_배송비를_낸_판매자_주문이_비면_배송비도_환불된다` — 20,000(B) + 20,000(C) 주문(배송비 3,000 ×2)에서 C 항목: `shippingFeeRefund=3000, refundAmount=23000`
   - `미리보기_금액은_직후_실제_취소_응답과_같다` — 미리보기 후 `POST …/cancel`: `refundAmount`, `shippingFeeDeducted`, `pointsRefund` 일치
@@ -131,7 +132,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `주문_목록에_판매자_주문_상태가_있다` — 판매자 2명 주문에서 한쪽만 발송 후 `sellerOrderStatuses`가 `["SHIPPING","PAID"]`(정렬 무관, 내용 비교)
   - `삭제된_상품의_주문_이미지는_null이다` (Review Focus 5) — Fake `ProductReader`가 해당 상품을 빼도록 한 `OrderQueryServiceTest`로 검증: `thumbnailUrl == null`, 예외 없음
   - `주문_목록_한_페이지의_이미지는_한_번에_조회한다` — `OrderQueryServiceTest`에서 Fake의 `findThumbnailUrls` 호출 횟수 1
-- [ ] **Step 7: 구현.** catalog application에 `findThumbnailUrls(productIds): Map<Long, String>`(상품의 첫 이미지 URL, 기존 `thumbnailUrl`을 만드는 코드와 같은 규칙·같은 base-url)를 추가하고 `order.infrastructure.ProductReaderImpl`에서 호출. `OrderQueryService`는 목록·상세에서 필요한 `productId`를 모아 **한 번** 조회해 결과 DTO에 채운다(`toSummary`, `toDetail`, `getForSeller`, `listForSeller`). `sellerOrderStatuses = order.sellerOrders.map { it.status.name }`(이미 로드된 애그리거트, 추가 쿼리 없음).
+- [ ] **Step 7: 구현.** catalog application(`SkuQueryService` 또는 `ProductQueryService`)에 `findThumbnailUrls(productIds): Map<Long, String>`(상품의 첫 이미지 URL — 기존 `ProductRepository.findAllByIds`와 `imageFileReader.findImages(...)`로 `SkuQueryService`가 `thumbnailUrl`을 만드는 것과 같은 규칙. 이미지가 없으면 결과에서 뺀다)를 추가하고 `order.infrastructure.ProductReaderImpl`에서 호출. `OrderQueryService`는 목록·상세에서 필요한 `productId`를 모아 **한 번** 조회해 결과 DTO에 채운다(`toSummary`, `toDetail`, `getForSeller`, `listForSeller`). `sellerOrderStatuses = order.sellerOrders.map { it.status.name }`(이미 로드된 애그리거트, 추가 쿼리 없음).
 - [ ] **Step 8: `./gradlew test --tests '*OrderQuery*' --tests '*OpenApiContractTest' --tests '*ArchitectureTest'` 통과 → `cd frontend && pnpm gen:api && pnpm check:api` → Commit** `feat(backend): 주문 응답에 상품 이미지와 판매자 주문 상태 추가`
 
 ---
@@ -159,7 +160,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `견적_항목에_표시용_상품_정보가_있다` — `productName`, `brandName`, `optionDisplayName`, `thumbnailUrl`(비어 있지 않음), `unitPrice`, `sellerId`
   - `견적에_무료배송_기준과_기본_배송비가_있다` — `freeShippingThreshold=50000, baseShippingFee=3000`
 - [ ] **Step 3: 실패 확인** `./gradlew test --tests '*OrderQuoteApiTest'`
-- [ ] **Step 4: 구현.** `OrderService.quote`가 이미 만드는 `order`에서 `order.sellerOrders`로 `sellerQuotes`를 만들고, 표시 필드는 `snapshot()`이 읽은 SKU 정보에서 채운다. **금액 계산 코드는 바꾸지 않는다**(응답 매핑만).
+- [ ] **Step 4: 구현.** `OrderService.quote`가 이미 만드는 `order`에서 `order.sellerOrders`로 `sellerQuotes`를 만들고, 표시 필드는 SKU 조회 결과에서 채운다 — `snapshot()`은 도메인 `OrderLine`만 돌려주므로 `thumbnailUrl`을 도메인에 넣지 말고 `skuId → OrderableSkuInfo` 맵을 따로 들고 매핑한다(`thumbnailUrl`은 빈 문자열일 수 있다). **금액 계산 코드는 바꾸지 않는다**(응답 매핑만).
 - [ ] **Step 5: `./gradlew test --tests '*OrderQuote*' --tests '*OrderServiceTest' --tests '*OpenApiContractTest'` 통과 → `pnpm gen:api` → Commit** `feat(backend): 주문 견적에 판매자별 배송비와 표시용 상품 정보 추가`
 
 ---
@@ -186,11 +187,11 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `정지된_판매자의_항목은_PAUSED이고_구매_가능_금액에서_빠진다` — 담기 → 관리자 정지 → `availability=PAUSED`, `availableAmount`에 미포함, `sellerName`은 채워짐
   - `정지가_풀리면_다시_AVAILABLE이다`
   - `장바구니가_AVAILABLE이라고_한_항목만으로_견적하면_판매자_사유로_거절되지_않는다` — 정지 판매자 항목 1 + 정상 판매자 항목 1에서 `AVAILABLE` 항목만 골라 `POST /orders/quote` → 200
-  - `SKU가_사라진_항목은_판매자_정보가_null이다`
+  - (`CartServiceTest`, Fake 사용 — API로는 SKU를 없앨 수 없다) `SKU가_사라진_항목은_판매자_정보가_null이다`, `판매자가_조회_결과에_없으면_PAUSED다`
   - `담기에_멱등_키가_없으면_400이다`(`IDEMPOTENCY_KEY_REQUIRED`), `같은_키로_두_번_담아도_수량은_한_번만_더해진다`
 - [ ] **Step 3: 실패 확인** `./gradlew test --tests '*CartApiTest'`
 - [ ] **Step 4: 구현.** `CartQueryService.get`: SKU 조회 뒤 `sellerReader.findSellers(판매자 ID들)` 1회. 판매자가 없거나 `orderable=false`이고 SKU `availability`가 `AVAILABLE`이면 `PAUSED`로 바꾼다(이미 다른 구매 불가 사유면 그대로). `IdempotencyProperties.paths`에 경로 추가.
-- [ ] **Step 5: 기존에 `/api/v1/cart/items`를 키 없이 POST하는 호출을 고친다.** `grep -rn "cart/items" src/test perf frontend/e2e` 로 찾아 테스트 헬퍼에 키를 붙인다.
+- [ ] **Step 5: 기존에 `/api/v1/cart/items`를 키 없이 POST하는 호출을 고친다.** `CommerceTestSupport.addToCart`와 `CartApiTest`의 직접 POST를 `postIdem`으로 바꾼다. 비로그인 401 케이스(`CartApiTest`, `CommerceAuthorizationApiTest`)는 그대로 둔다. `common/idempotency/IdempotencyFilterTest`가 `/api/v1/cart/items`를 "대상이 아닌 경로" 예시로 쓰므로 다른 비대상 POST 경로(예: `/api/v1/seller/brands`)로 바꾼다. `grep -rn "cart/items" src/test perf frontend/e2e`로 남은 곳이 없는지 확인한다.
 - [ ] **Step 6: `./gradlew test`(전체) 통과 확인 → `pnpm gen:api && pnpm check:api` → Commit** `feat(backend): 장바구니에 판매자 정보·판매자 상태 반영, 담기에 Idempotency-Key 적용`
 
 ---
@@ -207,15 +208,19 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 스펙 §11, §8-6(남은 시간), §9(택배사).
 
 **Files:**
-- Modify: `frontend/src/hooks/useIdempotentSubmit.ts`(+test), `lib/money.ts`(+test), `lib/datetime.ts`(+test), `lib/query-keys.ts`, `api/errors.ts`(+test), `components/common/StatusChip.tsx`(+test), `frontend/.env.example`, `frontend/scripts/e2e-server.sh`
+- Modify: `frontend/src/hooks/useIdempotentSubmit.ts`(+test), `src/api/idempotency.ts`(+test), 위 훅의 기존 호출자 6곳(Interfaces 참고), `lib/money.ts`(+test), `lib/datetime.ts`(+test), `lib/query-keys.ts`, `api/errors.ts`(+test), `components/common/StatusChip.tsx`(+test), `frontend/.env.example`, `frontend/scripts/e2e-server.sh`
 - Create: `hooks/useIdempotentAction.ts`(+test), `features/orders/carriers.ts`(+test), `features/payment/config.ts`
 
 **Interfaces:**
 - Produces:
-  - `useIdempotentSubmit` — 시그니처 그대로. 키 규칙만 변경: `submit`이 **resolve되거나 `ApiError`이면서 `status < 500`으로 reject**되면 저장된 키를 버린다(다음 제출은 새 키). 그 밖의 reject(네트워크 오류, 5xx)는 키를 유지해 같은 값 재제출·`retry()`가 같은 키를 쓴다. 값이 바뀌면 지금처럼 새 키.
-  - `useIdempotentAction<TArgs>(action: (args: TArgs, key: string) => Promise<void>): { run: (args: TArgs) => Promise<void>; pending: boolean }` — 폼 없는 요청용. 같은 키 규칙(직전 시도가 응답 없이 실패했고 `JSON.stringify(args)`가 같으면 같은 키), 처리 중 재호출 무시.
+  - `isAnswered(e: unknown): boolean`(`src/api/idempotency.ts`에 추가) — 서버가 답한 실패인가: `e instanceof ApiError && e.status >= 400 && e.status < 500`. **`ApiError`의 `status === 0`(네트워크 오류·본문 없음, `client.ts`가 그렇게 만든다), `>= 500`, `ApiError`가 아닌 오류는 false**(응답을 받지 못함).
+  - `useIdempotentSubmit(form, submit, opts?: { onError?: (e: unknown) => void })` — **계약 변경**: `submit`은 실패하면 **반드시 던진다**(안에서 삼키지 않는다). 훅이 잡아서 ① 키를 정하고 ② `opts.onError(e)`를 부르고 ③ 삼킨다(`onSubmit`·`retry`는 reject하지 않는다). 키 규칙: `submit`이 resolve되거나 `isAnswered(e)`면 저장된 키를 버린다(다음 제출은 새 키). 그렇지 않으면(응답 없음) 키를 유지해 같은 값 재제출·`retry()`가 같은 키를 쓴다. 값이 바뀌면 지금처럼 새 키.
+  - 기존 호출자 6곳(`features/seller/apply/components/ApplyForm.tsx`, `features/seller/products/components/{ProductForm,PriceDialog}.tsx`, `features/seller/brands/components/BrandDialog.tsx`, `features/auth/components/SignupForm.tsx`, `features/admin/categories/components/CategoryDialog.tsx`)을 새 계약으로 옮긴다: `submit` 안의 `try/catch`를 없애고 같은 처리를 `onError`로 옮긴다(화면 동작은 그대로).
+  - `useIdempotentAction<TArgs>(action: (args: TArgs, key: string) => Promise<void>, opts?: { onError?: (e: unknown) => void }): { run: (args: TArgs) => Promise<void>; pending: boolean }` — 폼 없는 요청용. 같은 계약·같은 키 규칙(직전 시도가 응답 없이 실패했고 `JSON.stringify(args)`가 같으면 같은 키), 처리 중 재호출 무시.
+  - **이후 태스크(8·10·11·12)의 "오류 처리"는 전부 이 `onError`에서 한다.**
   - `money.ts`: `amountUntil(threshold: number, amount: number): number` — `max(threshold − amount, 0)`, 안전 정수 검사.
-  - `datetime.ts`: `secondsUntilKst(kstLocalDateTime: string, nowMs: number): number` — 문자열에 `+09:00`을 붙여 해석, 지났으면 0. `formatCountdown(seconds: number): string` — `"MM:SS"`.
+  - `money.ts`: `floorDiv(n: number, d: number): number`, `mod(n: number, d: number): number` — 안전 정수 전용 헬퍼. ESLint가 `/`·`%`를 `money.ts` 밖에서 막으므로 시간 계산도 이 헬퍼를 쓴다(ESLint 규칙·CLAUDE.md는 바꾸지 않는다).
+  - `datetime.ts`: `secondsUntilKst(kstLocalDateTime: string, nowMs: number): number` — 초 이하 소수(최대 6자리)를 잘라낸 뒤 `+09:00`을 붙여 해석, 지났으면 0. `formatCountdown(seconds: number): string` — `"MM:SS"`. 둘 다 `floorDiv`·`mod` 사용.
   - `carriers.ts`: `CARRIERS: readonly { code: string; name: string }[]`(CJ대한통운 `04`, 한진택배 `05`, 롯데택배 `08`, 우체국택배 `01`, 로젠택배 `06` — `SweetTrackerDeliveryTracker`가 `code`로 그대로 보내는 값), `carrierName(code: string | null | undefined): string`(모르는 코드는 코드 그대로, null은 `""`).
   - `payment/config.ts`: `PG_PROVIDER: "mock" | "toss"`(`process.env.NEXT_PUBLIC_PG_PROVIDER === "toss" ? "toss" : "mock"`), `TOSS_CLIENT_KEY: string`.
   - `query-keys.ts`: `cart: ["cart"]`, `orders: { list(params), detail(id), cancelPreview(orderId, itemId), root: ["orders"] }`, `sellerOrders: { list(params), detail(id), count(status), root }`, `adminOrders: { list(params), detail(id), root }`, `checkout.quote(items)`.
@@ -225,15 +230,17 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 - [ ] **Step 1: 실패하는 테스트 — `useIdempotentSubmit.test.tsx`(기존 "같은 값이면 같은 키" 테스트를 새 규칙으로 고친다)**
   - `서버가_409로_답한_뒤_같은_값으로_다시_제출하면_새_키를_쓴다` (Review Focus 3)
   - `성공한_뒤_같은_값으로_다시_제출하면_새_키를_쓴다`
-  - `네트워크_오류_뒤_같은_값으로_다시_제출하면_같은_키를_쓴다`, `5xx_뒤_retry는_같은_키를_쓴다`
+  - `네트워크_오류_뒤_같은_값으로_다시_제출하면_같은_키를_쓴다`(`new ApiError(0, "INTERNAL_ERROR", …)`), `5xx_뒤_retry는_같은_키를_쓴다`, `ApiError가_아닌_오류_뒤에도_같은_키를_쓴다`
+  - `submit이_던지면_onError를_부르고_onSubmit은_reject하지_않는다`
+  - `idempotency.test.ts`: `isAnswered` — 409·402·422 true / status 0·500·503·`new Error()` false
   - `값을_고치면_새_키를_쓴다`, `제출_중_두_번째_호출은_무시한다`(기존 유지)
 - [ ] **Step 2: `useIdempotentAction.test.tsx`** — 위와 같은 4가지 키 규칙 + `처리_중_재호출은_무시한다` + `인자가_다르면_새_키를_쓴다`
 - [ ] **Step 3: 순수 함수 테스트**
   - `money.test.ts`: `amountUntil(50000, 42000) === 8000`, `amountUntil(50000, 50000) === 0`, `amountUntil(50000, 61000) === 0`
-  - `datetime.test.ts`: `secondsUntilKst("2026-11-12T10:15:00", Date.parse("2026-11-12T10:00:00+09:00")) === 900`, 지난 시각 → 0, `formatCountdown(754) === "12:34"`, `formatCountdown(0) === "00:00"`
+  - `datetime.test.ts`: `secondsUntilKst("2026-11-12T10:15:00", Date.parse("2026-11-12T10:00:00+09:00")) === 900`, 지난 시각 → 0, `secondsUntilKst("2026-11-12T10:15:00.123456", …) === 900`, `formatCountdown(754) === "12:34"`, `formatCountdown(0) === "00:00"`
   - `carriers.test.ts`: `carrierName("04") === "CJ대한통운"`, `carrierName("99") === "99"`, `carrierName(null) === ""` (Review Focus 5)
   - `StatusChip.test.tsx`: `orderItem`/`RETURN_REFUNDING` → "반품 환불 중", 모르는 값 → 값 그대로
-- [ ] **Step 4: `pnpm test` 실패 확인 → 구현 → 통과 확인**
+- [ ] **Step 4: `pnpm test` 실패 확인 → 구현(호출자 6곳 이전 포함) → 통과 확인. 기존 F1 폼 테스트(`BrandDialog.test.tsx` 등)가 그대로 통과해야 한다**
 - [ ] **Step 5: `.env.example`에 추가**
   ```
   # 결제 방식: mock(기본) | toss. 백엔드 KAIROS_PG_PROVIDER 와 같은 값으로 맞춘다(다르면 결제 승인이 실패한다).
@@ -276,7 +283,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `판매자별로_묶고_판매자_정보가_없는_항목은_마지막_묶음이다`
   - `수량_입력은_1에서_999로_맞춘다` — `"0"→1`, `"-3"→1`, `"1000"→999`, `"abc"→1`, `"12"→12`
 - [ ] **Step 2: 실패 확인 → `selection.ts`, `api.ts`, `checkout/api.ts`의 `useQuote`, `checkout-params.ts`의 `checkoutHref` 구현 → 통과**
-- [ ] **Step 3: 화면 구현(시안 구조 그대로).** `CartPage`: 선택 상태는 `useState`, 장바구니를 다시 읽을 때마다 `pruneSelection`. 요약은 `useQuote(selectedQuoteItems, 선택 ≥ 1)`의 값만 표시(`itemsAmount`, 판매자 묶음마다 `sellerQuotes`의 배송비와 부담 주체, `buyerShippingFee`, `totalAmount`). 무료배송 문구는 `amountUntil(quote.freeShippingThreshold, quote.itemsAmount)`. 견적이 409 `SKU_NOT_ORDERABLE`이면 장바구니 쿼리를 무효화한다. 수량 변경은 300ms 모아 `PATCH`, 응답 뒤 장바구니·견적 무효화. 삭제는 확인 없이. 선택 0이면 "주문하기" 비활성. 빈 장바구니는 `EmptyState`("장바구니가 비어 있습니다" → `/products`). 페이지는 `RequireAuth`.
+- [ ] **Step 3: 화면 구현(시안 구조 그대로).** `CartPage`: 선택 상태는 `useState`, 장바구니를 다시 읽을 때마다 `pruneSelection`. 요약은 `useQuote(selectedQuoteItems, 선택 ≥ 1)`의 값만 표시(`itemsAmount`, 판매자 묶음마다 `sellerQuotes`의 배송비와 부담 주체, `buyerShippingFee`, `totalAmount`). 무료배송 문구는 `amountUntil(quote.freeShippingThreshold, quote.itemsAmount)`. 견적이 409 `SKU_NOT_ORDERABLE`이면 장바구니 쿼리를 무효화한다. 수량 변경은 300ms 모아 `PATCH`, 응답 뒤 장바구니·견적 무효화. 삭제는 확인 없이. "선택 삭제"(선택 항목을 차례로 DELETE, 구매 불가 항목은 행의 삭제 버튼으로). 선택 0이면 "주문하기" 비활성. 빈 장바구니는 `EmptyState`("장바구니가 비어 있습니다" → `/products`). 페이지는 `RequireAuth`.
 - [ ] **Step 4: 상품 상세.** "구매 기능은 곧 열립니다" 문구를 지우고 `AddToCartButtons`(장바구니 / 바로 구매)를 넣는다. 옵션 미선택·품절 조합이면 둘 다 `disabled`. 장바구니: 비로그인이면 `/login?next=<현재 경로>`, 로그인이면 `useAddCartItem` → 성공 토스트 "장바구니에 담았습니다"(액션 "장바구니 보기" → `/cart`) + `queryKeys.cart` 무효화. 바로 구매: `checkoutHref.direct(sku.skuId, qty)`로 이동(비로그인이면 그 주소를 `next`로).
 - [ ] **Step 5: 헤더.** 로그인 상태에서 "장바구니"(`/cart`, `useCartCount`가 1 이상이면 숫자 배지, `aria-label="장바구니 n개"`)와 "마이"(`/my/orders`) 링크를 "판매자 센터" 앞에 추가한다.
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 장바구니 화면과 상품 상세 구매 버튼, 헤더 장바구니·마이 추가`
@@ -336,20 +343,20 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `confirm-key-store.ts`: `confirmKeyFor(paymentKey: string): string` — `sessionStorage["kairos:confirm:"+paymentKey]`에 있으면 그 값, 없으면 새 UUID를 저장하고 반환. storage 사용 불가면 모듈 메모리 Map으로 대체.
   - `confirm-state.ts`: `parseConfirmParams(sp): { orderNo: string; paymentKey: string; amount: number; orderId: number | null } | null`(`oid`가 없으면 `recallOrderId(orderNo)`), `type ConfirmView = { kind: "approved"; orderId: number } | { kind: "pending" } | { kind: "rejected" } | { kind: "error"; message: string }`, `toConfirmView(result: { ok: true; data: ConfirmPaymentResponse } | { ok: false; error: unknown }): ConfirmView`
     - `APPROVED` → approved / `UNKNOWN` → pending
-    - `ApiError` 409 `PAYMENT_IN_PROGRESS`·`IDEMPOTENCY_IN_PROGRESS` → pending / 5xx·`ApiError`가 아닌 오류 → pending
+    - `ApiError` 409 `PAYMENT_IN_PROGRESS`·`IDEMPOTENCY_IN_PROGRESS` → pending / `ApiError`의 `status === 0`(네트워크 오류)·`>= 500`·`ApiError`가 아닌 오류 → pending (`!isAnswered(e)`)
     - 402 `PAYMENT_REJECTED` → rejected / 그 외 `ApiError` → error(서버 메시지)
   - `toss.ts`: `requestTossPayment(args: { orderNo: string; orderName: string; amount: number; orderId: number }): Promise<void>` — SDK를 동적 import
-  - `MockOutcomePicker`: `({ value, onChange }: { value: MockOutcome; onChange(v: MockOutcome): void; }) => JSX`와 `DEMO_FAILURE_PREFIXES`
+  - `MockOutcomePicker`(default export): `({ value, onChange }: { value: MockOutcome; onChange(v: MockOutcome, prefixes: Record<Exclude<MockOutcome, "approve">, string>): void }) => JSX`. 접두사 상수는 이 파일 안에만 있다.
 
 - [ ] **Step 1: 실패하는 테스트**
   - `payment-key.test.ts`: `정상_결제_키는_mock_접두사다`, `결과별_접두사를_붙인다`(prefixes 전달 시 `fail-…`), `접두사가_없으면_실패_결과도_정상_키를_만든다`(운영 번들 안전)
   - `confirm-key-store.test.ts`: `같은_paymentKey는_항상_같은_키를_준다`(다시 호출·모듈 재로딩 흉내), `다른_paymentKey는_다른_키를_준다`, `sessionStorage가_막혀도_동작한다`
   - `confirm-state.test.ts`: 위 매핑 전부(각 1 테스트) + `쿼리가_빠지거나_amount가_숫자가_아니면_null이다` + `oid가_없으면_저장해_둔_주문_ID를_쓴다` (Review Focus 2)
   - `polling.test.ts`: `결제_확인_중이면_다시_조회한다`, `취소_확인_중_항목이_있으면_다시_조회한다`, `둘_다_아니면_멈춘다`
-  - `ConfirmPage.test.tsx`(Testing Library, `api` 모킹): `승인_요청은_마운트당_한_번만_나간다`(StrictMode로 렌더), `다시_마운트해도_같은_Idempotency_Key를_보낸다`, `네트워크_오류면_확인_중을_보여주고_완료나_실패_문구가_없다` (Review Focus 1, 2)
+  - `ConfirmPage.test.tsx`(Testing Library, `api` 모킹): 세 테스트 모두 `<StrictMode>`로 렌더한다(ref 가드와 effect cleanup의 취소 플래그를 함께 쓰면 StrictMode에서 결과가 버려져 로딩에 멈춘다 — 응답은 버리지 않는다). `승인_요청은_마운트당_한_번만_나간다`, `다시_마운트해도_같은_Idempotency_Key를_보낸다`, `네트워크_오류면_확인_중을_보여주고_완료나_실패_문구가_없다` (Review Focus 1, 2)
 - [ ] **Step 2: 실패 확인 → 순수 모듈 구현 → 통과**
 - [ ] **Step 3: 결제 페이지 `PayPage`(`/my/orders/[orderId]/pay`).** `useOrder`로 읽고: `PENDING_PAYMENT`가 아니거나 `secondsUntilKst(expiresAt) === 0`이거나 결제가 `IN_PROGRESS`/`UNKNOWN`이면 `/my/orders/{id}`로 `replace`. 주문 요약(주문번호, "첫 상품명 외 n건", 결제 금액)과 남은 시간, "결제하기" 버튼. `?auto=1`이면 처음 한 번 자동으로 결제창을 연다. 결제창을 열기 직전 `rememberOrderRef(orderNo, orderId)`.
-  - `PG_PROVIDER === "mock"`: `MockPaymentDialog`. "결제" → `mockPaymentKey(outcome, crypto.randomUUID(), prefixes)` → `router.push(mockSuccessHref(...))`. "닫기"는 다이얼로그만 닫는다. `process.env.NEXT_PUBLIC_DEMO_MODE === "true"`일 때만 `MockOutcomePicker`를 렌더하고 `DEMO_FAILURE_PREFIXES`를 넘긴다.
+  - `PG_PROVIDER === "mock"`: `MockPaymentDialog`. "결제" → `mockPaymentKey(outcome, crypto.randomUUID(), prefixes)` → `router.push(mockSuccessHref(...))`. "닫기"는 다이얼로그만 닫는다. `MockOutcomePicker`는 F1 `app/layout.tsx`의 DemoBar와 같은 방식 — `process.env.NEXT_PUBLIC_DEMO_MODE === "true"` 리터럴 가드 안의 `dynamic(() => import("@/features/demo/MockOutcomePicker"))` — 으로만 불러온다(정적 import 금지). 접두사는 picker가 `onChange(outcome, prefixes)` 콜백으로 넘기고, 결제 페이지는 `features/demo`의 상수를 import하지 않는다.
   - `PG_PROVIDER === "toss"`: `requestTossPayment`. `TOSS_CLIENT_KEY`가 비었으면 "토스 클라이언트 키가 설정되지 않았습니다" 오류 상태.
 - [ ] **Step 4: 토스 연동 `toss.ts`.** `@tosspayments/tosspayments-sdk`를 추가하고(**현재 공식 문서로 패키지명·호출 형태를 확인**: 결제창 방식, `orderId=orderNo`, `amount`, `orderName`, `successUrl: origin + successUrl(orderId)`, `failUrl: origin + failUrl(orderId)`, 카드 결제) 구현한다. 토스가 `successUrl`의 기존 쿼리(`oid`)를 보존하는지 문서로 확인해 결과를 코드 주석에 적는다(보존하지 않아도 `recallOrderId`가 받친다).
 - [ ] **Step 5: 승인 페이지 `ConfirmPage`(`/checkout/success`).** 인증 부트스트랩(`useAuth().status !== "loading"`)이 끝난 뒤 `parseConfirmParams` → null이면 오류 안내 + "주문 내역". `POST /payments/confirm`(`{ orderNo, paymentKey, amount }`, 헤더 `Idempotency-Key: confirmKeyFor(paymentKey)`)을 `useRef` 가드로 마운트당 한 번 호출 → `toConfirmView`.
@@ -358,7 +365,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - rejected: "결제가 거절되어 주문이 취소되었습니다. 담아 둔 상품은 장바구니에 그대로 있습니다" + "장바구니로"
   - error: 서버 메시지 + 주문 상세(없으면 주문 내역) 링크
 - [ ] **Step 6: `FailPage`(`/checkout/fail`, 토스 전용)** — 쿼리 `message`(없으면 "결제가 완료되지 않았습니다")와 "다시 결제"(→ `/my/orders/{oid}/pay`)·"주문 상세". **`CompletePage`** — `useOrder`; 주문이 `PAID`·`COMPLETED`가 아니면 주문 상세로 `replace`. 주문번호, 결제 금액, 배송지 요약, "주문 상세 보기"·"쇼핑 계속하기".
-- [ ] **Step 7: `check-bundle.sh` 확장.** 운영 빌드 검사에 패턴 추가: 실패 접두사 상수와 선택지 문구가 없어야 한다 — `MOCK_FAIL_PATTERN='MockOutcomePicker|"fail-"|"unknown-"|"lost-"|카드사 거절'`(실제 번들 표기에 맞게 조정하되 **운영 빌드에서 0건, 데모 빌드에서 1건 이상**을 둘 다 확인). 두 빌드 모두 `TOSS_SECRET` 문자열 0건.
+- [ ] **Step 7: `check-bundle.sh` 확장.** 운영 빌드 검사에 패턴 추가: 실패 접두사 상수와 선택지 문구가 없어야 한다 — `MOCK_FAIL_PATTERN='"(fail|unknown|lost)-"'` — 문자열 리터럴만 기준으로 삼는다(식별자는 압축 때 이름이 바뀌고 한글은 이스케이프될 수 있다). **운영 빌드에서 0건, 데모 빌드에서 1건 이상**을 둘 다 확인하고, 따옴표 표기가 번들과 다르면 패턴을 맞춘다. 두 빌드 모두 `TOSS_SECRET` 문자열 0건.
 - [ ] **Step 8: `pnpm lint && pnpm typecheck && pnpm test && pnpm check:bundle` → Commit** `feat(frontend): 결제 페이지, 모의·토스 결제창, 결제 승인 처리와 주문 완료 화면 추가`(본문에 토스 SDK 추가 이유)
 
 ---
@@ -398,7 +405,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 
 **Files:**
 - Create: `features/seller/orders/**`, `app/seller/orders/page.tsx`, `app/seller/orders/[sellerOrderId]/page.tsx`
-- Modify: 판매자 사이드바(`app/seller/layout.tsx` 또는 `SideNav` 설정), `features/seller/dashboard/components/StatusCards.tsx`(또는 `QuickActions.tsx`), `features/seller/gate/useSellerCapabilities.ts`
+- Modify: 판매자 사이드바(`features/seller/gate/SellerGate.tsx`의 `FULL_NAV`·`titleOf`), `features/seller/dashboard/components/StatusCards.tsx`(또는 `QuickActions.tsx`), `features/seller/gate/useSellerCapabilities.ts`
 
 **Interfaces:**
 - Consumes: `OrderItemRow`·`ShippingAddressCard`(Task 10), `CARRIERS`·`StatusChip`(Task 6), `useIdempotentSubmit`
@@ -406,13 +413,14 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `api.ts`: `useSellerOrders(params: { status?: SellerOrderStatus; page: number })`, `useSellerOrder(id)`, `useSellerOrderCount(status)`(`size=1`의 `totalElements`), `useShip(id)`: `({ carrierCode, trackingNumber }) => Promise<void>`, `useDeliver(id)`, `useSellerCancelItem(id)`: `(itemId, reason, key) => Promise<CancelItemResponse>`
   - `tabs.ts`: `SELLER_ORDER_TABS = [전체(undefined), 발송 대기(PAID), 배송 중(SHIPPING), 배송 완료(DELIVERED), 구매 확정(CONFIRMED), 취소(CANCELED)]`, `parseSellerOrderParams(sp): { status?: SellerOrderStatus; page: number }`(모르는 status는 전체, 음수·비숫자 page는 0)
   - `shipSchema`(zod): `carrierCode` ∈ `CARRIERS` 코드, `trackingNumber` trim 후 1~50
+  - `actions.ts`: `canShip(so): boolean`(`PAID` && `CANCEL_REQUESTED` 항목 없음 && `ORDERED` 항목 1개 이상), `canDeliver(so): boolean`(`SHIPPING`), `canSellerCancelItem(so, item): boolean`(판매자 주문 `PAID` && 항목 `ORDERED`)
   - `useSellerCapabilities`에 `canProcessOrders: boolean`(APPROVED만 true) 추가
 
-- [ ] **Step 1: 실패하는 테스트** — `tabs.test.ts`(`모르는_상태는_전체로_읽는다`, `page가_숫자가_아니면_0이다`), `shipSchema`(`송장번호_앞뒤_공백을_없앤다`, `빈_송장번호와_51자는_거절한다`, `목록에_없는_택배사는_거절한다`)
+- [ ] **Step 1: 실패하는 테스트** — `actions.test.ts`(`발송은_결제_완료이고_취소_확인_중_항목이_없을_때만`, `모든_항목이_취소된_판매자_주문은_발송할_수_없다`, `배송_완료는_배송_중일_때만`, `항목_취소는_배송_전_주문_완료_항목만`), `tabs.test.ts`(`모르는_상태는_전체로_읽는다`, `page가_숫자가_아니면_0이다`), `shipSchema`(`송장번호_앞뒤_공백을_없앤다`, `빈_송장번호와_51자는_거절한다`, `목록에_없는_택배사는_거절한다`)
 - [ ] **Step 2: 실패 확인 → 구현 → 통과**
 - [ ] **Step 3: 목록 화면.** 탭·페이지는 URL. 표: 이미지, 주문번호(상세 링크), 상품("이름 외 n건"), `<Money itemsAmount>`, `StatusChip sellerOrder`, 주문 일시. 탭별 빈 상태 문구 구분.
 - [ ] **Step 4: 상세 화면.** 배송지, 항목(상태 칩, 금액), 배송비·부담 주체, 진행 시각. `PAID`: "발송 처리"(`ShipDialog` → `PATCH …/ship`, 409는 서버 메시지 토스트). `SHIPPING`: "배송 완료"(`ConfirmDialog` → `PATCH …/deliver`). 판매자 주문 `PAID` && 항목 `ORDERED`: "취소"(`SellerCancelDialog`: "배송비 차감 없이 환불됩니다" + 사유 → `POST …/cancel` with key → 결과 토스트에 환불액). `canProcessOrders`가 false면 세 버튼을 비활성 + 툴팁 "정지 중", 서버 409 `SELLER_NOT_ACTIVE`는 기존 배너 규칙. 성공 시 상세·목록·건수 무효화.
-- [ ] **Step 5: 사이드바에 "주문 관리"(`/seller/orders`, `useSellerOrderCount("PAID")` 배지 — F1 검수 배지와 같은 표시), 대시보드에 "발송 대기 n건" 카드(→ `/seller/orders?status=PAID`)를 추가한다.**
+- [ ] **Step 5: 사이드바에 "주문 관리"(`/seller/orders`, `useSellerOrderCount("PAID")` 배지)를 추가한다 — `SellerGate.tsx`의 상수 `FULL_NAV`를 관리자 `app/admin/layout.tsx`의 `nav(reviewBadge)`처럼 배지를 받는 함수로 바꾸고, 전체 메뉴가 보이는 상태(`full`)일 때만 건수를 조회한다. `titleOf`에 `/seller/orders` → "주문 관리"를 더한다. 그리고 대시보드에 "발송 대기 n건" 카드(→ `/seller/orders?status=PAID`)를 추가한다.**
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 판매자 주문 관리(발송, 배송 완료, 항목 취소) 추가`
 
 ---
@@ -448,13 +456,13 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 
 **Interfaces:**
 - Produces (fixtures):
-  - `createSellerWithProduct(request, admin, opts: { sellerName: string; productName: string; price: number; stock: number }): Promise<{ sellerToken: string; sellerEmail: string; productId: number; skuId: number }>` — 회원 생성 → 입점·승인 → 브랜드 승인 → 상품 등록·승인 → SKU 재고 설정(기존 헬퍼 조합, 옵션 없는 상품)
-  - `changeSalePrice(request, sellerToken, productId, salePrice)`
+  - `createSellerWithProduct(request, admin, opts: { sellerName: string; productName: string; price: number; stock: number }): Promise<{ sellerToken: string; sellerEmail: string; productId: number; skuId: number }>` — 회원 생성 → 입점·승인 → 브랜드 승인 → 상품 등록·승인 → SKU 재고 설정(옵션 없는 상품). 기존 헬퍼를 넓혀야 한다: `registerProduct`에 `originalPrice`·`salePrice`·`options`(기본값은 지금 값, `[]` 허용) 인자를 추가하고, `api.patch`를 추가하고, `skuId`는 `GET /seller/products/{id}`의 `skus[0].skuId`, 재고는 `PATCH /seller/products/{id}/skus/{skuId}`에 `{ extraPrice: 0, stock, onSale: true }`(세 필드 모두). 정가는 판매가보다 넉넉히 크게(가격 변경 테스트용)
+  - `changeSalePrice(request, sellerToken, productId, salePrice)` — `PATCH /seller/products/{id}/price`(즉시 반영, 판매가 ≤ 정가)
   - `fillShippingAddress(page)` — 수령인 "홍길동", 연락처 "010-1234-5678", 우편번호 "06236", 주소 "서울 강남구 테헤란로 1", 상세 "101호"(직접 입력)
   - `payWithMock(page)` — 모의 결제창에서 "결제" 클릭 후 주문 완료 화면 대기
 
-- [ ] **Step 1: 픽스처 작성 후 `c2-purchase.spec.ts`** — 판매자 B(20,000원 상품), C(20,000원 상품) 준비. 구매자 UI 로그인 → 각 상세에서 "장바구니" → `/cart`에 판매자 묶음 2개, 배송비 3,000원 2건, 결제 예정 46,000원, "10,000원 더 담으면 무료배송" → 주문하기 → 배송지 입력 → **"결제하기"를 연달아 두 번 클릭** → 모의 결제 → 주문 완료 → `GET /orders`(API)로 구매자 주문이 정확히 1건 → 주문 내역 카드 "배송 준비 중" → 상세. 판매자 B로 UI 로그인 → 주문 관리 "발송 대기" 탭 → 발송 처리(CJ대한통운, 송장 "1234567890") → 배송 완료. 구매자 상세에서 B 카드 "배송 완료"·택배사명 표시 → "구매 확정" → 칩 "구매 확정". 헤더 장바구니 배지가 결제 후 사라짐.
-  - 같은 spec의 두 번째 테스트 `가격이_바뀌면_안내하고_다시_결제할_수_있다`: 주문서를 연 뒤 API로 판매가 변경 → 결제하기 → "금액이 변경되었습니다" + 새 금액 → 다시 결제하기 → 결제 페이지 진입(422 없음) (Review Focus 3)
+- [ ] **Step 1: 픽스처 작성 후 `c2-purchase.spec.ts`** — 판매자 B(20,000원 상품), C(20,000원 상품) 준비. 구매자 UI 로그인 → 각 상세에서 "장바구니" → `/cart`에 판매자 묶음 2개, 배송비 3,000원 2건, 결제 예정 46,000원, "10,000원 더 담으면 무료배송" → 주문하기 → 배송지 입력 → **"결제하기"를 `dblclick()`으로 두 번 누른다**(첫 클릭 뒤 버튼이 잠기므로 `click()` 두 번은 타임아웃 난다) → 모의 결제 → 주문 완료 → `GET /orders`(API)로 구매자 주문이 정확히 1건 → 주문 내역 카드 "배송 준비 중" → 상세. 판매자 B로 UI 로그인 → 주문 관리 "발송 대기" 탭 → 발송 처리(CJ대한통운, 송장 "1234567890") → 배송 완료. 구매자 상세에서 B 카드 "배송 완료"·택배사명 표시 → "구매 확정" → 칩 "구매 확정". 헤더 장바구니 배지가 결제 후 사라짐.
+  - 같은 spec의 두 번째 테스트 `가격이_바뀌면_안내하고_다시_결제할_수_있다`: 주문서를 연 뒤 API로 판매가를 **내림**(20,000 → 19,000) → 결제하기 → "금액이 변경되었습니다" + 새 금액 → 다시 결제하기 → 결제 페이지 진입(422 없음) (Review Focus 3)
 - [ ] **Step 2: `c2-cancel.spec.ts`** — B 30,000 + C 30,000 주문·결제(무료배송). 구매자 상세에서 C 항목 "취소" → 창에 "배송비 차감" 3,000원, "환불 예정 금액" 27,000원 → 사유 입력 → 취소하기 → 항목 칩 "취소", 결제 요약 환불 금액 27,000원. B 항목 취소 → 창에 환불 예정 33,000원 → 취소 → 주문 상태 "취소", 환불 금액 60,000원. 두 번째 테스트: 판매자 화면에서 배송 전 항목 취소 → "배송비 차감 없이 환불됩니다" → 구매자 상세에 전액 환불(차감 줄 없음).
 - [ ] **Step 3: `c2-payment-failure.spec.ts`**
   - `결제창을_닫으면_결제_대기로_남고_다시_결제할_수_있다`: 결제 페이지에서 "닫기" → `/my/orders/{id}` 헤더 "결제 대기" + 남은 시간 → "결제하기" → 모의 결제 → 완료
