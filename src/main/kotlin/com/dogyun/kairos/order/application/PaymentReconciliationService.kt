@@ -3,10 +3,12 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /**
  * PG 를 다시 조회해 결제 승인·환불의 불확실한 상태를 확정하는 정리 작업. PG 호출은 트랜잭션 밖이고, 상태 변경은
@@ -31,7 +33,7 @@ class PaymentReconciliationService(
             try {
                 reconcileApproval(payment)
             } catch (e: RuntimeException) {
-                log.error("결제 승인 대사에 실패했다: orderId={}", payment.orderId, e)
+                log.error(e) { "결제 승인 대사에 실패했다: orderId=${payment.orderId}" }
                 false
             }
         }
@@ -65,7 +67,7 @@ class PaymentReconciliationService(
             try {
                 revoid(candidate)
             } catch (e: RuntimeException) {
-                log.error("닫힌 주문 재취소에 실패했다: orderId={}", candidate.orderId, e)
+                log.error(e) { "닫힌 주문 재취소에 실패했다: orderId=${candidate.orderId}" }
                 false
             }
         }
@@ -111,7 +113,7 @@ class PaymentReconciliationService(
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
-                log.error("환불 대사에 실패했다: orderId={}, itemId={}", orderId, itemId, e)
+                log.error(e) { "환불 대사에 실패했다: orderId=$orderId, itemId=$itemId" }
                 false
             }
         }
@@ -137,7 +139,7 @@ class PaymentReconciliationService(
         if (paymentKey == null) {
             // 현재 도달 불가: paymentKey 없는 주문(PG 미사용)은 현금 환불이 0원이라 여기까지 오지 않는다.
             // 무PG 결제수단을 추가하면 이 항목은 영원히 건너뛰어지므로 관리자 종결 경로가 필요하다. 그때까지 매 주기 WARN 으로 드러낸다.
-            log.warn("PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId={}, itemId={}, refundAmount={}", orderId, itemId, refundAmount)
+            log.warn { "PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId=$orderId, itemId=$itemId, refundAmount=$refundAmount" }
             return null
         }
         val found = paymentGateway.findFromPg(paymentKey)
@@ -148,7 +150,6 @@ class PaymentReconciliationService(
     }
 
     private companion object {
-        val log = LoggerFactory.getLogger(PaymentReconciliationService::class.java)
         const val RECONCILED = "RECONCILED"
         val NO_REFUND: PgOutcome = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.CANCELED, 0, 0, emptyList()))
     }

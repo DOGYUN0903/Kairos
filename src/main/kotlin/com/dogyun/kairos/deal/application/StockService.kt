@@ -4,9 +4,11 @@ import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.deal.domain.DealId
 import com.dogyun.kairos.deal.domain.StockRepository
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+
+private val log = KotlinLogging.logger {}
 
 /**
  * Phase 1: 락 없이 읽기 -> 도메인 검사 -> 저장. 동시 요청 시 초과 판매(lost update)가 가능하며
@@ -28,12 +30,8 @@ class StockService(private val stockRepository: StockRepository) {
         stock.restore(quantity)
         stockRepository.save(stock)
         if (stock.remaining > stock.total) {
-            log.warn("oversell detected: dealId={}, remaining={}, total={}", dealId, stock.remaining, stock.total)
+            log.warn { "oversell detected: dealId=$dealId, remaining=${stock.remaining}, total=${stock.total}" }
         }
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(StockService::class.java)
     }
 
     private fun find(dealId: Long) =

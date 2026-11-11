@@ -1,10 +1,12 @@
 package com.dogyun.kairos.benefit.infrastructure
 
 import com.dogyun.kairos.benefit.application.PointExpiryService
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+
+private val log = KotlinLogging.logger {}
 
 /** 혜택 정리 작업 스케줄. 트랜잭션을 열지 않는다(서비스가 건별 트랜잭션을 연다). 예외는 로그만 남기고 삼킨다. */
 @Component
@@ -15,13 +17,9 @@ class BenefitScheduledJobs(private val pointExpiryService: PointExpiryService) {
     fun expirePoints() {
         try {
             val count = pointExpiryService.expireLots()
-            if (count > 0) log.info("포인트 만료 작업: {}건 처리", count)
+            if (count > 0) log.info { "포인트 만료 작업: ${count}건 처리" }
         } catch (e: RuntimeException) {
-            log.error("포인트 만료 작업이 실패했다", e)
+            log.error(e) { "포인트 만료 작업이 실패했다" }
         }
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(BenefitScheduledJobs::class.java)
     }
 }

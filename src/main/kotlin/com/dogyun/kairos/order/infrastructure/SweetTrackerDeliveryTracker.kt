@@ -2,9 +2,11 @@ package com.dogyun.kairos.order.infrastructure
 
 import com.dogyun.kairos.order.application.DeliveryTracker
 import com.dogyun.kairos.order.application.TrackingResult
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
+
+private val log = KotlinLogging.logger {}
 
 /**
  * 스마트택배(SweetTracker) 배송 조회. 비2xx·예외·타임아웃은 모두 [TrackingResult.UNAVAILABLE] 이다(예외를 던지지 않는다).
@@ -30,12 +32,11 @@ class SweetTrackerDeliveryTracker(
             TrackingResult.IN_TRANSIT
         }
     } catch (e: Exception) {
-        log.warn("배송 조회 실패: carrier={} cause={}", carrierCode, e.javaClass.simpleName)
+        log.warn { "배송 조회 실패: carrier=$carrierCode cause=${e.javaClass.simpleName}" }
         TrackingResult.UNAVAILABLE
     }
 
     private companion object {
         const val DELIVERED_LEVEL = 6
-        val log = LoggerFactory.getLogger(SweetTrackerDeliveryTracker::class.java)
     }
 }

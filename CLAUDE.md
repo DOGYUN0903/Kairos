@@ -80,6 +80,7 @@ com.dogyun.kairos.{module}/
 - Lombok 사용 안 함. 값 객체는 Kotlin `value class`/`data class`로 만든다.
 - 애플리케이션 서비스 테스트는 Mock 라이브러리 대신 인메모리 Fake를 쓴다.
 - 테스트 이름은 한국어 백틱 또는 언더스코어 문장으로 쓴다(예: `제한_초과_주문은_거절된다`).
+- 로깅은 kotlin-logging(`private val log = KotlinLogging.logger {}`, 람다 메시지)을 쓴다.
 
 ## 커밋과 git
 - 커밋 메시지는 한국어 Conventional Commits(`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
