@@ -12,7 +12,7 @@ import { ProductDetailCard } from "@/features/admin/review/components/ProductDet
 import { QueueTable } from "@/features/admin/review/components/QueueTable";
 import { QueueTabs } from "@/features/admin/review/components/QueueTabs";
 import { SellerDetailCard } from "@/features/admin/review/components/SellerDetailCard";
-import { parseReviewParams, TAB_LABEL, toReviewSearch, type ReviewParams, type ReviewSort } from "@/features/admin/review/review-params";
+import { parseReviewParams, TAB_LABEL, toReviewSearch, type ReviewParams, type ReviewSort, type ReviewTab } from "@/features/admin/review/review-params";
 import { nextSelection, type QueueRow } from "@/features/admin/review/rows";
 
 /** URL(?tab=&id=&page=&sort=)이 상태의 진실이다. */
@@ -74,37 +74,30 @@ export function ReviewPage() {
         </section>
 
         <div className="min-[1100px]:sticky min-[1100px]:top-4">
-          <Detail row={selected} id={id} loaded={!queue.isPending && !queue.isError} onDone={onDone} onClear={() => go({ id: null }, "replace")} />
+          <Detail tab={tab} id={id} hint={selected} onDone={onDone} />
         </div>
       </div>
     </div>
   );
 }
 
-function Detail({ row, id, loaded, onDone, onClear }: { row: QueueRow | undefined; id: number | null; loaded: boolean; onDone: (id: number) => void; onClear: () => void }) {
-  if (!row) {
-    if (id !== null && loaded) {
-      return (
-        <section className="card" aria-live="polite">
-          <EmptyState message="선택한 건이 이 목록에 없습니다. 이미 처리됐거나 다른 페이지에 있을 수 있습니다." action={{ label: "선택 해제", onClick: onClear }} />
-        </section>
-      );
-    }
+function Detail({ tab, id, hint, onDone }: { tab: ReviewTab; id: number | null; hint: QueueRow | undefined; onDone: (id: number) => void }) {
+  if (id === null) {
     return (
       <section className="card">
         <EmptyState message="왼쪽에서 건을 선택하세요" />
       </section>
     );
   }
-  // key: 선택이 바뀌면 다이얼로그·폼 상태를 새로 시작한다.
-  switch (row.tab) {
+  // key: 선택이 바뀌면 다이얼로그·폼 상태를 새로 시작한다. 상세는 큐 페이지와 무관하게 id 로 읽는다.
+  switch (tab) {
     case "sellers":
-      return <SellerDetailCard key={row.id} row={row} onDone={onDone} />;
+      return <SellerDetailCard key={id} id={id} onDone={onDone} />;
     case "brands":
-      return <BrandDetailCard key={row.id} row={row} onDone={onDone} />;
+      return <BrandDetailCard key={id} id={id} onDone={onDone} />;
     case "products":
-      return <ProductDetailCard key={row.id} row={row} onDone={onDone} />;
+      return <ProductDetailCard key={id} id={id} hint={hint} onDone={onDone} />;
     case "change-requests":
-      return <ChangeRequestDiff key={row.id} row={row} onDone={onDone} />;
+      return <ChangeRequestDiff key={id} id={id} hint={hint} onDone={onDone} />;
   }
 }

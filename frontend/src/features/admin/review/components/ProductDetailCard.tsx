@@ -16,23 +16,24 @@ export function useCategoryLabel(categoryId: number): string {
   return path.length > 0 ? path.map((n) => n.name).join(" > ") : `카테고리 #${categoryId}`;
 }
 
-export function ProductDetailCard({ row, onDone }: { row: Extract<QueueRow, { tab: "products" }>; onDone: (id: number) => void }) {
-  const q = useAdminProduct(row.id);
+/** id 로 직접 읽는다. `hint`(큐 행)가 있으면 판매자·등록일을 덧붙인다(없어도 동작). */
+export function ProductDetailCard({ id, hint, onDone }: { id: number; hint?: QueueRow | undefined; onDone: (id: number) => void }) {
+  const q = useAdminProduct(id);
   const p = q.data;
   const category = useCategoryLabel(p?.categoryId ?? 0);
-  const title = `${row.name} 상품 검수`;
-  const sub = `#${row.id} · ${row.raw.brandName} · ${row.sellerName ?? ""} · 등록 ${formatDateTime(row.at)}`;
+  const title = `${p?.name ?? ""} 상품 검수`.trim();
+  const sub = [`#${id}`, p?.brandName, hint?.sellerName, hint ? `등록 ${formatDateTime(hint.at)}` : null].filter(Boolean).join(" · ");
 
   if (q.isError) {
     return (
-      <DetailShell row={row} title={title} sub={sub} ready={false} onDone={onDone}>
+      <DetailShell row={null} title={title} sub={sub} onDone={onDone}>
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       </DetailShell>
     );
   }
   if (!p) {
     return (
-      <DetailShell row={row} title={title} sub={sub} ready={false} onDone={onDone}>
+      <DetailShell row={null} title={title} sub={sub} onDone={onDone}>
         <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-4 w-2/3" />
@@ -43,7 +44,7 @@ export function ProductDetailCard({ row, onDone }: { row: Extract<QueueRow, { ta
   }
   const active = p.skus.filter((s) => s.skuStatus === "ACTIVE");
   return (
-    <DetailShell row={row} title={title} sub={sub} onDone={onDone}>
+    <DetailShell row={{ tab: "products", id, name: p.name, status: p.status }} title={title} sub={sub} onDone={onDone}>
       <div className="flex flex-wrap gap-2" aria-label="상품 이미지">
         {p.images.map((img, i) => (
           // eslint-disable-next-line @next/next/no-img-element -- 백엔드 절대 URL 그대로(계획: next/image 미사용)

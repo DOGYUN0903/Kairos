@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { StatusChip } from "@/components/common/StatusChip";
 import { DecisionBar } from "@/features/admin/review/components/DecisionBar";
-import type { QueueRow } from "@/features/admin/review/rows";
+import type { Subject } from "@/features/admin/review/rows";
 
 const CHIP_KIND = { sellers: "seller", brands: "brand", products: "product", "change-requests": "changeRequest" } as const;
 
@@ -14,7 +14,8 @@ export function DetailShell({
   onDone,
   children,
 }: {
-  row: QueueRow;
+  /** 상세를 아직 못 불러왔으면 null(상태 칩·승인/반려 바 없음). */
+  row: Subject | null;
   title: string;
   sub?: ReactNode;
   ready?: boolean;
@@ -28,10 +29,10 @@ export function DetailShell({
           <h2 id="detail-h" className="text-[15px] font-bold">{title}</h2>
           {sub && <div className="mt-0.5 text-xs text-text-2">{sub}</div>}
         </div>
-        <StatusChip kind={CHIP_KIND[row.tab]} status={row.status} />
+        {row && <StatusChip kind={CHIP_KIND[row.tab]} status={row.status} />}
       </div>
       <div className="flex flex-col gap-4 px-5 py-4 text-sm">{children}</div>
-      <DecisionBar row={row} onDone={onDone} {...(ready === undefined ? {} : { ready })} />
+      {row && <DecisionBar row={row} onDone={onDone} {...(ready === undefined ? {} : { ready })} />}
     </section>
   );
 }

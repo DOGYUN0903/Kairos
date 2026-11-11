@@ -5,6 +5,19 @@ export type SellerDetail = components["schemas"]["SellerDetail"];
 export type BrandDetail = components["schemas"]["BrandDetail"];
 export type AdminProductSummary = components["schemas"]["AdminProductSummary"];
 export type ChangeRequestSummary = components["schemas"]["ChangeRequestSummary"];
+export type ChangedField = ChangeRequestSummary["changedFields"][number];
+
+export const CHANGED_FIELD_LABEL: Record<ChangedField, string> = {
+  NAME: "상품명",
+  DESCRIPTION: "설명",
+  CATEGORY: "카테고리",
+  IMAGES: "이미지",
+  OPTIONS: "옵션",
+  ORIGINAL_PRICE: "정가",
+};
+
+/** 승인·반려가 가리키는 대상. 큐 행이 없어도(딥링크) 상세에서 만들 수 있다. */
+export type Subject = { tab: ReviewTab; id: number; name: string; status: string };
 
 type Raw =
   | { tab: "sellers"; raw: SellerDetail }

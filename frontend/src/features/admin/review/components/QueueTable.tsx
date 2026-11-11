@@ -1,7 +1,7 @@
 "use client";
 
 import { StatusChip } from "@/components/common/StatusChip";
-import type { QueueRow } from "@/features/admin/review/rows";
+import { CHANGED_FIELD_LABEL, type QueueRow } from "@/features/admin/review/rows";
 import type { ReviewTab } from "@/features/admin/review/review-params";
 import { formatDateTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ export function QueueTable({ tab, rows, selectedId, onSelect }: { tab: ReviewTab
           <tr>
             <th scope="col" className={TH}>이름</th>
             {seller && <th scope="col" className={TH}>판매자</th>}
+            {tab === "change-requests" && <th scope="col" className={TH}>변경 항목</th>}
             <th scope="col" className={TH}>요청일</th>
             <th scope="col" className={TH}>상태</th>
             <th scope="col" className={TH}><span className="sr-only">열기</span></th>
@@ -39,6 +40,19 @@ export function QueueTable({ tab, rows, selectedId, onSelect }: { tab: ReviewTab
                   {r.meta && <span className="block text-xs text-text-3">{r.meta}</span>}
                 </td>
                 {seller && <td className={td}>{r.sellerName}</td>}
+                {r.tab === "change-requests" && (
+                  <td className={td}>
+                    {r.raw.changedFields.length === 0 ? (
+                      <span className="text-text-3">-</span>
+                    ) : (
+                      <span className="flex flex-wrap gap-1">
+                        {r.raw.changedFields.map((f) => (
+                          <span key={f} className="rounded-sm bg-surface-2 px-1.5 py-px text-[11px] font-medium text-text-2">{CHANGED_FIELD_LABEL[f]}</span>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                )}
                 <td className={cn(td, "whitespace-nowrap text-text-2")}>{formatDateTime(r.at)}</td>
                 <td className={td}><StatusChip kind={CHIP_KIND[r.tab]} status={r.status} /></td>
                 <td className={td}>

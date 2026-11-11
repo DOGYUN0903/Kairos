@@ -23,6 +23,8 @@ export const queryKeys = {
     queue: (kind: string, params?: Params) => ["admin", "queue", kind, params ?? {}] as const,
     queueCount: (kind: string) => ["admin", "queueCount", kind] as const,
     changeRequest: (id: number) => ["admin", "changeRequest", id] as const,
+    seller: (id: number) => ["admin", "seller", id] as const,
+    brand: (id: number) => ["admin", "brand", id] as const,
     product: (id: number) => ["admin", "product", id] as const,
     sellers: (params?: Params) => ["admin", "sellers", params ?? {}] as const,
   },

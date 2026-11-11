@@ -8,7 +8,7 @@ describe("toQueueRow", () => {
   it("변경_요청_행은_requestedAt과_sellerName을_쓴다", () => {
     const r = toQueueRow({
       tab: "change-requests",
-      raw: { changeRequestId: 301, productId: 1024, sellerId: 5, name: "오버핏 티셔츠", originalPrice: 45000, status: "PENDING", requestedAt: "2026-11-07T14:20:00", sellerName: "판매자 A 주식회사" },
+      raw: { changeRequestId: 301, productId: 1024, sellerId: 5, name: "오버핏 티셔츠", originalPrice: 45000, status: "PENDING", requestedAt: "2026-11-07T14:20:00", sellerName: "판매자 A 주식회사", changedFields: ["NAME", "OPTIONS"] },
     });
     expect(r).toMatchObject({ id: 301, productId: 1024, at: "2026-11-07T14:20:00", sellerName: "판매자 A 주식회사", meta: "#CR-301 · 상품 #1024" });
   });

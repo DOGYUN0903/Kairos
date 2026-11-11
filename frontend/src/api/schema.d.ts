@@ -256,6 +256,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/sellers/{sellerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 판매자 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관) */
+        get: operations["getAdminSeller"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/sellers/{sellerId}/approve": {
         parameters: {
             query?: never;
@@ -408,6 +425,23 @@ export interface paths {
         };
         /** 브랜드 심사 목록 (ADMIN, `sort` 기본 최신순) */
         get: operations["listAdminBrands"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/brands/{brandId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 브랜드 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관) */
+        get: operations["getAdminBrand"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2633,6 +2667,8 @@ export interface components {
             requestedAt: components["schemas"]["LocalDateTime"];
             /** @description 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)" */
             sellerName: string;
+            /** @description 현재 상품과 다른 항목(고정 순서). 이미지는 순서까지, 옵션은 ID·이름까지 비교한다. 상품을 찾을 수 없으면 빈 배열. */
+            changedFields: ("NAME" | "DESCRIPTION" | "CATEGORY" | "IMAGES" | "OPTIONS" | "ORIGINAL_PRICE")[];
             /** Format: int64 */
             changeRequestId: number;
             /** Format: int64 */
@@ -4395,6 +4431,33 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getAdminSeller: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sellerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 판매자 상세 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["SellerDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["SellerNotFound"];
+        };
+    };
     approveSeller: {
         parameters: {
             query?: never;
@@ -4781,6 +4844,33 @@ export interface operations {
             400: components["responses"]["InvalidRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getAdminBrand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brandId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 브랜드 상세 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["BrandDetail"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["BrandNotFound"];
         };
     };
     approveBrand: {

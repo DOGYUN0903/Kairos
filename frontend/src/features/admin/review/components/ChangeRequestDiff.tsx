@@ -48,15 +48,16 @@ const optionText = (options: Axis[]) =>
 
 const find = (diffs: FieldDiff[], field: FieldDiff["field"]) => diffs.find((d) => d.field === field) as FieldDiff;
 
-export function ChangeRequestDiff({ row, onDone }: { row: Extract<QueueRow, { tab: "change-requests" }>; onDone: (id: number) => void }) {
-  const cr = useAdminChangeRequest(row.id);
-  const product = useAdminProduct(row.productId);
+/** id 로 직접 읽는다. `hint`(큐 행)가 있으면 판매자명을 덧붙인다(없어도 동작). */
+export function ChangeRequestDiff({ id, hint, onDone }: { id: number; hint?: QueueRow | undefined; onDone: (id: number) => void }) {
+  const cr = useAdminChangeRequest(id);
+  const product = useAdminProduct(cr.data?.productId ?? null);
   const categoryBefore = useCategoryLabel(product.data?.categoryId ?? 0);
   const categoryAfter = useCategoryLabel(cr.data?.content.categoryId ?? 0);
-  const title = `#CR-${row.id} 변경 요청`;
+  const title = `#CR-${id} 변경 요청`;
   const sub = (
     <>
-      상품 #{row.productId} · {product.data?.brandName ?? ""} · {row.sellerName} · 요청 {formatDateTime(row.at)}
+      {[cr.data ? `상품 #${cr.data.productId}` : null, product.data?.brandName, hint?.sellerName, cr.data ? `요청 ${formatDateTime(cr.data.requestedAt)}` : null].filter(Boolean).join(" · ")}
       {product.data && (
         <>
           {" "}· 현재 상태 <StatusChip kind="product" status={product.data.status} />
@@ -68,14 +69,14 @@ export function ChangeRequestDiff({ row, onDone }: { row: Extract<QueueRow, { ta
   const error = cr.error ?? product.error;
   if (error) {
     return (
-      <DetailShell row={row} title={title} sub={sub} ready={false} onDone={onDone}>
+      <DetailShell row={null} title={title} sub={sub} onDone={onDone}>
         <ErrorState error={error} onRetry={() => { void cr.refetch(); void product.refetch(); }} />
       </DetailShell>
     );
   }
   if (!cr.data || !product.data) {
     return (
-      <DetailShell row={row} title={title} sub={sub} ready={false} onDone={onDone}>
+      <DetailShell row={null} title={title} sub={sub} onDone={onDone}>
         <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
@@ -101,7 +102,7 @@ export function ChangeRequestDiff({ row, onDone }: { row: Extract<QueueRow, { ta
   const renamedTo = new Map(impact.renamed.map((r) => [r.to, r.from]));
 
   return (
-    <DetailShell row={row} title={title} sub={sub} onDone={onDone}>
+    <DetailShell row={{ tab: "change-requests", id, name: request.content.name, status: request.status }} title={title} sub={sub} onDone={onDone}>
       <p className="text-xs text-text-2">
         검수 중에도 기존 내용으로 계속 판매됩니다. 승인하면 아래 &quot;변경 후&quot; 내용으로 교체되고, 반려하면 변경 요청만 버려집니다.
       </p>

@@ -95,6 +95,22 @@ export function useOldestRows() {
   };
 }
 
+export function useAdminSeller(id: number | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.seller(id ?? 0),
+    queryFn: async () => unwrap<SellerDetail>(await api.GET("/api/v1/admin/sellers/{sellerId}", { params: { path: { sellerId: id ?? 0 } } })),
+    enabled: id !== null,
+  });
+}
+
+export function useAdminBrand(id: number | null) {
+  return useQuery({
+    queryKey: queryKeys.admin.brand(id ?? 0),
+    queryFn: async () => unwrap<BrandDetail>(await api.GET("/api/v1/admin/brands/{brandId}", { params: { path: { brandId: id ?? 0 } } })),
+    enabled: id !== null,
+  });
+}
+
 export function useAdminProduct(id: number | null) {
   return useQuery({
     queryKey: queryKeys.admin.product(id ?? 0),
@@ -151,9 +167,10 @@ async function run(tab: ReviewTab, kind: "approve" | "reject", v: ActionVars): P
 const TRANSITION_CODES = new Set(["SELLER_INVALID_STATE_TRANSITION", "BRAND_INVALID_STATE_TRANSITION", "PRODUCT_INVALID_STATE_TRANSITION", "CHANGE_REQUEST_INVALID_STATE_TRANSITION"]);
 
 /**
- * 승인·반려 뮤테이션. 처리 중에는 두 번째 호출을 무시하고(이중 제출 방지),
- * 이미 처리된 건(409 상태 전이)은 서버 상태가 목표와 같으므로 오류가 아니라 안내로 본다.
- * 끝나면(성공·실패 모두) 큐·대기 건수·상세를 다시 읽는다. 승인/반려 API 는 상태 전이로 멱등하다.
+ * 승인·반려 뮤테이션. 처리 중에는 두 번째 호출을 무시한다(이중 제출 방지).
+ * 409 상태 전이는 이미 다른 요청(같은 관리자의 이중 클릭이나 다른 관리자)이 처리했다는 뜻이다.
+ * 서버 상태가 내가 원한 결정과 반대일 수도 있으므로 성공처럼 말하지 않고 "이미 처리된 건"으로 안내하고 다시 읽는다.
+ * 끝나면(성공·실패 모두) 큐·대기 건수·상세를 다시 읽는다.
  */
 function useReviewAction(tab: ReviewTab, kind: "approve" | "reject", onDone?: (id: number) => void) {
   const qc = useQueryClient();
@@ -179,6 +196,8 @@ function useReviewAction(tab: ReviewTab, kind: "approve" | "reject", onDone?: (i
         qc.invalidateQueries({ queryKey: ["admin", "queueCount"] }),
         qc.invalidateQueries({ queryKey: ["admin", "changeRequest"] }),
         qc.invalidateQueries({ queryKey: ["admin", "product"] }),
+        qc.invalidateQueries({ queryKey: ["admin", "seller"] }),
+        qc.invalidateQueries({ queryKey: ["admin", "brand"] }),
       ]),
   });
   const submit = async (v: ActionVars): Promise<boolean> => {
