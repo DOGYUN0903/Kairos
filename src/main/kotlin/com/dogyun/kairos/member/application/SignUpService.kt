@@ -23,4 +23,16 @@ class SignUpService(
         val member = Member.register(email, command.password, command.name, Role.USER, passwordHasher)
         return memberRepository.save(member).id!!.value
     }
+
+    /**
+     * ADMIN 회원 가입. 컨트롤러에 노출하지 않는다(demo 프로필 시더 전용).
+     * 운영 관리자 계정(KAIROS_ADMIN_*)은 AdminInitializer 가 따로 만든다.
+     */
+    @Transactional
+    fun signUpAdmin(command: SignUpCommand): Long {
+        val email = Email(command.email)
+        if (memberRepository.existsByEmail(email)) throw DomainException(ErrorCode.MEMBER_EMAIL_DUPLICATED)
+        val member = Member.register(email, command.password, command.name, Role.ADMIN, passwordHasher)
+        return memberRepository.save(member).id!!.value
+    }
 }

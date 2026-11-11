@@ -41,4 +41,8 @@ class ArchitectureTest {
     @ArchTest
     fun `다른 모듈 application 호출은 infrastructure 에서만 한다`(classes: JavaClasses) =
         rules.crossModuleApplicationOnlyFromInfrastructure().forEach { it.check(classes) }
+
+    @ArchTest
+    fun `demo 는 다른 모듈의 domain presentation infrastructure 에 의존하지 않는다`(classes: JavaClasses) =
+        rules.demoUsesOnlyApplication().check(classes)
 }

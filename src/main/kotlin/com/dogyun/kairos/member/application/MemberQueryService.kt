@@ -2,6 +2,7 @@ package com.dogyun.kairos.member.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.member.domain.Email
 import com.dogyun.kairos.member.domain.MemberId
 import com.dogyun.kairos.member.domain.MemberRepository
 import org.springframework.stereotype.Service
@@ -17,6 +18,11 @@ class MemberQueryService(private val memberRepository: MemberRepository) {
         val member = memberRepository.findById(MemberId(memberId)) ?: throw DomainException(ErrorCode.AUTH_INVALID_TOKEN)
         return MemberMeResult(memberId, member.email.value, member.name, member.role)
     }
+
+    /** 이메일로 회원 ID 를 찾는다. 없거나 형식이 틀리면 null. */
+    @Transactional(readOnly = true)
+    fun findIdByEmail(email: String): Long? =
+        runCatching { Email(email) }.getOrNull()?.let { memberRepository.findByEmail(it) }?.id?.value
 
     /** memberId → 이름. 없는 회원은 빠진다. */
     @Transactional(readOnly = true)

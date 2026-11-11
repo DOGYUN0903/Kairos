@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.7.0
+  version: 0.8.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
@@ -56,6 +56,8 @@ tags:
   - name: Admin Return
   - name: Seller Settlement
   - name: Admin Settlement
+  - name: Demo
+    description: demo 프로필에서만 존재한다. 운영에는 없다
 security:
   - bearerAuth: []
 paths:
@@ -226,6 +228,30 @@ paths:
                         $ref: '#/components/schemas/MeResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/demo/reseed:
+    post:
+      tags: [Demo]
+      operationId: reseedDemo
+      summary: 데모 데이터 보충 (ADMIN, demo 프로필)
+      description: |
+        demo 프로필에서만 존재한다. 부족한 데모 데이터만 새로 만든다(멱등, 삭제하지 않음).
+        판매 중 데모 상품이 20개 미만이면 부족분만 등록·승인하고, 검수 대기 데모 상품이 없으면 3개를 만든다.
+      responses:
+        '200':
+          description: 이번 호출로 새로 만든 건수
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DemoReseedResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/admin/deals:
     post:
       tags: [Admin Deal]
@@ -4496,6 +4522,31 @@ components:
             message: 같은 요청이 처리 중입니다.
             timestamp: '2026-11-08T12:00:00'
   schemas:
+    DemoReseedResult:
+      type: object
+      description: 이번 호출로 새로 만든 수(이미 있던 것은 세지 않는다)
+      required: [members, sellers, brands, categories, products, pendingReviews]
+      properties:
+        members:
+          type: integer
+          format: int32
+        sellers:
+          type: integer
+          format: int32
+        brands:
+          type: integer
+          format: int32
+        categories:
+          type: integer
+          format: int32
+        products:
+          type: integer
+          format: int32
+          description: 새로 등록·승인해 판매 중으로 만든 상품 수
+        pendingReviews:
+          type: integer
+          format: int32
+          description: 새로 만든 검수 대기 상품 수
     CreateSettlementAdjustmentRequest:
       type: object
       required: [amount, reason]
