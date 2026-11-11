@@ -1,0 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 221 47% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 221 47% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 47% 20%;
+    --primary: 221 47% 20%; /* navy */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 26% 96%; /* surface */
+    --secondary-foreground: 221 47% 20%;
+    --muted: 216 26% 96%;
+    --muted-foreground: 219 13% 41%; /* text-2 */
+    --accent: 220 21% 95%; /* surface-2 */
+    --accent-foreground: 221 47% 20%;
+    --destructive: 4 76% 40%; /* danger */
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 19% 91%;
+    --input: 220 19% 91%;
+    --ring: 221 47% 20%;
+    --radius: 4px;
+  }
+
+  body {
+    min-width: 1280px;
+    font-size: 14px;
+    color: #1b2a4a;
+    background: #ffffff;
+    font-family: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+  }
+
+  :focus-visible {
+    outline: 2px solid #1b2a4a;
+    outline-offset: 2px;
+  }
+}
