@@ -1027,7 +1027,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999) */
+        /**
+         * 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999)
+         * @description 수량을 더하는 요청이라 `Idempotency-Key` 필수다. 같은 키로 다시 보내면 저장된 응답을 돌려주고 수량은 한 번만 더해진다. 정지된 판매자의 상품도 담을 수 있다(장바구니 조회에서 `PAUSED` 로 보인다).
+         */
         post: operations["addCartItem"];
         delete?: never;
         options?: never;
@@ -3022,6 +3025,13 @@ export interface components {
             skuId: number;
             /** Format: int64 */
             productId: number;
+            /**
+             * Format: int64
+             * @description 판매자 ID. SKU 가 사라진(DISCONTINUED) 항목만 null. 정지된 판매자여도 채운다.
+             */
+            sellerId: number | null;
+            /** @description 판매자 회사명. SKU 가 사라진 항목만 null. */
+            sellerName: string | null;
             productName: string;
             brandName: string;
             thumbnailUrl: string;
@@ -3035,7 +3045,10 @@ export interface components {
             quantity: number;
             /** Format: int64 */
             lineAmount: number;
-            /** @enum {string} */
+            /**
+             * @description 판매자가 주문 가능한 상태(활성)가 아니면 AVAILABLE 대신 PAUSED 로 내려준다(견적·주문과 같은 기준).
+             * @enum {string}
+             */
             availability: "AVAILABLE" | "SOLD_OUT" | "PAUSED" | "DISCONTINUED" | "ENDED";
         };
         CartResult: {
@@ -6226,7 +6239,10 @@ export interface operations {
     addCartItem: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 같은 요청의 재시도를 식별하는 키(1~100자). 같은 회원·같은 키·같은 본문이면 저장된 응답을 다시 돌려준다. 저장되는 응답에는 409 같은 오류도 포함되므로, 같은 키로 재시도하면 그 409 가 그대로 재생된다. 상태가 바뀐 뒤(재고 보충 등) 다시 시도하려면 새 키를 쓴다. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -6247,7 +6263,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description `CART_INVALID`(합산 수량 범위 초과) 또는 `INVALID_REQUEST` */
+            /** @description `CART_INVALID`(합산 수량 범위 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST` */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6266,7 +6282,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `SKU_NOT_ORDERABLE` AVAILABLE 이 아닌 SKU */
+            /** @description `SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU) 또는 `IDEMPOTENCY_IN_PROGRESS` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6275,6 +6291,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            422: components["responses"]["IdempotencyKeyReused"];
         };
     };
     removeCartItem: {

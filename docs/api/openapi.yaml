@@ -2149,6 +2149,9 @@ paths:
       tags: [Cart]
       operationId: addCartItem
       summary: 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999)
+      description: 수량을 더하는 요청이라 `Idempotency-Key` 필수다. 같은 키로 다시 보내면 저장된 응답을 돌려주고 수량은 한 번만 더해진다. 정지된 판매자의 상품도 담을 수 있다(장바구니 조회에서 `PAUSED` 로 보인다).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2168,7 +2171,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/AddCartItemResponse'
         '400':
-          description: "`CART_INVALID`(합산 수량 범위 초과) 또는 `INVALID_REQUEST`"
+          description: "`CART_INVALID`(합산 수량 범위 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
           content:
             application/json:
               schema:
@@ -2182,11 +2185,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: "`SKU_NOT_ORDERABLE` AVAILABLE 이 아닌 SKU"
+          description: "`SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU) 또는 `IDEMPOTENCY_IN_PROGRESS`"
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
   /api/v1/cart/items/{cartItemId}:
     patch:
       tags: [Cart]
@@ -6140,7 +6145,7 @@ components:
           maximum: 999
     CartItemResult:
       type: object
-      required: [cartItemId, skuId, productId, productName, brandName, thumbnailUrl, optionDisplayName, unitPrice, quantity, lineAmount, availability]
+      required: [cartItemId, skuId, productId, sellerId, sellerName, productName, brandName, thumbnailUrl, optionDisplayName, unitPrice, quantity, lineAmount, availability]
       properties:
         cartItemId:
           type: integer
@@ -6151,6 +6156,15 @@ components:
         productId:
           type: integer
           format: int64
+        sellerId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 판매자 ID. SKU 가 사라진(DISCONTINUED) 항목만 null. 정지된 판매자여도 채운다.
+        sellerName:
+          type: string
+          nullable: true
+          description: 판매자 회사명. SKU 가 사라진 항목만 null.
         productName:
           type: string
         brandName:
@@ -6172,6 +6186,7 @@ components:
         availability:
           type: string
           enum: [AVAILABLE, SOLD_OUT, PAUSED, DISCONTINUED, ENDED]
+          description: 판매자가 주문 가능한 상태(활성)가 아니면 AVAILABLE 대신 PAUSED 로 내려준다(견적·주문과 같은 기준).
     CartResult:
       type: object
       required: [items, availableAmount]

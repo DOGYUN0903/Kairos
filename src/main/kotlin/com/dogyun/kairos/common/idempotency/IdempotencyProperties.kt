@@ -10,6 +10,7 @@ data class IdempotencyProperties(
     val inProgressTimeout: Duration = Duration.ofSeconds(60),
     val paths: List<String> = listOf(
         "/api/v1/orders",
+        "/api/v1/cart/items",
         "/api/v1/payments/confirm",
         "/api/v1/orders/*/items/*/cancel",
         "/api/v1/seller/orders/*/items/*/cancel",

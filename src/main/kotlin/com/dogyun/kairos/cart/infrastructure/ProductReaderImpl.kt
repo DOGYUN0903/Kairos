@@ -14,6 +14,7 @@ class ProductReaderImpl(private val skuQueryService: SkuQueryService) : ProductR
             CartSkuInfo(
                 skuId = sku.skuId,
                 productId = sku.productId,
+                sellerId = sku.sellerId,
                 productName = sku.productName,
                 brandName = sku.brandName,
                 thumbnailUrl = sku.thumbnailUrl,
