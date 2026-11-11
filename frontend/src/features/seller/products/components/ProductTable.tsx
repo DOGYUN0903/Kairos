@@ -69,6 +69,13 @@ function Row({ p, canManage }: { p: SellerProductSummary; canManage: boolean }) 
       <td className={TD}>{p.brandName}</td>
       <td className={`${TD} text-right`}>
         <Money value={p.salePrice} className="font-bold" />
+        {p.originalPrice > p.salePrice && (
+          <>
+            <br />
+            <span className="sr-only">정가 </span>
+            <Money value={p.originalPrice} className="text-xs text-text-3 line-through" />
+          </>
+        )}
       </td>
       <td className={TD}>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -81,6 +88,7 @@ function Row({ p, canManage }: { p: SellerProductSummary; canManage: boolean }) 
           )}
           {p.soldOut && !ended && <span className="rounded-sm border border-border px-1.5 py-0.5 text-[11px] text-text-2">품절</span>}
         </div>
+        {p.status === "REJECTED" && p.rejectReason && <p className="mt-1 text-xs text-danger">사유: {p.rejectReason}</p>}
       </td>
       <td className={`${TD} text-right tabular-nums`}>{ended ? "—" : p.stockTotal}</td>
       <td className={`${TD} text-text-2`}>{formatDate(p.createdAt)}</td>

@@ -33,6 +33,24 @@ describe("productSchema", () => {
     expect(Object.keys(errs)).toEqual(["salePrice"]);
   });
 
+  it("다른_필드가_틀려도_판매가_초과는_바로_알린다", () => {
+    const errs = fieldErrors({ ...valid, name: "", images: [], originalPrice: "10000", salePrice: "20000" });
+    expect(errs).toHaveProperty("salePrice", "판매가는 정가 이하여야 합니다.");
+    expect(errs).toHaveProperty("name");
+  });
+
+  it("다른_필드가_틀려도_축_이름_중복은_바로_알린다", () => {
+    const options = [
+      { name: "색상", values: ["블랙"] },
+      { name: "색상", values: ["M"] },
+    ];
+    expect(fieldErrors({ ...valid, name: "", options })).toHaveProperty("options.1.name");
+  });
+
+  it("빈_옵션_값은_한국어_메시지", () => {
+    expect(fieldErrors({ ...valid, options: [{ name: "색상", values: [" "] }] })).toHaveProperty("options.0.values.0", "옵션 값을 입력해 주세요.");
+  });
+
   it("판매가_0원은_거부한다", () => {
     expect(fieldErrors({ ...valid, salePrice: "0" })).toHaveProperty("salePrice");
   });

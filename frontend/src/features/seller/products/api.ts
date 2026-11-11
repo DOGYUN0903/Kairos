@@ -17,10 +17,16 @@ export type SellerProductPage = Omit<components["schemas"]["PageResponse"], "con
 
 export const PAGE_SIZE = 20;
 
-export type SellerProductParams = { status?: ProductStatus; page: number };
+export type SellerProductParams = { status?: ProductStatus; keyword?: string; brandId?: number; page: number };
 
-export function useSellerProducts({ status, page }: SellerProductParams) {
-  const query = { ...(status ? { status } : {}), page, size: PAGE_SIZE };
+export function useSellerProducts({ status, keyword, brandId, page }: SellerProductParams) {
+  const query = {
+    ...(status ? { status } : {}),
+    ...(keyword ? { keyword } : {}),
+    ...(brandId !== undefined ? { brandId } : {}),
+    page,
+    size: PAGE_SIZE,
+  };
   return useQuery({
     queryKey: queryKeys.seller.products(query),
     queryFn: async () => unwrap<SellerProductPage>(await api.GET("/api/v1/seller/products", { params: { query } })),

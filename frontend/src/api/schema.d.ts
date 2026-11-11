@@ -2780,9 +2780,16 @@ export interface components {
             /** @description 대표 이미지 URL */
             thumbnailUrl: string;
             brandName: string;
+            /**
+             * Format: int64
+             * @description 정가(원)
+             */
+            originalPrice: number;
             /** Format: int64 */
             salePrice: number;
             status: components["schemas"]["ProductStatus"];
+            /** @description 반려 사유(REJECTED 일 때). 없으면 null. */
+            rejectReason: string | null;
             soldOut: boolean;
             /**
              * Format: int32
@@ -5163,6 +5170,10 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["ProductStatus"];
+                /** @description 상품명 부분 일치(앞뒤 공백 제거, 비면 무시). 최대 100자, 넘으면 `INVALID_REQUEST`. */
+                keyword?: string;
+                /** @description 내 브랜드로 좁힌다. 남의 브랜드 ID 면 빈 결과. */
+                brandId?: number;
                 /** @description 0부터 시작 */
                 page?: components["parameters"]["Page"];
                 /** @description 페이지 크기 (최대 100) */

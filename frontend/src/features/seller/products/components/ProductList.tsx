@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { Pagination } from "@/components/common/Pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBrands } from "@/features/seller/brands/api";
 import { useSellerCapabilities } from "@/features/seller/gate/useSellerCapabilities";
 import { useSellerProducts, type ProductStatus } from "@/features/seller/products/api";
 import { ProductTable } from "@/features/seller/products/components/ProductTable";
@@ -28,18 +31,37 @@ function parsePage(v: string | null): number {
   return Number.isSafeInteger(n) && n >= 0 ? n : 0;
 }
 
-/** URL(?status=&page=)이 필터의 진실이다. */
+function parseId(v: string | null): number | undefined {
+  if (v === null || !/^[1-9][0-9]*$/.test(v)) return undefined;
+  const n = Number(v);
+  return Number.isSafeInteger(n) ? n : undefined;
+}
+
+export const KEYWORD_MAX = 100;
+
+type Filters = { status: ProductStatus | undefined; keyword: string; brandId: number | undefined; page: number };
+
+/** URL(?status=&keyword=&brandId=&page=)이 필터의 진실이다. 필터가 바뀌면 첫 페이지로 간다. */
 export function ProductList() {
   const router = useRouter();
   const params = useSearchParams();
   const status = parseStatus(params.get("status"));
   const page = parsePage(params.get("page"));
+  const keyword = (params.get("keyword") ?? "").trim().slice(0, KEYWORD_MAX);
+  const brandId = parseId(params.get("brandId"));
   const { canManage } = useSellerCapabilities();
-  const q = useSellerProducts({ status, page });
+  const brands = useBrands();
+  const q = useSellerProducts({ status, keyword, brandId, page });
+  const current: Filters = { status, keyword, brandId, page };
+  const [draft, setDraft] = useState(keyword);
+  useEffect(() => setDraft(keyword), [keyword]);
 
-  const go = (next: { status: ProductStatus | undefined; page: number }) => {
+  const go = (patch: Partial<Filters>) => {
+    const next = { ...current, page: 0, ...patch };
     const sp = new URLSearchParams();
     if (next.status) sp.set("status", next.status);
+    if (next.keyword) sp.set("keyword", next.keyword);
+    if (next.brandId !== undefined) sp.set("brandId", String(next.brandId));
     if (next.page > 0) sp.set("page", String(next.page));
     const qs = sp.toString();
     router.replace(qs ? `/seller/products?${qs}` : "/seller/products");
@@ -49,9 +71,41 @@ export function ProductList() {
 
   return (
     <>
-      <StatusSummary status={status} total={q.data?.totalElements} onSelect={(s) => go({ status: s, page: 0 })} />
+      <StatusSummary status={status} total={q.data?.totalElements} onSelect={(s) => go({ status: s })} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        <form
+          role="search"
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            go({ keyword: draft.trim().slice(0, KEYWORD_MAX) });
+          }}
+        >
+          <label htmlFor="q" className="sr-only">
+            상품명 검색
+          </label>
+          <input id="q" className="input w-60" type="search" placeholder="상품명 검색" maxLength={KEYWORD_MAX} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <button type="submit" className="btn btn-ghost" aria-label="검색">
+            <Search className="h-4 w-4" aria-hidden />
+          </button>
+        </form>
+        <label htmlFor="brandFilter" className="sr-only">
+          브랜드
+        </label>
+        <select
+          id="brandFilter"
+          className="input w-auto"
+          value={brandId ?? ""}
+          onChange={(e) => go({ brandId: parseId(e.target.value) })}
+        >
+          <option value="">모든 브랜드</option>
+          {(brands.data ?? []).map((b) => (
+            <option key={b.brandId} value={b.brandId}>
+              {b.name}
+            </option>
+          ))}
+        </select>
         <label htmlFor="statusFilter" className="sr-only">
           상태
         </label>
@@ -59,7 +113,7 @@ export function ProductList() {
           id="statusFilter"
           className="input w-auto"
           value={status ?? ""}
-          onChange={(e) => go({ status: parseStatus(e.target.value), page: 0 })}
+          onChange={(e) => go({ status: parseStatus(e.target.value) })}
         >
           <option value="">모든 상태</option>
           {STATUS_OPTIONS.map((o) => (
@@ -90,8 +144,11 @@ export function ProductList() {
         ) : q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : rows.length === 0 ? (
-          status ? (
-            <EmptyState message="해당 상태의 상품이 없습니다." action={{ label: "전체 보기", onClick: () => go({ status: undefined, page: 0 }) }} />
+          status || keyword || brandId !== undefined ? (
+            <EmptyState
+              message={keyword || brandId !== undefined ? "조건에 맞는 상품이 없습니다." : "해당 상태의 상품이 없습니다."}
+              action={{ label: "전체 보기", onClick: () => go({ status: undefined, keyword: "", brandId: undefined }) }}
+            />
           ) : (
             <EmptyState message="등록한 상품이 없습니다." {...(canManage ? { action: { label: "상품 등록", href: "/seller/products/new" } } : {})} />
           )
@@ -100,7 +157,7 @@ export function ProductList() {
             <ProductTable rows={rows} canManage={canManage} />
             <div className="flex items-center justify-between px-3.5 pb-4">
               <span className="text-xs text-text-2">총 {q.data.totalElements}개</span>
-              <Pagination page={q.data.page} totalPages={q.data.totalPages} onChange={(p) => go({ status, page: p })} />
+              <Pagination page={q.data.page} totalPages={q.data.totalPages} onChange={(p) => go({ page: p })} />
             </div>
           </>
         )}

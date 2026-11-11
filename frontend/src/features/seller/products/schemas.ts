@@ -33,7 +33,7 @@ const won = (label: string) =>
 const optionSchema = z.object({
   name: z.string().trim().min(1, "옵션명을 입력해 주세요.").max(OPTION_NAME_MAX, `옵션명은 ${OPTION_NAME_MAX}자 이하로 입력해 주세요.`),
   values: z
-    .array(z.string().trim().min(1).max(OPTION_VALUE_MAX, `옵션 값은 ${OPTION_VALUE_MAX}자 이하로 입력해 주세요.`))
+    .array(z.string().trim().min(1, "옵션 값을 입력해 주세요.").max(OPTION_VALUE_MAX, `옵션 값은 ${OPTION_VALUE_MAX}자 이하로 입력해 주세요.`))
     .min(1, "옵션 값을 하나 이상 입력해 주세요.")
     .max(MAX_VALUES_PER_AXIS, `옵션 값은 축마다 최대 ${MAX_VALUES_PER_AXIS}개입니다.`)
     .refine((vs) => new Set(vs).size === vs.length, "같은 옵션 값을 두 번 넣을 수 없습니다."),
@@ -55,17 +55,22 @@ export const productSchema = z
       .max(IMAGES_MAX, `이미지는 최대 ${IMAGES_MAX}장입니다.`),
     originalPrice: won("정가"),
     salePrice: won("판매가"),
-    options: z.array(optionSchema).max(MAX_AXES, `옵션 축은 최대 ${MAX_AXES}개입니다.`),
+    options: z
+      .array(optionSchema)
+      .max(MAX_AXES, `옵션 축은 최대 ${MAX_AXES}개입니다.`)
+      .superRefine((options, ctx) => {
+        const seen = new Set<string>();
+        options.forEach((o, i) => {
+          if (seen.has(o.name)) ctx.addIssue({ code: "custom", path: [i, "name"], message: "옵션명이 겹칩니다." });
+          seen.add(o.name);
+        });
+      }),
   })
-  .superRefine((v, ctx) => {
-    if (v.salePrice > v.originalPrice) {
-      ctx.addIssue({ code: "custom", path: ["salePrice"], message: "판매가는 정가 이하여야 합니다." });
-    }
-    const seen = new Set<string>();
-    v.options.forEach((o, i) => {
-      if (seen.has(o.name)) ctx.addIssue({ code: "custom", path: ["options", i, "name"], message: "옵션명이 겹칩니다." });
-      seen.add(o.name);
-    });
+  // 다른 필드가 아직 틀려도 두 가격만 올바르면 바로 검사한다(객체 refine 은 기본적으로 전체가 통과해야 돈다).
+  .refine((v) => v.salePrice <= v.originalPrice, {
+    path: ["salePrice"],
+    message: "판매가는 정가 이하여야 합니다.",
+    when: ({ issues }) => !issues.some((i) => i.path?.[0] === "originalPrice" || i.path?.[0] === "salePrice"),
   });
 
 export type ProductFormInput = z.input<typeof productSchema>;
