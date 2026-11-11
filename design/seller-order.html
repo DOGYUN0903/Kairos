@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 판매자 — 주문 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+<div class="console">
+  <aside class="console__side">
+    <a class="logo" href="index.html">KAIROS</a>
+    <div class="console__role">판매자 센터</div>
+    <nav class="side-nav" aria-label="판매자 메뉴">
+      <a href="seller-dashboard.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>대시보드</a>
+      <a href="seller-product-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>상품 관리</a>
+      <a href="seller-order.html" aria-current="page"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 관리<span class="nav-badge" aria-label="발송 대기 3건">3</span></a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 7h16v4H4z"/><path d="M6 11v9h12v-9"/><path d="M10 15h4"/></svg>브랜드</a>
+      <a href="#" aria-disabled="true"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>정산<span class="soon">준비 중</span></a>
+    </nav>
+  </aside>
+
+  <div class="console__main">
+    <header class="console__top">
+      <h1>주문 관리</h1>
+      <div class="console__user"><span>[판매자 A 주식회사]</span><span class="avatar" aria-hidden="true">A</span></div>
+    </header>
+
+    <main class="console__content">
+      <nav class="board-nav" aria-label="상태별 보기" style="margin-top:0">
+        <strong>상태별 보기</strong>
+        <a href="#state-list">① 주문 목록</a><a href="#state-detail">② 주문 상세 (발송 대기)</a><a href="#state-shipping">③ 주문 상세 (배송 중)</a><a href="#state-dialogs">④ 발송 처리 창 · 항목 취소 창</a>
+      </nav>
+
+      <!-- ① 목록 -->
+      <section id="state-list" class="mt-24" aria-label="주문 목록">
+        <div class="tabs" role="tablist" aria-label="주문 상태">
+          <button type="button" role="tab" aria-selected="true">전체</button>
+          <button type="button" role="tab" aria-selected="false">발송 대기<span class="count">3</span></button>
+          <button type="button" role="tab" aria-selected="false">배송 중</button>
+          <button type="button" role="tab" aria-selected="false">배송 완료</button>
+          <button type="button" role="tab" aria-selected="false">구매 확정</button>
+          <button type="button" role="tab" aria-selected="false">취소</button>
+        </div>
+
+        <div class="card mt-16">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">주문번호</th>
+                  <th scope="col">상품</th>
+                  <th scope="col" class="num">상품 금액</th>
+                  <th scope="col">상태</th>
+                  <th scope="col">주문 일시</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261112093311T7RW2E</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span><span class="meta">외 2건</span></div></div></td>
+                  <td class="num"><span class="price">79,200원</span></td>
+                  <td><span class="chip chip-pending">발송 대기</span></td>
+                  <td class="muted mono">2026-11-12 09:33</td>
+                </tr>
+                <tr>
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261111224508C1NZ6J</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">로고 자수 볼캡</span></div></div></td>
+                  <td class="num"><span class="price">29,000원</span></td>
+                  <td><span class="chip chip-pending">발송 대기</span></td>
+                  <td class="muted mono">2026-11-11 22:45</td>
+                </tr>
+                <tr>
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261111180219X5GM0A</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">워싱 피그먼트 포켓 티셔츠</span><span class="meta">외 2건</span></div></div></td>
+                  <td class="num"><span class="price">99,600원</span></td>
+                  <td><span class="chip chip-pending">발송 대기</span></td>
+                  <td class="muted mono">2026-11-11 18:02</td>
+                </tr>
+                <tr>
+                  <td><a class="mono" href="#state-shipping" style="font-weight:500">K20261110193042M4XA7C</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></div></td>
+                  <td class="num"><span class="price">27,300원</span></td>
+                  <td><span class="chip chip-info">배송 중</span></td>
+                  <td class="muted mono">2026-11-10 19:30</td>
+                </tr>
+                <tr>
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261108131450L9VE4S</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">스트라이프 보트넥 롱슬리브</span><span class="meta">외 1건</span></div></div></td>
+                  <td class="num"><span class="price">78,000원</span></td>
+                  <td><span class="chip chip-onsale">배송 완료</span></td>
+                  <td class="muted mono">2026-11-08 13:14</td>
+                </tr>
+                <tr>
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261105211733B2KQ9F</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">로고 자수 볼캡</span></div></div></td>
+                  <td class="num"><span class="price">29,000원</span></td>
+                  <td><span class="chip chip-paused">구매 확정</span></td>
+                  <td class="muted mono">2026-11-05 21:17</td>
+                </tr>
+                <tr class="is-canceled">
+                  <td><a class="mono" href="#state-detail" style="font-weight:500">K20261103101502H8PD3W</a></td>
+                  <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">링거 넥 레트로 티셔츠</span></div></div></td>
+                  <td class="num"><span class="price">22,900원</span></td>
+                  <td><span class="chip chip-ended">취소</span></td>
+                  <td class="mono">2026-11-03 10:15</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-foot">
+            <span class="small muted">38건 중 1–7</span>
+            <nav class="pager" aria-label="페이지">
+              <a href="#" aria-current="page">1</a><a href="#">2</a><a href="#">3</a><a href="#">4</a>
+            </nav>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 상세: 발송 대기 -->
+      <section id="state-detail" class="board">
+        <h2 class="board__label">② 주문 상세 — 발송 대기</h2>
+        <p class="board__note">목록에서 주문번호를 누르면 열리는 별도 페이지입니다. 발송 대기에서는 "발송 처리"와 항목별 "항목 취소"가 보입니다.</p>
+
+        <a class="back-link" href="#state-list"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>주문 목록</a>
+        <div class="detail-head">
+          <div>
+            <h2><span class="mono">K20261112093311T7RW2E</span><span class="chip chip-pending">발송 대기</span></h2>
+            <div class="meta"><span>주문 일시<b class="mono">2026-11-12 09:33</b></span></div>
+          </div>
+          <button type="button" class="btn btn-primary">발송 처리</button>
+        </div>
+
+        <div class="console-grid">
+          <div class="card">
+            <div class="card__head"><h2>주문 항목</h2><span class="small muted">3개</span></div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">상품</th>
+                    <th scope="col" class="num">단가</th>
+                    <th scope="col" class="num">수량</th>
+                    <th scope="col" class="num">금액</th>
+                    <th scope="col">상태</th>
+                    <th scope="col" style="text-align:right">작업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span><span class="meta">[브랜드 A] · 블랙 / L</span></div></div></td>
+                    <td class="num">27,300원</td>
+                    <td class="num">1</td>
+                    <td class="num"><span class="price">27,300원</span></td>
+                    <td><span class="chip chip-info">주문 완료</span></td>
+                    <td style="text-align:right"><button type="button" class="btn btn-danger btn-sm">항목 취소</button></td>
+                  </tr>
+                  <tr>
+                    <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">로고 자수 볼캡</span><span class="meta">[브랜드 A] · 네이비 / FREE</span></div></div></td>
+                    <td class="num">29,000원</td>
+                    <td class="num">1</td>
+                    <td class="num"><span class="price">29,000원</span></td>
+                    <td><span class="chip chip-info">주문 완료</span></td>
+                    <td style="text-align:right"><button type="button" class="btn btn-danger btn-sm">항목 취소</button></td>
+                  </tr>
+                  <tr class="is-canceled">
+                    <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">링거 넥 레트로 티셔츠</span><span class="meta">[브랜드 B] · 아이보리 / M</span></div></div></td>
+                    <td class="num">22,900원</td>
+                    <td class="num">1</td>
+                    <td class="num">22,900원</td>
+                    <td><span class="chip chip-ended">취소</span><div class="small mt-8">구매자 취소 · 환불 22,900원</div></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card__foot">
+              <span>배송비<b>3,000원</b></span><span>부담 주체<b>KAIROS (무료배송)</b></span>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <div class="card__head"><h2>배송지</h2></div>
+              <div class="card__body">
+                <dl class="kv">
+                  <dt>수령인</dt><dd>김민지</dd>
+                  <dt>연락처</dt><dd class="mono">010-1234-5678</dd>
+                  <dt>주소</dt><dd>(04524) 서울특별시 중구 세종대로 110, 302호</dd>
+                  <dt>배송 메모</dt><dd>부재 시 문 앞에 놓아 주세요</dd>
+                </dl>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card__head"><h2>진행 시각</h2></div>
+              <div class="card__body">
+                <ol class="timeline">
+                  <li class="is-done"><span>주문</span><span>2026-11-12 09:33</span></li>
+                  <li><span>발송</span><span>—</span></li>
+                  <li><span>배송 완료</span><span>—</span></li>
+                  <li><span>구매 확정</span><span>—</span></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ③ 상세: 배송 중 -->
+      <section id="state-shipping" class="board">
+        <h2 class="board__label">③ 주문 상세 — 배송 중</h2>
+        <p class="board__note">발송 처리 뒤에는 택배사·송장번호가 보이고 버튼이 "배송 완료"로 바뀝니다. 항목 취소 버튼은 사라집니다. 배송 완료·구매 확정 상태에서는 버튼 없이 진행 시각만 채워집니다.</p>
+
+        <div class="detail-head">
+          <div>
+            <h2><span class="mono">K20261110193042M4XA7C</span><span class="chip chip-info">배송 중</span></h2>
+            <div class="meta">
+              <span>주문 일시<b class="mono">2026-11-10 19:30</b></span>
+              <span>택배사<b>CJ대한통운</b></span>
+              <span>송장번호<b class="mono">6812 3345 9021</b></span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary">배송 완료</button>
+        </div>
+
+        <div class="console-grid">
+          <div class="card">
+            <div class="card__head"><h2>주문 항목</h2><span class="small muted">1개</span></div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">상품</th>
+                    <th scope="col" class="num">단가</th>
+                    <th scope="col" class="num">수량</th>
+                    <th scope="col" class="num">금액</th>
+                    <th scope="col">상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><div class="cell-product"><div class="ph ph-sm">[이미지]</div><div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span><span class="meta">[브랜드 A] · 블랙 / L</span></div></div></td>
+                    <td class="num">27,300원</td>
+                    <td class="num">1</td>
+                    <td class="num"><span class="price">27,300원</span></td>
+                    <td><span class="chip chip-info">주문 완료</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card__foot">
+              <span>배송비<b>3,000원</b></span><span>부담 주체<b>구매자</b></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head"><h2>진행 시각</h2></div>
+            <div class="card__body">
+              <ol class="timeline">
+                <li class="is-done"><span>주문</span><span>2026-11-10 19:30</span></li>
+                <li class="is-done"><span>발송</span><span>2026-11-11 10:05</span></li>
+                <li><span>배송 완료</span><span>—</span></li>
+                <li><span>구매 확정</span><span>—</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 다이얼로그 -->
+      <section id="state-dialogs" class="board">
+        <h2 class="board__label">④ 발송 처리 창 · 항목 취소 창</h2>
+        <p class="board__note">왼쪽은 "발송 처리", 오른쪽은 "항목 취소"를 눌렀을 때 열립니다. 판매자 취소는 배송비 차감 없이 환불되며, 실제 환불 금액은 취소 뒤 알림으로 보여 줍니다.</p>
+
+        <div class="dialog-stage">
+          <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ship-h">
+            <div class="dialog__head"><h3 id="ship-h">발송 처리</h3></div>
+            <div class="dialog__body">
+              <p class="muted small" style="margin-top:-8px">주문 <span class="mono">K20261112093311T7RW2E</span> · 항목 2개를 발송합니다.</p>
+              <div class="field">
+                <label for="carrier">택배사<span class="req" aria-hidden="true">*</span></label>
+                <select id="carrier" class="select">
+                  <option>CJ대한통운</option>
+                  <option>한진택배</option>
+                  <option>롯데택배</option>
+                  <option>우체국택배</option>
+                  <option>로젠택배</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="tracking">송장번호<span class="req" aria-hidden="true">*</span></label>
+                <input id="tracking" class="input mono" type="text" maxlength="50" value="681233459021" placeholder="숫자만 입력">
+                <span class="hint">발송 처리 뒤에는 송장번호를 바꿀 수 없습니다. 다시 확인해 주세요.</span>
+              </div>
+            </div>
+            <div class="dialog__foot">
+              <button type="button" class="btn btn-ghost">닫기</button>
+              <button type="button" class="btn btn-primary">발송 처리</button>
+            </div>
+          </div>
+
+          <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="scancel-h">
+            <div class="dialog__head"><h3 id="scancel-h">항목 취소</h3></div>
+            <div class="dialog__body">
+              <div class="dialog__item">
+                <div class="ph ph-sm">[이미지]</div>
+                <div class="line-item__info" style="min-width:0">
+                  <span class="line-item__name" style="margin-top:0">로고 자수 볼캡</span>
+                  <div class="line-item__opt">네이비 / FREE · 수량 1개 · 29,000원</div>
+                </div>
+              </div>
+              <div class="notice">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                <span><strong style="color:var(--text)">배송비 차감 없이 환불됩니다.</strong> 취소하면 되돌릴 수 없습니다.</span>
+              </div>
+              <div class="field">
+                <label for="scancel-reason">취소 사유<span class="req" aria-hidden="true">*</span></label>
+                <textarea id="scancel-reason" class="textarea" maxlength="500" style="min-height:88px" placeholder="취소 사유를 입력해 주세요">재고 수량 오류로 발송이 어렵습니다</textarea>
+                <span class="counter">19 / 500</span>
+              </div>
+            </div>
+            <div class="dialog__foot">
+              <button type="button" class="btn btn-ghost">닫기</button>
+              <button type="button" class="btn btn-danger">항목 취소</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

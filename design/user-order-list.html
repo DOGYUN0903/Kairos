@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 주문 내역</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>장바구니</a>
+      <a href="user-order-list.html" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <div class="narrow">
+    <nav class="board-nav" aria-label="상태별 보기">
+      <strong>상태별 보기</strong>
+      <a href="#state-default">① 주문 내역</a><a href="#state-empty">② 빈 상태</a>
+    </nav>
+
+    <!-- ① 주문 내역 -->
+    <section id="state-default" aria-labelledby="ol-h">
+      <div class="page-head">
+        <h1 id="ol-h">주문 내역</h1>
+        <span class="small muted">전체 23건</span>
+      </div>
+
+      <!-- 결제 대기 -->
+      <article class="order-card">
+        <div class="order-card__head">
+          <div><span class="order-card__date">2026-11-12</span><span class="order-card__no mono">주문번호 K20261112142110Q3ZT8B</span></div>
+        </div>
+        <div class="order-card__body">
+          <a href="user-order-detail.html"><div class="ph ph-md">[이미지]</div></a>
+          <div style="min-width:0">
+            <div class="order-card__name">오버핏 헤비웨이트 코튼 티셔츠 <span class="more">외 1건</span></div>
+            <div class="order-card__amount">결제 금액<b>48,000원</b></div>
+          </div>
+          <div class="order-card__status">
+            <span class="chip chip-pending">결제 대기</span>
+            <span class="small muted">결제 기한이 지나면 자동 취소됩니다</span>
+          </div>
+          <div class="order-card__actions">
+            <a class="btn btn-primary" href="#">결제하기</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- 배송 중 1 · 배송 준비 1 -->
+      <article class="order-card">
+        <div class="order-card__head">
+          <div><span class="order-card__date">2026-11-10</span><span class="order-card__no mono">주문번호 K20261110193042M4XA7C</span></div>
+        </div>
+        <div class="order-card__body">
+          <a href="user-order-detail.html"><div class="ph ph-md">[이미지]</div></a>
+          <div style="min-width:0">
+            <div class="order-card__name">코튼 립 삭스 <span class="more">외 3건</span></div>
+            <div class="order-card__amount">결제 금액<b>76,900원</b></div>
+          </div>
+          <div class="order-card__status">
+            <span class="chip chip-info">배송 중 1 · 배송 준비 1</span>
+            <span class="small muted">판매자 2곳에서 따로 배송됩니다</span>
+          </div>
+          <div class="order-card__actions">
+            <a class="btn btn-ghost" href="user-order-detail.html">주문 상세</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- 구매 확정 -->
+      <article class="order-card">
+        <div class="order-card__head">
+          <div><span class="order-card__date">2026-11-05</span><span class="order-card__no mono">주문번호 K20261105211733B2KQ9F</span></div>
+        </div>
+        <div class="order-card__body">
+          <a href="user-order-detail.html"><div class="ph ph-md">[이미지]</div></a>
+          <div style="min-width:0">
+            <div class="order-card__name">로고 자수 볼캡</div>
+            <div class="order-card__amount">결제 금액<b>32,000원</b></div>
+          </div>
+          <div class="order-card__status">
+            <span class="chip chip-onsale">구매 확정</span>
+          </div>
+          <div class="order-card__actions">
+            <a class="btn btn-ghost" href="user-order-detail.html">주문 상세</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- 취소 -->
+      <article class="order-card is-closed">
+        <div class="order-card__head">
+          <div><span class="order-card__date">2026-11-03</span><span class="order-card__no mono">주문번호 K20261103101502H8PD3W</span></div>
+        </div>
+        <div class="order-card__body">
+          <a href="user-order-detail.html"><div class="ph ph-md">[이미지]</div></a>
+          <div style="min-width:0">
+            <div class="order-card__name">헨리넥 와플 티셔츠 <span class="more">외 2건</span></div>
+            <div class="order-card__amount">결제 금액<b>91,000원</b></div>
+          </div>
+          <div class="order-card__status">
+            <span class="chip chip-ended">취소</span>
+          </div>
+          <div class="order-card__actions">
+            <a class="btn btn-ghost" href="user-order-detail.html">주문 상세</a>
+          </div>
+        </div>
+      </article>
+
+      <nav class="pager" aria-label="페이지">
+        <a href="#" aria-label="이전 페이지"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></a>
+        <a href="#" aria-current="page">1</a>
+        <a href="#">2</a>
+        <a href="#">3</a>
+        <a href="#" aria-label="다음 페이지"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+      </nav>
+    </section>
+
+    <!-- ② 빈 상태 -->
+    <section id="state-empty" class="board">
+      <h2 class="board__label">② 빈 상태 — 주문이 한 건도 없을 때</h2>
+      <p class="board__note">카드와 페이지네이션 없이 안내만 보여 줍니다.</p>
+      <div class="page-head" style="margin-top:8px">
+        <h1>주문 내역</h1>
+      </div>
+      <div class="empty">
+        <div class="empty__icon"><svg class="icon" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></div>
+        <h2>주문 내역이 없습니다</h2>
+        <p>첫 주문을 시작해 보세요.</p>
+        <a class="btn btn-primary" href="user-product-list.html">상품 보러 가기</a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+</body>
+</html>
