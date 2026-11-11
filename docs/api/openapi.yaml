@@ -1845,6 +1845,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/v1/seller/products/{productId}/change-requests/{changeRequestId}:
+    get:
+      tags: [Seller Change Request]
+      operationId: getMyChangeRequest
+      summary: 내 변경 요청 상세 (APPROVED·SUSPENDED 판매자)
+      description: 요청한 내용·정가·상태·반려 사유. 남의 요청이나 다른 상품의 요청은 `CHANGE_REQUEST_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ChangeRequestId'
+      responses:
+        '200':
+          description: 변경 요청 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerChangeRequestDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
     delete:
       tags: [Seller Change Request]
       operationId: withdrawChangeRequest
@@ -5372,6 +5398,46 @@ components:
           type: [integer, 'null']
           format: int64
           description: 대기 중인 변경 요청 ID. 없으면 null.
+        latestChangeRequest:
+          description: 가장 최근 변경 요청(상태 무관). 없으면 null.
+          oneOf:
+            - $ref: '#/components/schemas/LatestChangeRequest'
+            - type: 'null'
+    LatestChangeRequest:
+      type: object
+      required: [changeRequestId, status, requestedAt]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        rejectReason:
+          type: [string, 'null']
+    SellerChangeRequestDetail:
+      type: object
+      required: [changeRequestId, productId, status, requestedAt, originalPrice, content]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        rejectReason:
+          type: [string, 'null']
+        originalPrice:
+          type: integer
+          format: int64
+          description: 요청한 정가
+        content:
+          $ref: '#/components/schemas/ProductContentResult'
     ChangeRequestStatus:
       type: string
       enum: [PENDING, APPROVED, REJECTED, WITHDRAWN]

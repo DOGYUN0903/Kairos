@@ -90,17 +90,7 @@ class ChangeRequestAdminService(
             status = request.status.name,
             rejectReason = request.rejectReason,
             originalPrice = request.originalPrice,
-            content = ProductContentResult(
-                name = content.name,
-                description = content.description,
-                categoryId = content.categoryId,
-                images = content.imageFileIds.mapIndexed { index, fileId ->
-                    ProductImageResult(fileId, urls[fileId].orEmpty(), isMain = index == 0)
-                },
-                options = content.options.map { option ->
-                    ChangeOptionResult(option.id, option.name, option.values.map { ChangeOptionValueResult(it.id, it.name) })
-                },
-            ),
+            content = toContentResult(content, urls),
         )
     }
 

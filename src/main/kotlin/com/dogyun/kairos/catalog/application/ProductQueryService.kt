@@ -30,7 +30,8 @@ class ProductQueryService(
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
         val pending = changeRequestRepository.findPendingByProductId(productId)?.id
-        return toSellerProductDetail(product, brandName, urls, pending)
+        val latest = changeRequestRepository.findLatestByProductId(productId)
+        return toSellerProductDetail(product, brandName, urls, pending, latest)
     }
 
     /** 다른 모듈(benefit)이 상품의 존재와 판매자만 확인할 때 쓴다. 삭제된 상품은 없는 것으로 본다. */

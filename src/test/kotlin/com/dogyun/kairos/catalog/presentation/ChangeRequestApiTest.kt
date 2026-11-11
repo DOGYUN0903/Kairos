@@ -118,6 +118,30 @@ class ChangeRequestApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 판매자는_자기_변경_요청을_조회하고_상세에서_최근_요청과_반려_사유를_본다() {
+        val f = onSaleFixture()
+        val id = f.submit(f.sameContentRequest(name = "새 티셔츠", originalPrice = 16000))
+
+        val mine = json(get("/api/v1/seller/products/${f.productId}/change-requests/$id", f.token).andExpect { status { isOk() } }).get("data")
+        assertEquals(id, mine.get("changeRequestId").asLong())
+        assertEquals("PENDING", mine.get("status").asString())
+        assertEquals(16000, mine.get("originalPrice").asLong())
+        assertEquals("새 티셔츠", mine.get("content").get("name").asString())
+        assertTrue(mine.get("requestedAt").asString().isNotBlank())
+        assertEquals(id, sellerProductDetail(f.token, f.productId).get("latestChangeRequest").get("changeRequestId").asLong())
+
+        val otherToken = newUserToken()
+        approvedSeller(otherToken)
+        get("/api/v1/seller/products/${f.productId}/change-requests/$id", otherToken).expectCode(404, "CHANGE_REQUEST_NOT_FOUND")
+
+        post("/api/v1/admin/change-requests/$id/reject", adminToken(), mapOf("reason" to "이미지가 흐립니다")).andExpect { status { isOk() } }
+        val latest = sellerProductDetail(f.token, f.productId).get("latestChangeRequest")
+        assertEquals("REJECTED", latest.get("status").asString())
+        assertEquals("이미지가 흐립니다", latest.get("rejectReason").asString())
+        assertTrue(latest.get("requestedAt").asString().isNotBlank())
+    }
+
+    @Test
     fun 두_번째_요청은_409() {
         val f = onSaleFixture()
         f.submit()

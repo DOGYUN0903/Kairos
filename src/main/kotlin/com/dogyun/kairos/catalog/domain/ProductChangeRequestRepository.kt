@@ -7,6 +7,8 @@ interface ProductChangeRequestRepository {
     fun save(changeRequest: ProductChangeRequest): ProductChangeRequest
     fun findById(id: Long): ProductChangeRequest?
     fun findPendingByProductId(productId: Long): ProductChangeRequest?
+    /** 상태와 무관하게 가장 최근(id 최대) 요청. */
+    fun findLatestByProductId(productId: Long): ProductChangeRequest?
     /** 주어진 상품 중 PENDING 변경 요청이 있는 상품 ID. 한 번의 쿼리로 구한다. */
     fun findPendingProductIds(productIds: Collection<Long>): Set<Long>
 

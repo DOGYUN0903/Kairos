@@ -85,7 +85,8 @@ class ProductAdminService(
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
         val pending = changeRequestRepository.findPendingByProductId(productId)?.id
-        return toSellerProductDetail(product, brandName, urls, pending)
+        val latest = changeRequestRepository.findLatestByProductId(productId)
+        return toSellerProductDetail(product, brandName, urls, pending, latest)
     }
 
     private fun review(

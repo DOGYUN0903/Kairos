@@ -33,12 +33,31 @@ class ChangeRequestService(
         return requireNotNull(changeRequestRepository.save(request).id)
     }
 
+    /** 남의 요청·다른 상품의 요청은 404. 정지된 판매자도 조회는 한다. */
+    @Transactional(readOnly = true)
+    fun getMine(seller: SellerPrincipal, productId: Long, changeRequestId: Long): SellerChangeRequestDetail {
+        val request = findMine(seller, productId, changeRequestId)
+        val urls = imageFileReader.findImages(request.content.imageFileIds).mapValues { it.value.url }
+        return SellerChangeRequestDetail(
+            changeRequestId = changeRequestId,
+            productId = request.productId,
+            status = request.status.name,
+            requestedAt = requireNotNull(request.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
+            rejectReason = request.rejectReason,
+            originalPrice = request.originalPrice,
+            content = toContentResult(request.content, urls),
+        )
+    }
+
     /** 남의 요청·다른 상품의 요청은 404. */
     fun withdraw(seller: SellerPrincipal, productId: Long, changeRequestId: Long) {
-        val request = changeRequestRepository.findById(changeRequestId)
-            ?.takeIf { it.sellerId == seller.sellerId && it.productId == productId }
-            ?: throw DomainException(ErrorCode.CHANGE_REQUEST_NOT_FOUND)
+        val request = findMine(seller, productId, changeRequestId)
         request.withdraw()
         changeRequestRepository.save(request)
     }
+
+    private fun findMine(seller: SellerPrincipal, productId: Long, changeRequestId: Long): ProductChangeRequest =
+        changeRequestRepository.findById(changeRequestId)
+            ?.takeIf { it.sellerId == seller.sellerId && it.productId == productId }
+            ?: throw DomainException(ErrorCode.CHANGE_REQUEST_NOT_FOUND)
 }

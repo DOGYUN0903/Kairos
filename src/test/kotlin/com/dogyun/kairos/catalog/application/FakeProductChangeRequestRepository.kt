@@ -25,6 +25,9 @@ internal class FakeProductChangeRequestRepository : ProductChangeRequestReposito
     override fun findPendingByProductId(productId: Long): ProductChangeRequest? =
         store.values.firstOrNull { it.productId == productId && it.status == ChangeRequestStatus.PENDING }
 
+    override fun findLatestByProductId(productId: Long): ProductChangeRequest? =
+        store.values.filter { it.productId == productId }.maxByOrNull { requireNotNull(it.id) }
+
     override fun findPendingProductIds(productIds: Collection<Long>): Set<Long> =
         store.values.filter { it.productId in productIds && it.status == ChangeRequestStatus.PENDING }.map { it.productId }.toSet()
 

@@ -171,6 +171,62 @@ class ChangeRequestServiceTest {
     }
 
     @Test
+    fun 판매자는_자기_변경_요청을_조회하고_남의_요청이나_다른_상품의_요청은_404() {
+        val productId = onSaleProduct()
+        val id = service.submit(me, productId, SubmitChangeRequestCommand(content(name = "새 티셔츠"), 12000))
+
+        val detail = service.getMine(me, productId, id)
+
+        assertEquals(id, detail.changeRequestId)
+        assertEquals("PENDING", detail.status)
+        assertEquals(12000, detail.originalPrice)
+        assertEquals("새 티셔츠", detail.content.name)
+        assertEquals(listOf("http://files/a.png", "http://files/b.png"), detail.content.images.map { it.url })
+        assertEquals(LocalDateTime.of(2026, 11, 9, 9, 0), detail.requestedAt)
+        assertCode(ErrorCode.CHANGE_REQUEST_NOT_FOUND) { service.getMine(other, productId, id) }
+        assertCode(ErrorCode.CHANGE_REQUEST_NOT_FOUND) { service.getMine(me, productId + 1000, id) }
+        assertCode(ErrorCode.CHANGE_REQUEST_NOT_FOUND) { service.getMine(me, productId, 999L) }
+    }
+
+    @Test
+    fun 판매자_상세의_latestChangeRequest는_가장_최근_요청이고_반려_사유를_담는다() {
+        val productId = onSaleProduct()
+        assertNull(query.getMine(me, productId).latestChangeRequest)
+        val first = submitSame(productId)
+        service.withdraw(me, productId, first)
+        val second = submitSame(productId)
+        assertEquals(second, query.getMine(me, productId).latestChangeRequest?.changeRequestId)
+
+        adminService.reject(second, "이미지가 흐립니다", reviewerId)
+
+        val latest = requireNotNull(query.getMine(me, productId).latestChangeRequest)
+        assertEquals(second, latest.changeRequestId)
+        assertEquals("REJECTED", latest.status)
+        assertEquals("이미지가 흐립니다", latest.rejectReason)
+        assertEquals(LocalDateTime.of(2026, 11, 9, 9, 0), latest.requestedAt)
+        assertNull(query.getMine(me, productId).pendingChangeRequestId)
+    }
+
+    @Test
+    fun 기존_값_ID로_이름만_바꾸면_승인_후에도_SKU와_재고가_유지된다() {
+        val productId = onSaleProduct()
+        val before = product(productId).skus.map { requireNotNull(it.id) }.toSet()
+        val options = product(productId).content.options
+        val renamed = options.map { o ->
+            OptionCommand(o.id, if (o.name == "색상") "컬러" else o.name, o.values.map { OptionValueCommand(it.id, if (it.name == "블랙") "검정" else it.name) })
+        }
+        val id = service.submit(me, productId, SubmitChangeRequestCommand(content(options = renamed), 10000))
+
+        adminService.approve(id, reviewerId)
+
+        val after = product(productId)
+        assertEquals("컬러", after.content.options[0].name)
+        assertEquals(listOf("검정", "화이트"), after.content.options[0].values.map { it.name })
+        assertEquals(before, after.skus.map { requireNotNull(it.id) }.toSet())
+        assertTrue(after.skus.all { it.skuStatus == SkuStatus.ACTIVE && it.stock == 5 })
+    }
+
+    @Test
     fun 제출_후_카테고리가_삭제되면_승인은_CATEGORY_NOT_FOUND이고_요청은_PENDING으로_남는다() {
         val productId = onSaleProduct()
         val id = submitSame(productId)

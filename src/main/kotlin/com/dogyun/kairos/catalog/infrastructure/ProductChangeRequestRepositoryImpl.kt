@@ -37,6 +37,9 @@ class ProductChangeRequestRepositoryImpl(
     override fun findPendingByProductId(productId: Long): ProductChangeRequest? =
         jpaRepository.findFirstByProductIdAndChangeStatus(productId, ChangeRequestStatus.PENDING)?.let(::toDomain)
 
+    override fun findLatestByProductId(productId: Long): ProductChangeRequest? =
+        jpaRepository.findFirstByProductIdOrderByIdDesc(productId)?.let(::toDomain)
+
     override fun findPendingProductIds(productIds: Collection<Long>): Set<Long> =
         if (productIds.isEmpty()) emptySet()
         else jpaRepository.findAllByProductIdInAndChangeStatus(productIds, ChangeRequestStatus.PENDING).map { it.productId }.toSet()
