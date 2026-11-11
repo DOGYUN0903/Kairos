@@ -9,8 +9,10 @@ import { newIdempotencyKey } from "@/api/idempotency";
  * - 제출 중 두 번째 호출은 무시한다.
  * submit 의 에러 처리는 호출자가 submit 안에서 한다(여기서는 그대로 전파).
  */
-export function useIdempotentSubmit<TValues extends FieldValues>(
-  form: UseFormReturn<TValues>,
+export function useIdempotentSubmit<TInput extends FieldValues, TValues = TInput>(
+  // zod transform 을 쓰는 폼은 입력(TInput)과 제출 값(TValues)이 다르다.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RHF 의 TContext 기본값과 같다
+  form: UseFormReturn<TInput, any, TValues>,
   submit: (values: TValues, key: string) => Promise<void>,
 ): { onSubmit: (e?: BaseSyntheticEvent) => Promise<void>; submitting: boolean; retry: () => Promise<void> } {
   const [submitting, setSubmitting] = useState(false);

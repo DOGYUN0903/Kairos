@@ -8,7 +8,11 @@ import { toast } from "@/hooks/use-toast";
  * - form: 폼 상단(root.server)
  * - 나머지(toast/page/banner): 토스트. page/banner 의 화면 처리는 호출자 몫이다.
  */
-export function applyFormError<T extends FieldValues>(form: UseFormReturn<T>, err: unknown): void {
+export function applyFormError<T extends FieldValues, TOut = T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RHF 의 TContext 기본값과 같다
+  form: UseFormReturn<T, any, TOut>,
+  err: unknown,
+): void {
   const r = resolveError(err);
   if (r.kind === "field" && r.field && r.field in form.getValues()) {
     form.setError(r.field as Path<T>, { type: "server", message: r.message }, { shouldFocus: true });
