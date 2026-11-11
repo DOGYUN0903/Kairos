@@ -11,6 +11,9 @@ class AdminQueueRowApiTest : CommerceTestSupport() {
 
     private val format = Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?""")
 
+    private fun org.springframework.test.web.servlet.ResultActionsDsl.expectCode(httpStatus: Int, code: String) =
+        andExpect { status { isEqualTo(httpStatus) } }.andExpect { jsonPath("$.code") { value(code) } }
+
     private fun now(): LocalDateTime = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
 
     private fun rows(path: String): List<JsonNode> {
@@ -89,5 +92,33 @@ class AdminQueueRowApiTest : CommerceTestSupport() {
         val brands = json(get("/api/v1/seller/brands", token).andExpect { status { isOk() } }).get("data")
         val brand = if (brands.has("content")) brands.get("content").get(0) else brands.get(0)
         assertTrue(format.matches(brand.get("createdAt").asString()))
+    }
+
+    @Test
+    fun 관리자는_판매자와_브랜드_단건을_id로_조회한다() {
+        val token = newUserToken()
+        val sellerId = approvedSeller(token, companyName = "단건상사")
+        val applied = json(post("/api/v1/seller/brands", token, mapOf("name" to "단건브랜드-${System.nanoTime()}")).andExpect { status { isCreated() } })
+            .get("data").get("brandId").asLong()
+
+        val seller = json(get("/api/v1/admin/sellers/$sellerId", adminToken()).andExpect { status { isOk() } }).get("data")
+        assertEquals("단건상사", seller.get("companyName").asString())
+        assertEquals(sellerId, seller.get("sellerId").asLong())
+        assertTrue(format.matches(seller.get("createdAt").asString()))
+        val brand = json(get("/api/v1/admin/brands/$applied", adminToken()).andExpect { status { isOk() } }).get("data")
+        assertEquals(applied, brand.get("brandId").asLong())
+        assertTrue(format.matches(brand.get("createdAt").asString()))
+    }
+
+    @Test
+    fun 판매자와_브랜드_단건_조회는_관리자만_가능하고_없으면_404() {
+        val token = newUserToken()
+        val sellerId = appliedSeller(token)
+
+        get("/api/v1/admin/sellers/$sellerId", token).expectCode(403, "FORBIDDEN")
+        get("/api/v1/admin/brands/1", token).expectCode(403, "FORBIDDEN")
+        get("/api/v1/admin/sellers/$sellerId").andExpect { status { isUnauthorized() } }
+        get("/api/v1/admin/sellers/999999", adminToken()).expectCode(404, "SELLER_NOT_FOUND")
+        get("/api/v1/admin/brands/999999", adminToken()).expectCode(404, "BRAND_NOT_FOUND")
     }
 }

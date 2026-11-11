@@ -35,6 +35,10 @@ class AdminSellerController(
     ): ResponseEntity<ApiResponse<PageResponse<SellerDetail>>> =
         ApiResponse.ok(PageResponse.from(sellerQueryService.listForAdmin(status, sort, page, size)))
 
+    @GetMapping("/{sellerId}")
+    fun get(@PathVariable sellerId: Long): ResponseEntity<ApiResponse<SellerDetail>> =
+        ApiResponse.ok(sellerQueryService.getForAdmin(sellerId))
+
     @PostMapping("/{sellerId}/approve")
     fun approve(
         @AuthenticationPrincipal loginMember: LoginMember,

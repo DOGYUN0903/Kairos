@@ -52,6 +52,7 @@ class ProductAdminServiceTest {
         override fun findAllBySkuIds(skuIds: Collection<Long>): List<Product> =
             store.values.filter { product -> product.skus.any { it.id?.value in skuIds } }
 
+        override fun findAllByIds(ids: Collection<Long>): List<Product> = ids.toSet().mapNotNull { store[it] }
         override fun existsByCategoryId(categoryId: Long): Boolean = store.values.any { it.content.categoryId == categoryId }
 
         private fun page(all: List<Product>, page: Int, size: Int): PageResult<Product> {

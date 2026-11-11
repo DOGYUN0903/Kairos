@@ -40,6 +40,19 @@ class ProductChangeRequest(
         status = ChangeRequestStatus.WITHDRAWN
     }
 
+    /** 요청 내용이 [product] 의 현재 내용·정가와 다른 항목. 이미지는 순서까지, 옵션은 ID·이름까지 비교한다. */
+    fun changedFields(product: Product): List<ChangedField> {
+        val current = product.content
+        return listOfNotNull(
+            ChangedField.NAME.takeIf { content.name != current.name },
+            ChangedField.DESCRIPTION.takeIf { content.description != current.description },
+            ChangedField.CATEGORY.takeIf { content.categoryId != current.categoryId },
+            ChangedField.IMAGES.takeIf { content.imageFileIds != current.imageFileIds },
+            ChangedField.OPTIONS.takeIf { content.options != current.options },
+            ChangedField.ORIGINAL_PRICE.takeIf { originalPrice != product.originalPrice },
+        )
+    }
+
     private fun requirePending() {
         if (status != ChangeRequestStatus.PENDING) throw DomainException(ErrorCode.CHANGE_REQUEST_INVALID_STATE_TRANSITION)
     }

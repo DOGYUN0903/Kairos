@@ -31,6 +31,10 @@ class AdminBrandController(private val brandAdminService: BrandAdminService) {
     ): ResponseEntity<ApiResponse<PageResponse<BrandDetail>>> =
         ApiResponse.ok(PageResponse.from(brandAdminService.listForAdmin(status, sort, page, size)))
 
+    @GetMapping("/{brandId}")
+    fun get(@PathVariable brandId: Long): ResponseEntity<ApiResponse<BrandDetail>> =
+        ApiResponse.ok(brandAdminService.getForAdmin(brandId))
+
     @PostMapping("/{brandId}/approve")
     fun approve(
         @AuthenticationPrincipal loginMember: LoginMember,

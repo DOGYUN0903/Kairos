@@ -38,6 +38,9 @@ class SellerQueryService(private val sellerRepository: SellerRepository) {
     fun getCompanyNames(sellerIds: Collection<Long>): Map<Long, String> =
         sellerRepository.findAllByIds(sellerIds.map(::SellerId)).associate { requireNotNull(it.id).value to it.companyName }
 
+    fun getForAdmin(sellerId: Long): SellerDetail =
+        sellerRepository.findById(SellerId(sellerId))?.let(::toDetail) ?: throw DomainException(ErrorCode.SELLER_NOT_FOUND)
+
     fun listForAdmin(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<SellerDetail> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val result = sellerRepository.findPage(status, order, page, size)

@@ -101,6 +101,8 @@ data class ChangeRequestSummary(
     val status: String,
     val requestedAt: LocalDateTime,
     val sellerName: String,
+    /** 현재 상품과 다른 항목(NAME, DESCRIPTION, CATEGORY, IMAGES, OPTIONS, ORIGINAL_PRICE). 상품을 못 찾으면 빈 목록. */
+    val changedFields: List<String>,
 )
 
 data class SellerProductSummary(

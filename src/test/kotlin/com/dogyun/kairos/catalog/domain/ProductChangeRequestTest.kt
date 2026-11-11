@@ -46,4 +46,39 @@ class ProductChangeRequestTest {
         assertEquals(ChangeRequestStatus.WITHDRAWN, withdrawn.status)
         assertCode(ErrorCode.CHANGE_REQUEST_INVALID_STATE_TRANSITION) { withdrawn.approve() }
     }
+
+    private fun product(content: ProductContent, originalPrice: Long = 12000) = Product.restore(
+        ProductId(1L), 1L, 1L, content, originalPrice, 9000, ProductStatus.ON_SALE, null, null, 0, emptyList(),
+    )
+
+    @Test
+    fun 상품과_같은_내용이면_changedFields는_비어_있다() {
+        val content = ProductContent("티셔츠", "설명", 5L, listOf(100L), listOf(ProductOption(1L, "색상", listOf(OptionValue(11L, "블랙")))))
+        val request = ProductChangeRequest.submit(1L, 1L, content, 12000)
+
+        assertEquals(emptyList(), request.changedFields(product(content)))
+    }
+
+    @Test
+    fun changedFields는_상품과_다른_항목만_고정_순서로_돌려준다() {
+        val current = ProductContent("티셔츠", "설명", 5L, listOf(100L, 101L), listOf(ProductOption(1L, "색상", listOf(OptionValue(11L, "블랙")))))
+        val requested = ProductContent(
+            "새 티셔츠", "설명", 6L, listOf(101L, 100L, 102L),
+            listOf(ProductOption(1L, "색상", listOf(OptionValue(11L, "블랙"), OptionValue(null, "네이비")))),
+        )
+        val request = ProductChangeRequest.submit(1L, 1L, requested, 15000)
+
+        assertEquals(
+            listOf(ChangedField.NAME, ChangedField.CATEGORY, ChangedField.IMAGES, ChangedField.OPTIONS, ChangedField.ORIGINAL_PRICE),
+            request.changedFields(product(current)),
+        )
+    }
+
+    @Test
+    fun 설명만_바뀌면_DESCRIPTION만_돌려준다() {
+        val current = ProductContent("티셔츠", "설명", 5L, listOf(100L), emptyList())
+        val request = ProductChangeRequest.submit(1L, 1L, current.copy(description = "새 설명"), 12000)
+
+        assertEquals(listOf(ChangedField.DESCRIPTION), request.changedFields(product(current)))
+    }
 }

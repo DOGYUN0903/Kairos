@@ -33,6 +33,17 @@ class ChangeRequestApiTest : CommerceTestSupport() {
     private fun Fixture.sameContentRequest(name: String, originalPrice: Long = 10000): Map<String, Any?> =
         mapOf("content" to productContent(categoryId, fileIds, name = name), "originalPrice" to originalPrice)
 
+    /** 현재 옵션·값 ID 를 그대로 보내는(=옵션은 안 바뀌는) 요청. */
+    private fun Fixture.keepingOptions(name: String, originalPrice: Long = 10000): Map<String, Any?> {
+        val options = sellerProductDetail(token, productId).get("options").list().map { option ->
+            mapOf(
+                "optionId" to option.get("optionId").asLong(), "name" to option.get("name").asString(),
+                "values" to option.get("values").list().map { mapOf("valueId" to it.get("valueId").asLong(), "name" to it.get("name").asString()) },
+            )
+        }
+        return mapOf("content" to productContent(categoryId, fileIds, options = options, name = name), "originalPrice" to originalPrice)
+    }
+
     /** 색상[블랙(유지)·레드(새 값)] × 사이즈[M·L(유지)], 이름 "새 티셔츠". */
     private fun Fixture.blackRedRequest(): Map<String, Any?> {
         val options = sellerProductDetail(token, productId).get("options")
@@ -55,6 +66,37 @@ class ChangeRequestApiTest : CommerceTestSupport() {
             ),
             "originalPrice" to 10000,
         )
+    }
+
+    @Test
+    fun 변경_요청_목록_행은_바뀐_항목_changedFields를_준다() {
+        val f = onSaleFixture()
+        f.submit(f.keepingOptions(name = "새 티셔츠", originalPrice = 16000))
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken()).andExpect { status { isOk() } })
+            .get("data").get("content").get(0)
+
+        assertEquals(listOf("NAME", "ORIGINAL_PRICE"), row.get("changedFields").list().map { it.asString() })
+    }
+
+    @Test
+    fun 옵션_값을_바꾼_변경_요청의_changedFields에_OPTIONS가_들어간다() {
+        val f = onSaleFixture()
+        f.submit(f.blackRedRequest())
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken())).get("data").get("content").get(0)
+
+        assertEquals(listOf("NAME", "OPTIONS"), row.get("changedFields").list().map { it.asString() })
+    }
+
+    @Test
+    fun 내용이_같은_변경_요청의_changedFields는_빈_배열이다() {
+        val f = onSaleFixture()
+        f.submit(f.keepingOptions(name = "티셔츠"))
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken())).get("data").get("content").get(0)
+
+        assertEquals(0, row.get("changedFields").size())
     }
 
     @Test

@@ -13,5 +13,7 @@ interface ProductRepository {
     fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product>
     /** SKU 가 속한 상품(DISCONTINUED SKU 포함). 없는 SKU ID 는 무시하고 같은 상품은 한 번만 돌려준다. */
     fun findAllBySkuIds(skuIds: Collection<Long>): List<Product>
+    /** `id in (…)` 한 번의 조회(관계는 묶어서 읽는다). 없는 ID 는 결과에 없다. */
+    fun findAllByIds(ids: Collection<Long>): List<Product>
     fun existsByCategoryId(categoryId: Long): Boolean
 }

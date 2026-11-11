@@ -583,6 +583,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/sellers/{sellerId}:
+    get:
+      tags: [Admin Seller]
+      operationId: getAdminSeller
+      summary: 판매자 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관)
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 판매자 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/SellerNotFound'
   /api/v1/admin/sellers/{sellerId}/approve:
     post:
       tags: [Admin Seller]
@@ -947,6 +977,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/brands/{brandId}:
+    get:
+      tags: [Admin Brand]
+      operationId: getAdminBrand
+      summary: 브랜드 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관)
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 브랜드 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BrandDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/BrandNotFound'
   /api/v1/admin/brands/{brandId}/approve:
     post:
       tags: [Admin Brand]
@@ -5481,7 +5541,7 @@ components:
             $ref: '#/components/schemas/OptionRequest'
     ChangeRequestSummary:
       type: object
-      required: [changeRequestId, productId, sellerId, name, originalPrice, status, requestedAt, sellerName]
+      required: [changeRequestId, productId, sellerId, name, originalPrice, status, requestedAt, sellerName, changedFields]
       properties:
         requestedAt:
           $ref: '#/components/schemas/LocalDateTime'
@@ -5489,6 +5549,12 @@ components:
         sellerName:
           type: string
           description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
+        changedFields:
+          type: array
+          description: 현재 상품과 다른 항목(고정 순서). 이미지는 순서까지, 옵션은 ID·이름까지 비교한다. 상품을 찾을 수 없으면 빈 배열.
+          items:
+            type: string
+            enum: [NAME, DESCRIPTION, CATEGORY, IMAGES, OPTIONS, ORIGINAL_PRICE]
         changeRequestId:
           type: integer
           format: int64

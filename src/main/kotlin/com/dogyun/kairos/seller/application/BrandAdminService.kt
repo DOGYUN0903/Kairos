@@ -35,6 +35,12 @@ class BrandAdminService(
         review(brandId, ReviewResult.REJECTED, reason, reviewerId) { it.reject(reason) }
 
     @Transactional(readOnly = true)
+    fun getForAdmin(brandId: Long): BrandDetail {
+        val brand = brandRepository.findById(BrandId(brandId)) ?: throw DomainException(ErrorCode.BRAND_NOT_FOUND)
+        return toBrandDetails(listOf(brand), imageFileReader).single()
+    }
+
+    @Transactional(readOnly = true)
     fun listForAdmin(status: BrandStatus?, order: ListOrder, page: Int, size: Int): PageResult<BrandDetail> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val result = brandRepository.findPage(status, order, page, size)

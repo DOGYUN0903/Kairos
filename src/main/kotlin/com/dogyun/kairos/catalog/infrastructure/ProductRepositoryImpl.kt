@@ -72,6 +72,9 @@ class ProductRepositoryImpl(
         return toDomains(productJpaRepository.findAllById(productIds))
     }
 
+    override fun findAllByIds(ids: Collection<Long>): List<Product> =
+        if (ids.isEmpty()) emptyList() else toDomains(productJpaRepository.findAllById(ids.toSet()))
+
     override fun existsByCategoryId(categoryId: Long): Boolean = productJpaRepository.existsByCategoryId(categoryId)
 
     private fun findPage(where: List<Predicate>, order: ListOrder, page: Int, size: Int): PageResult<Product> {

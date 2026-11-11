@@ -1,6 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.ChangeRequestStatus
+import com.dogyun.kairos.catalog.domain.ChangedField
 import com.dogyun.kairos.catalog.domain.ProductChangeRequest
 import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
@@ -63,6 +64,7 @@ class ChangeRequestAdminService(
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val result = changeRequestRepository.findPage(status, order, page, size)
         val sellerNames = sellerReader.getSellerNames(result.content.map { it.sellerId }.toSet())
+        val products = productRepository.findAllByIds(result.content.map { it.productId }.toSet()).associateBy { it.id?.value }
         val summaries = result.content.map {
             ChangeRequestSummary(
                 changeRequestId = requireNotNull(it.id),
@@ -73,6 +75,7 @@ class ChangeRequestAdminService(
                 status = it.status.name,
                 requestedAt = requireNotNull(it.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
                 sellerName = sellerNames[it.sellerId] ?: DELETED_SELLER_NAME,
+                changedFields = products[it.productId]?.let { product -> it.changedFields(product).map(ChangedField::name) }.orEmpty(),
             )
         }
         return PageResult(summaries, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
