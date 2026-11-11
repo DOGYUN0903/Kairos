@@ -58,8 +58,8 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
 
     private enum class Kind { PLAIN, CANCEL, DEFECTIVE_WITH_BENEFITS, ALL_RETURNED, ALL_DEFECTIVE }
 
-    /** 판매자 3명: 20,000원/1000bp, 33,000원/1000bp, 12,345원/850bp(버림 확인). */
-    private fun shops(): List<Shop> = listOf(20_000L to 1000, 33_000L to 1000, 12_345L to 850).map { (price, bp) ->
+    /** 판매자 3명: 20,000원/1000bp, 33,000원/1000bp, 12,360원/850bp(1,050.6 → 버림 1,050, 반올림이면 1,051). */
+    private fun shops(): List<Shop> = listOf(20_000L to 1000, 33_000L to 1000, 12_360L to 850).map { (price, bp) ->
         val token = newUserToken()
         val sellerId = approvedSeller(token)
         jdbcTemplate.update("update seller set commission_rate_bp = ? where id = ?", bp, sellerId)
@@ -320,7 +320,8 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
             "구매자 배송비 환불 반품",
         )
         assertTrue(lines.any { long(it["seller_coupon_discount"]) > 0 }, "판매자 쿠폰 라인")
-        assertTrue(lines.any { long(it["commission_base"]) * 850 % 10_000 != 0L && (it["commission_rate_bp"] as Number).toInt() == 850 }, "버림 라인")
+        // 소수부 ≥ .5 인 수수료가 있어야 버림과 반올림이 갈린다(12,360 × 850bp = 1,050.6).
+        assertTrue(lines.any { (it["commission_rate_bp"] as Number).toInt() == 850 && long(it["commission_base"]) * 850 % 10_000 >= 5_000 }, "버림≠반올림 라인")
         assertTrue(
             jdbcTemplate.queryForObject("select count(*) from order_item where order_item_status = 'CANCELED'", Long::class.java)!! > 0,
             "취소 항목",
@@ -358,24 +359,30 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
         generateSettlement(admin, periodA) // 같은 경로(HTTP, 같은 관리자)로 한 번 실행한 기준 결과
         val single = canonical(withGeneratedAt = false)
 
-        repeat(3) { round ->
+        var contended = 0
+        repeat(5) { round ->
             resetGeneration()
             val start = CountDownLatch(1)
             val pool = Executors.newFixedThreadPool(2)
             try {
                 val futures = (1..2).map {
-                    pool.submit<Int> {
+                    pool.submit<JsonNode> {
                         start.await()
                         mockMvc.post("/api/v1/admin/settlements/generate") {
                             header("Authorization", "Bearer $admin")
                             header("Idempotency-Key", UUID.randomUUID().toString())
                             contentType = MediaType.APPLICATION_JSON
                             content = objectMapper.writeValueAsString(mapOf("periodStart" to periodA.toString()))
-                        }.andReturn().response.status
+                        }.andReturn().let { res -> assertEquals(200, res.response.status, "round=$round"); json(res).get("data") }
                     }
                 }
                 start.countDown()
-                assertEquals(listOf(200, 200), futures.map { it.get(60, TimeUnit.SECONDS) }, "round=$round")
+                val results = futures.map { it.get(60, TimeUnit.SECONDS) }
+                // 겹침은 강제할 수 없다(스레드 시작 시점이 비결정적). 경로를 남기고 겹친 라운드 수를 센다:
+                // 판매자를 건너뛰었거나(skipped > 0) 판매자를 돈 뒤 run INSERT 에서 졌으면(alreadyGenerated && sellerCount > 0) 실제로 겹친 것이다.
+                println("동시 생성 round=$round: " + results.joinToString { "created=${it.get("createdCount")} skipped=${it.get("skippedCount")} already=${it.get("alreadyGenerated")} sellers=${it.get("sellerCount")}" })
+                if (results.any { it.get("skippedCount").asInt() > 0 || (it.get("alreadyGenerated").asBoolean() && it.get("sellerCount").asInt() > 0) }) contended++
+                assertEquals(3, results.sumOf { it.get("createdCount").asInt() }, "round=$round: 두 실행이 만든 정산 합이 판매자 수와 같다")
             } finally {
                 pool.shutdown()
             }
@@ -384,6 +391,9 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
             assertAllInvariants()
             assertSameSnapshot(single, canonical(withGeneratedAt = false), "round=$round")
         }
+        println("동시 생성: 실제로 겹친 라운드 $contended/5")
+        // 래치로 동시에 출발시키면 관측상 매 라운드 겹친다(10/10). 하나도 안 겹치면 이 테스트는 동시성을 증명하지 못한 것이다.
+        assertTrue(contended >= 1, "동시 실행이 한 번도 겹치지 않았다")
     }
 
     @Test
@@ -428,6 +438,63 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
         val (e, a) = diff.value
         val firstDiff = (0 until maxOf(e.size, a.size)).first { e.getOrNull(it) != a.getOrNull(it) }
         throw AssertionError("$label: part=${diff.index} sizes ${e.size}/${a.size}\nexpected=${e.getOrNull(firstDiff)}\nactual  =${a.getOrNull(firstDiff)}")
+    }
+
+    private enum class CrashPoint { AFTER_HEADER_AND_LINES, AFTER_ATTACH, AFTER_CARRY_OVER }
+
+    @Test
+    fun 판매자_트랜잭션_안에서_헤더_라인_INSERT_뒤_조정_붙이기_뒤_CARRY_OVER_뒤에_실패하면_그_판매자_전체가_롤백되고_재실행이_한_번_실행과_같다() {
+        val shops = standardFixture()
+        service().generateDue(periodB)
+        val clean = canonical()
+
+        // 판매자 1 은 기간 A 에 MANUAL 조정, 판매자 3 은 A 합계가 음수라 CARRY_OVER 를 만든다.
+        val cases = listOf(
+            CrashPoint.AFTER_HEADER_AND_LINES to shops[1].sellerId,
+            CrashPoint.AFTER_ATTACH to shops[0].sellerId,
+            CrashPoint.AFTER_CARRY_OVER to shops[2].sellerId,
+        )
+        for ((point, victim) in cases) {
+            resetGeneration()
+            val label = "point=$point"
+            var fired = false
+            val settlements = object : SettlementRepository by settlementRepository {
+                override fun save(s: Settlement): Settlement {
+                    val saved = settlementRepository.save(s) // 헤더 + 라인 INSERT(flush)까지 끝난 뒤
+                    if (point == CrashPoint.AFTER_HEADER_AND_LINES && s.id == null && s.sellerId == victim) { fired = true; throw IllegalStateException(label) }
+                    return saved
+                }
+            }
+            val adjustments = object : SettlementAdjustmentRepository by adjustmentRepository {
+                override fun attach(sellerId: Long, settlementId: Long, createdBefore: LocalDateTime): Int {
+                    val n = adjustmentRepository.attach(sellerId, settlementId, createdBefore)
+                    if (point == CrashPoint.AFTER_ATTACH && sellerId == victim) { assertTrue(n > 0, label); fired = true; throw IllegalStateException(label) }
+                    return n
+                }
+                override fun save(a: com.dogyun.kairos.settlement.domain.SettlementAdjustment): com.dogyun.kairos.settlement.domain.SettlementAdjustment {
+                    val saved = adjustmentRepository.save(a)
+                    if (point == CrashPoint.AFTER_CARRY_OVER && a.sellerId == victim) { fired = true; throw IllegalStateException(label) }
+                    return saved
+                }
+            }
+            val r = SettlementGenerationService(sellerOrderReader, settlements, adjustments, runRepository, properties, transactionRunner, fixedClock)
+                .generate(periodA)
+
+            assertTrue(fired, label)
+            assertEquals(1, r.failedCount, label)
+            assertEquals(2, r.createdCount, label)
+            assertEquals(0L, runCount(), "$label: run 없음")
+            fun count(sql: String) = jdbcTemplate.queryForObject(sql, Long::class.java, victim)!!
+            assertEquals(0L, count("select count(*) from settlement where seller_id = ?"), "$label: 헤더 롤백")
+            assertEquals(0L, count("select count(*) from settlement_line l join seller_order so on so.id = l.seller_order_id where so.seller_id = ?"), "$label: 라인 롤백")
+            assertEquals(0L, count("select count(*) from settlement_adjustment where seller_id = ? and settlement_id is not null"), "$label: 조정 붙임 롤백")
+            assertEquals(0L, count("select count(*) from settlement_adjustment where seller_id = ? and adjustment_type = 'CARRY_OVER'"), "$label: CARRY_OVER 롤백")
+            assertAllInvariants()
+
+            service().generateDue(periodB)
+            service().generateDue(periodB)
+            assertSameSnapshot(clean, canonical(), "$label: 재실행 == 한 번에 끝난 실행")
+        }
     }
 
     private fun assertAllInvariantsIfAny() {
