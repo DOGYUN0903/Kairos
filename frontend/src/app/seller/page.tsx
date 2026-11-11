@@ -1,4 +1,15 @@
-// Task 10 에서 판매자 대시보드로 바뀐다. 가드·콘솔 레이아웃 확인용 자리.
+import { QuickActions } from "@/features/seller/dashboard/components/QuickActions";
+import { RecentProducts } from "@/features/seller/dashboard/components/RecentProducts";
+import { StatusCards } from "@/features/seller/dashboard/components/StatusCards";
+
 export default function SellerHome() {
-  return <p className="text-text-2">판매자 센터</p>;
+  return (
+    <>
+      <StatusCards />
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)_280px] items-start gap-6">
+        <RecentProducts />
+        <QuickActions />
+      </div>
+    </>
+  );
 }

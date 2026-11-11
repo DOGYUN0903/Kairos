@@ -12,6 +12,7 @@ export function ConsoleShell({
   nav,
   userLabel,
   title,
+  banner,
   children,
 }: {
   role: "판매자 센터" | "관리자 콘솔";
@@ -19,6 +20,8 @@ export function ConsoleShell({
   userLabel: string;
   /** console__top h1. 없으면 역할 이름. */
   title?: string;
+  /** 본문 위 전폭 배너(판매자 정지 중, 서버 409 SELLER_NOT_ACTIVE 등). */
+  banner?: ReactNode;
   children: ReactNode;
 }) {
   const { logout } = useAuth();
@@ -41,7 +44,10 @@ export function ConsoleShell({
             </button>
           </div>
         </header>
-        <main className="max-w-[1200px] px-8 pb-16 pt-7">{children}</main>
+        <main className="max-w-[1200px] px-8 pb-16 pt-7">
+          {banner && <div className="mb-5">{banner}</div>}
+          {children}
+        </main>
       </div>
     </div>
   );

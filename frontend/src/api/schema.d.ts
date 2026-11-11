@@ -2408,6 +2408,11 @@ export interface components {
             name: string;
             englishName?: string | null;
             logoUrl?: string | null;
+            /**
+             * Format: int64
+             * @description 로고 파일 ID. 반려된 브랜드를 재신청할 때 그대로 다시 보내면 로고가 유지된다.
+             */
+            logoFileId?: number | null;
             description?: string | null;
             status: components["schemas"]["BrandStatus"];
             rejectReason?: string | null;
