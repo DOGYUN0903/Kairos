@@ -25,7 +25,7 @@ class CategoryApiTest : CommerceTestSupport() {
 
     @Test
     fun 일반_회원의_카테고리_생성은_403() {
-        post("/api/v1/admin/categories", newUserToken(), mapOf("name" to "패션", "displayOrder" to 1))
+        postIdem("/api/v1/admin/categories", newUserToken(), mapOf("name" to "패션", "displayOrder" to 1))
             .andExpect { status { isForbidden() } }
     }
 
@@ -55,9 +55,9 @@ class CategoryApiTest : CommerceTestSupport() {
         val root = createCategory(null, "패션", 1)
         val leaf = createCategory(root, "신발", 1)
 
-        post("/api/v1/admin/categories", adminToken(), mapOf("parentId" to leaf, "name" to "러닝화", "displayOrder" to 1))
+        postIdem("/api/v1/admin/categories", adminToken(), mapOf("parentId" to leaf, "name" to "러닝화", "displayOrder" to 1))
             .andExpect { status { isBadRequest() } }
-        post("/api/v1/admin/categories", adminToken(), mapOf("parentId" to 99999, "name" to "러닝화", "displayOrder" to 1))
+        postIdem("/api/v1/admin/categories", adminToken(), mapOf("parentId" to 99999, "name" to "러닝화", "displayOrder" to 1))
             .andExpect { status { isNotFound() } }
     }
 
@@ -128,10 +128,31 @@ class CategoryApiTest : CommerceTestSupport() {
 
     @Test
     fun 음수_displayOrder는_400이다() {
-        post("/api/v1/admin/categories", adminToken(), mapOf("name" to "패션", "displayOrder" to -1))
+        postIdem("/api/v1/admin/categories", adminToken(), mapOf("name" to "패션", "displayOrder" to -1))
             .andExpect { status { isBadRequest() } }
         val id = createCategory(null, "패션", 0)
         put("/api/v1/admin/categories/$id", adminToken(), mapOf("name" to "패션", "displayOrder" to -1))
+            .andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun 같은_Idempotency_Key로_카테고리를_다시_생성하면_저장된_응답을_돌려주고_하나만_만든다() {
+        val body = mapOf("parentId" to null, "name" to "멱등-패션", "displayOrder" to 1)
+        val token = adminToken()
+        val first = postIdem("/api/v1/admin/categories", token, body, "cat-key-1").andExpect { status { isCreated() } }
+        val second = postIdem("/api/v1/admin/categories", token, body, "cat-key-1").andExpect { status { isCreated() } }
+
+        assertEquals(
+            json(first).get("data").get("categoryId").asLong(),
+            json(second).get("data").get("categoryId").asLong(),
+        )
+        val tree = json(get("/api/v1/categories").andExpect { status { isOk() } }).get("data")
+        assertEquals(1, names(tree).count { it == "멱등-패션" })
+    }
+
+    @Test
+    fun 카테고리_생성에_Idempotency_Key가_없으면_400() {
+        post("/api/v1/admin/categories", adminToken(), mapOf("name" to "패션", "displayOrder" to 1))
             .andExpect { status { isBadRequest() } }
     }
 }

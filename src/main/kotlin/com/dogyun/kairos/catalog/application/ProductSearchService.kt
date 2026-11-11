@@ -80,6 +80,5 @@ class ProductSearchService(
 
     private companion object {
         const val MAX_SIZE = 100
-        const val DELETED_SELLER_NAME = "(삭제된 판매자)"
     }
 }

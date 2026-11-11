@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/admin/categories")
 class AdminCategoryController(private val categoryService: CategoryService) {
 
+    /** `Idempotency-Key` 헤더는 필터가 검증·처리한다(IdempotencyProperties.paths). */
     @PostMapping
     fun create(@Valid @RequestBody request: CategoryRequest): ResponseEntity<ApiResponse<CreateCategoryResponse>> =
         ApiResponse.created(CreateCategoryResponse(categoryService.create(request.toCreateCommand())))

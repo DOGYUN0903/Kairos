@@ -1,5 +1,8 @@
 package com.dogyun.kairos.catalog.application
 
+/** 판매자 정보를 찾을 수 없을 때(탈퇴·삭제) 화면에 보이는 이름. */
+const val DELETED_SELLER_NAME = "(삭제된 판매자)"
+
 /** seller 모듈의 브랜드·판매자 정보를 읽는 포트. 구현은 catalog.infrastructure 가 맡는다. */
 interface SellerReader {
     fun findBrand(brandId: Long): BrandSnapshot?

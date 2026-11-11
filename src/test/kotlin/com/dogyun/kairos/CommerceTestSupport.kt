@@ -167,7 +167,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     }
 
     protected fun createCategory(parentId: Long?, name: String, displayOrder: Int): Long {
-        val created = post(
+        val created = postIdem(
             "/api/v1/admin/categories", adminToken(),
             mapOf("parentId" to parentId, "name" to name, "displayOrder" to displayOrder),
         ).andExpect { status { isCreated() } }
