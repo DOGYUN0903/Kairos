@@ -41,3 +41,46 @@
     outline-offset: 2px;
   }
 }
+
+/* design/assets/kairos.css 의 공용 컴포넌트를 Tailwind 로 옮긴 것. 값은 시안과 같다. */
+@layer components {
+  .chip {
+    @apply inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-[13px] border border-transparent px-2.5 text-xs font-medium;
+  }
+  .chip::before {
+    content: "";
+    @apply h-[7px] w-[7px] rounded-full bg-current;
+  }
+  .chip-pending { @apply bg-[#FFF6DD] text-[#7A5600]; }
+  .chip-onsale { @apply bg-[#E6F4EC] text-[#1F7A4D]; }
+  .chip-rejected { @apply bg-[#FBECEA] text-[#B42318]; }
+  .chip-paused { @apply bg-surface-2 text-text-2; }
+  .chip-ended { @apply bg-surface-2 text-text-3; }
+  .chip-info { @apply bg-[#E8EDF7] text-navy; }
+
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-1.5 whitespace-nowrap rounded border border-navy bg-bg px-[18px] text-sm font-medium text-navy no-underline hover:bg-surface;
+  }
+  .btn-primary { @apply bg-navy text-white hover:bg-navy-hover; }
+  .btn-ghost { @apply border-border text-navy; }
+  .btn-danger { @apply border-danger text-danger hover:bg-[#FBECEA]; }
+  .btn-destructive { @apply border-danger bg-danger text-white hover:bg-[#9a1d13]; }
+  .btn-sm { @apply min-h-[36px] px-3 text-[13px]; }
+  .btn-lg { @apply min-h-[52px] text-base font-bold; }
+  .btn-block { @apply w-full; }
+  .btn:disabled,
+  .btn[aria-disabled="true"] { @apply cursor-not-allowed border-border bg-surface-2 text-text-3; }
+
+  .field { @apply flex flex-col gap-1.5; }
+  .field > label { @apply text-[13px] font-medium; }
+  .input {
+    @apply min-h-[44px] w-full rounded border border-border bg-bg px-3 hover:border-text-3 focus:border-navy focus:shadow-[0_0_0_2px_rgba(27,42,74,.15)] focus:outline-none;
+  }
+  .input[aria-invalid="true"] { @apply border-danger; }
+  .hint { @apply text-xs text-text-2; }
+  .field-error { @apply text-xs text-danger; }
+
+  .notice { @apply flex gap-2.5 rounded border border-border bg-surface px-3.5 py-3 text-[13px] text-text-2; }
+  .notice-warn { @apply border-[#F0DFA8] bg-[#FFF6DD] text-[#7A5600]; }
+  .card { @apply rounded-lg border border-border bg-bg; }
+}
