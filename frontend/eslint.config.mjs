@@ -9,7 +9,7 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 const moneyMessage = "금액 나눗셈은 src/lib/money.ts 에서만";
 
 const config = [
-  { ignores: [".next/**", "node_modules/**", "out/**", "next-env.d.ts", "src/api/schema.d.ts", "playwright-report/**", "test-results/**"] },
+  { ignores: [".next/**", ".next-*/**", "node_modules/**", "out/**", "next-env.d.ts", "src/api/schema.d.ts", "playwright-report/**", "test-results/**"] },
   ...compat.extends("next/core-web-vitals"),
   ...tseslint.configs.recommended,
   {
