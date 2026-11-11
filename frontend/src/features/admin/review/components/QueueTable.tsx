@@ -34,7 +34,7 @@ export function QueueTable({ tab, rows, selectedId, onSelect }: { tab: ReviewTab
             const selected = r.id === selectedId;
             const td = cn("border-b border-border px-3.5 py-3 align-middle", selected && "bg-[#E8EDF7]");
             return (
-              <tr key={r.id} aria-current={selected ? "true" : undefined} className={cn(!selected && "hover:bg-[#FAFBFC]")}>
+              <tr key={r.id} aria-current={selected ? "true" : undefined} className={cn(!selected && "hover:bg-surface")}>
                 <td className={td}>
                   <span className="font-medium">{r.name}</span>
                   {r.meta && <span className="block text-xs text-text-3">{r.meta}</span>}

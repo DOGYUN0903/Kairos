@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMove, nextDisplayOrder, reorderUpdates, sortTree, type CategoryNode } from "./tree";
+import { canMove, nextDisplayOrder, reorderedIds, sortTree, type CategoryNode } from "./tree";
 
 const n = (categoryId: number, displayOrder: number, children: CategoryNode[] = []): CategoryNode => ({ categoryId, name: `c${categoryId}`, displayOrder, children });
 
@@ -18,23 +18,15 @@ describe("category tree", () => {
     expect(canMove(s, 1, "up")).toBe(false);
     expect(canMove(s, 2, "down")).toBe(false);
     expect(canMove(s, 2, "up")).toBe(true);
-    expect(reorderUpdates(s, 1, "up")).toEqual([]);
+    expect(reorderedIds(s, 1, "up")).toBeNull();
   });
-  it("위로_옮기면_두_행의_순서가_바뀐다", () => {
-    expect(reorderUpdates([n(1, 0), n(2, 1), n(3, 2)], 3, "up")).toEqual([
-      { id: 3, name: "c3", displayOrder: 1 },
-      { id: 2, name: "c2", displayOrder: 2 },
-    ]);
+  it("위로_옮기면_보이는_순서에서_두_ID가_바뀐다", () => {
+    expect(reorderedIds([n(1, 0), n(2, 1), n(3, 2)], 3, "up")).toEqual([1, 3, 2]);
   });
-  it("같은_순서값이_섞여_있어도_보이는_순서대로_연속_값으로_저장한다", () => {
-    // 보이는 순서: 1, 2, 3 (모두 displayOrder 5). 2를 위로 → 2, 1, 3
-    expect(reorderUpdates([n(1, 5), n(2, 5), n(3, 5)], 2, "up")).toEqual([
-      { id: 2, name: "c2", displayOrder: 0 },
-      { id: 1, name: "c1", displayOrder: 1 },
-      { id: 3, name: "c3", displayOrder: 2 },
-    ]);
+  it("같은_순서값이_섞여_있어도_보이는_순서_기준으로_옮긴다", () => {
+    expect(reorderedIds([n(1, 5), n(2, 5), n(3, 5)], 2, "up")).toEqual([2, 1, 3]);
   });
   it("모르는_id는_옮기지_않는다", () => {
-    expect(reorderUpdates([n(1, 0)], 99, "down")).toEqual([]);
+    expect(reorderedIds([n(1, 0)], 99, "down")).toBeNull();
   });
 });

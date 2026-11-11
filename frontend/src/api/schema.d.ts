@@ -634,6 +634,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/categories/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 같은 부모 아래 카테고리 순서 일괄 변경 (ADMIN, 한 트랜잭션)
+         * @description `categoryIds` 의 순서대로 displayOrder 를 0, 1, 2… 로 다시 매긴다. `parentId` 가 null 이면 대분류들이다.
+         *     `categoryIds` 는 그 부모 아래 (삭제되지 않은) 카테고리 전부와 정확히 일치해야 한다(중복·누락·다른 부모의 ID 는 `CATEGORY_INVALID`). 하나라도 어긋나면 아무것도 바꾸지 않는다.
+         */
+        put: operations["reorderCategories"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/categories/{categoryId}": {
         parameters: {
             query?: never;
@@ -2464,6 +2485,15 @@ export interface components {
             name: string;
             /** Format: int32 */
             displayOrder: number;
+        };
+        CategoryOrderRequest: {
+            /**
+             * Format: int64
+             * @description 순서를 바꿀 카테고리들의 부모(null이면 대분류)
+             */
+            parentId?: number | null;
+            /** @description 원하는 순서대로 나열한 그 부모 아래 카테고리 ID 전부 */
+            categoryIds: number[];
         };
         CreateCategoryResponse: {
             /** Format: int64 */
@@ -5179,6 +5209,50 @@ export interface operations {
                 };
             };
             /** @description `INVALID_REQUEST` 또는 `CATEGORY_INVALID` 이름 길이 위반, 소분류 아래에는 만들 수 없다 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description `CATEGORY_NOT_FOUND` 부모 카테고리가 없다 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reorderCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description 처리 완료 (`data`는 null) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyApiResponse"];
+                };
+            };
+            /** @description `INVALID_REQUEST` 또는 `CATEGORY_INVALID` ID 목록이 부모 아래 카테고리와 정확히 일치하지 않는다 */
             400: {
                 headers: {
                     [name: string]: unknown;

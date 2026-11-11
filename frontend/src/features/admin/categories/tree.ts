@@ -1,7 +1,6 @@
 import type { components } from "@/api/schema";
 
 export type CategoryNode = components["schemas"]["CategoryNode"];
-export type OrderUpdate = { id: number; name: string; displayOrder: number };
 
 const byOrder = (a: CategoryNode, b: CategoryNode) => a.displayOrder - b.displayOrder || a.categoryId - b.categoryId;
 
@@ -23,18 +22,18 @@ export function canMove(siblings: CategoryNode[], id: number, dir: "up" | "down"
 }
 
 /**
- * 형제 안에서 한 칸 옮긴 결과를 0..n-1 연속 순서로 정규화하고, 값이 바뀌는 행만 돌려준다.
- * 같은 displayOrder 가 섞여 있어도 보이는 순서(정렬 결과)가 그대로 저장된다. 못 옮기면 빈 배열.
+ * 형제 안에서 한 칸 옮긴 뒤의 ID 순서(보이는 순서 기준). 못 옮기면 null.
+ * 서버가 이 순서로 0.. 연속 값을 다시 매긴다(같은 displayOrder 가 섞여 있어도 보이는 순서가 저장된다).
  */
-export function reorderUpdates(siblings: CategoryNode[], id: number, dir: "up" | "down"): OrderUpdate[] {
-  if (!canMove(siblings, id, dir)) return [];
-  const list = [...siblings].sort(byOrder);
-  const i = list.findIndex((n) => n.categoryId === id);
+export function reorderedIds(siblings: CategoryNode[], id: number, dir: "up" | "down"): number[] | null {
+  if (!canMove(siblings, id, dir)) return null;
+  const ids = [...siblings].sort(byOrder).map((n) => n.categoryId);
+  const i = ids.indexOf(id);
   const j = dir === "up" ? i - 1 : i + 1;
-  const a = list[i];
-  const b = list[j];
-  if (!a || !b) return [];
-  list[i] = b;
-  list[j] = a;
-  return list.flatMap((n, idx) => (n.displayOrder === idx ? [] : [{ id: n.categoryId, name: n.name, displayOrder: idx }]));
+  const a = ids[i];
+  const b = ids[j];
+  if (a === undefined || b === undefined) return null;
+  ids[i] = b;
+  ids[j] = a;
+  return ids;
 }

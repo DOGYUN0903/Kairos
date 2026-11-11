@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema";
 import { resolveError } from "@/api/errors";
-import { sortTree, type CategoryNode, type OrderUpdate } from "@/features/admin/categories/tree";
+import { sortTree, type CategoryNode } from "@/features/admin/categories/tree";
 import type { CategoryValues } from "@/features/admin/categories/schemas";
 import { toast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/query-keys";
@@ -74,15 +74,13 @@ export function useDeleteCategory() {
   return { remove: (id: number) => guard(() => m.mutateAsync(id).then(() => true, () => false)), isPending: m.isPending };
 }
 
-/** 순서 변경: 바뀐 행마다 PUT 을 순서대로 보낸다. 중간 실패여도 끝에 다시 읽어 서버 상태를 보인다. */
+/** 순서 변경: 한 요청(서버 한 트랜잭션)으로 같은 부모 아래 ID 순서를 보낸다. */
 export function useReorderCategories() {
   const invalidate = useInvalidate();
   const guard = useGuard();
   const m = useMutation({
-    mutationFn: async (updates: OrderUpdate[]) => {
-      for (const u of updates) {
-        await api.PUT("/api/v1/admin/categories/{categoryId}", { params: { path: { categoryId: u.id } }, body: { name: u.name, displayOrder: u.displayOrder } });
-      }
+    mutationFn: async (v: { parentId: number | null; categoryIds: number[] }) => {
+      await api.PUT("/api/v1/admin/categories/order", { body: v });
     },
     onError: (e) => {
       const { message } = resolveError(e);
@@ -90,5 +88,5 @@ export function useReorderCategories() {
     },
     onSettled: invalidate,
   });
-  return { reorder: (updates: OrderUpdate[]) => guard(() => m.mutateAsync(updates).then(() => true, () => false)), isPending: m.isPending };
+  return { reorder: (v: { parentId: number | null; categoryIds: number[] }) => guard(() => m.mutateAsync(v).then(() => true, () => false)), isPending: m.isPending };
 }

@@ -38,7 +38,7 @@ export function SellerTable({ rows }: { rows: AdminSeller[] }) {
             {rows.map((s) => {
               const act = sellerActions(s.status);
               return (
-                <tr key={s.sellerId} className="hover:bg-[#FAFBFC]">
+                <tr key={s.sellerId} className="hover:bg-surface">
                   <td className={TD}>
                     <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => setDetail(s)}>{s.companyName}</button>
                   </td>

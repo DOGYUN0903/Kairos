@@ -17,8 +17,8 @@ export const errorTable: Partial<Record<ErrorCode, { kind: ErrorKind; field?: st
   FORBIDDEN: { kind: "page" },
   PRODUCT_NOT_FOUND: { kind: "page" },
   BRAND_NOT_FOUND: { kind: "page" },
-  CATEGORY_HAS_PRODUCTS: { kind: "toast" },
-  CATEGORY_HAS_CHILDREN: { kind: "toast" },
+  CATEGORY_HAS_PRODUCTS: { kind: "toast", message: "이 카테고리에 상품이 있어 삭제할 수 없습니다. 상품을 다른 카테고리로 옮긴 뒤 다시 시도하세요." },
+  CATEGORY_HAS_CHILDREN: { kind: "toast", message: "소분류가 있는 대분류는 삭제할 수 없습니다. 소분류를 먼저 삭제하세요." },
   CHANGE_REQUEST_ALREADY_PENDING: {
     kind: "toast",
     message: "이미 검수 중인 변경 요청이 있습니다. 철회한 뒤 다시 요청하세요.",
