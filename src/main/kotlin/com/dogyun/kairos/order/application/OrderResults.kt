@@ -170,6 +170,17 @@ data class SellerOrderSummary(
     val orderedAt: LocalDateTime,
 )
 
+/** 환불 미리보기. 실제 취소와 같은 계산([com.dogyun.kairos.order.domain.RefundCalculator])의 결과이며 아무것도 바꾸지 않는다. */
+data class CancelPreviewResult(
+    val orderItemId: Long,
+    val paidAmount: Long,
+    val shippingFeeRefund: Long,
+    val shippingFeeDeducted: Long,
+    val shippingFeeReturned: Long,
+    val refundAmount: Long,
+    val pointsRefund: Long,
+)
+
 data class CancelItemResult(
     val orderItemId: Long,
     /** ORDERED, CANCEL_REQUESTED, CANCELED */

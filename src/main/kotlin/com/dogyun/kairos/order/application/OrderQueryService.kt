@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
+import com.dogyun.kairos.order.domain.CancelActor
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
@@ -24,6 +25,26 @@ class OrderQueryService(
     private val paymentGateway: PaymentGateway,
     private val properties: OrderProperties,
 ) {
+
+    /**
+     * 환불 미리보기. 주문 행 락 없이 읽는다(쓰기를 결정하는 읽기가 아니다). 계산은 실제 취소와 같은 [Order.planCancel] 이다.
+     * 미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다.
+     */
+    fun previewCancel(memberId: Long, orderId: Long, orderItemId: Long): CancelPreviewResult {
+        val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
+            ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
+        order.findItem(orderItemId)
+        val plan = order.planCancel(orderItemId, CancelActor.BUYER, properties.shippingPolicy())
+        return CancelPreviewResult(
+            orderItemId = orderItemId,
+            paidAmount = plan.paidAmount,
+            shippingFeeRefund = plan.shippingFeeRefund,
+            shippingFeeDeducted = plan.shippingFeeDeducted,
+            shippingFeeReturned = plan.shippingFeeReturned,
+            refundAmount = plan.refundAmount,
+            pointsRefund = plan.pointsRefund,
+        )
+    }
 
     fun getMine(memberId: Long, orderId: Long): OrderDetail {
         val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }

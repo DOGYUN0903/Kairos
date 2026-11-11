@@ -2598,6 +2598,45 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/orders/{orderId}/items/{orderItemId}/cancel-preview:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - $ref: '#/components/parameters/OrderItemId'
+    get:
+      tags: [Order]
+      operationId: previewCancelMyOrderItem
+      summary: 주문 항목 환불 미리보기 (구매자)
+      description: |
+        실제 취소와 같은 계산(`RefundCalculator`)으로 지금 이 항목을 취소하면 얼마가 환불되는지 보여준다. 아무것도 바꾸지 않는다(주문·결제·재고 불변, 주문 행 락 없음).
+        미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다. `Idempotency-Key` 는 없다.
+      responses:
+        '200':
+          description: 지금 취소하면 받을 환불 내역
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CancelPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`ORDER_ITEM_NOT_CANCELABLE`(배송 시작·다른 항목 취소 확인 중) 또는 `ORDER_INVALID_STATE_TRANSITION`(결제 전 등)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/seller/orders/{sellerOrderId}/items/{orderItemId}/cancel:
     parameters:
       - $ref: '#/components/parameters/SellerOrderId'
@@ -6358,6 +6397,36 @@ components:
           type: integer
           format: int64
           description: 되돌려진 포인트
+    CancelPreview:
+      type: object
+      required: [orderItemId, paidAmount, shippingFeeRefund, shippingFeeDeducted, shippingFeeReturned, refundAmount, pointsRefund]
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+        paidAmount:
+          type: integer
+          format: int64
+          description: 항목의 현금 결제 몫
+        shippingFeeRefund:
+          type: integer
+          format: int64
+          description: 판매자 주문이 통째로 비어 돌려받는 배송비
+        shippingFeeDeducted:
+          type: integer
+          format: int64
+          description: 무료배송 기준이 깨져 차감되는 배송비
+        shippingFeeReturned:
+          type: integer
+          format: int64
+          description: 마지막 취소라 되돌려받는 앞선 차감액
+        refundAmount:
+          type: integer
+          format: int64
+          description: 최종 환불액(`paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`)
+        pointsRefund:
+          type: integer
+          format: int64
     ConfirmPaymentRequest:
       type: object
       required: [orderNo, paymentKey, amount]

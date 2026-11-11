@@ -1223,6 +1223,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{orderId}/items/{orderItemId}/cancel-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 주문 항목 환불 미리보기 (구매자)
+         * @description 실제 취소와 같은 계산(`RefundCalculator`)으로 지금 이 항목을 취소하면 얼마가 환불되는지 보여준다. 아무것도 바꾸지 않는다(주문·결제·재고 불변, 주문 행 락 없음).
+         *     미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다. `Idempotency-Key` 는 없다.
+         */
+        get: operations["previewCancelMyOrderItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/seller/orders/{sellerOrderId}/items/{orderItemId}/cancel": {
         parameters: {
             query?: never;
@@ -3144,6 +3168,37 @@ export interface components {
              * Format: int64
              * @description 되돌려진 포인트
              */
+            pointsRefund: number;
+        };
+        CancelPreview: {
+            /** Format: int64 */
+            orderItemId: number;
+            /**
+             * Format: int64
+             * @description 항목의 현금 결제 몫
+             */
+            paidAmount: number;
+            /**
+             * Format: int64
+             * @description 판매자 주문이 통째로 비어 돌려받는 배송비
+             */
+            shippingFeeRefund: number;
+            /**
+             * Format: int64
+             * @description 무료배송 기준이 깨져 차감되는 배송비
+             */
+            shippingFeeDeducted: number;
+            /**
+             * Format: int64
+             * @description 마지막 취소라 되돌려받는 앞선 차감액
+             */
+            shippingFeeReturned: number;
+            /**
+             * Format: int64
+             * @description 최종 환불액(`paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`)
+             */
+            refundAmount: number;
+            /** Format: int64 */
             pointsRefund: number;
         };
         ConfirmPaymentRequest: {
@@ -6619,6 +6674,51 @@ export interface operations {
                 };
             };
             422: components["responses"]["IdempotencyKeyReused"];
+        };
+    };
+    previewCancelMyOrderItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 지금 취소하면 받을 환불 내역 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["CancelPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description `ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `ORDER_ITEM_NOT_CANCELABLE`(배송 시작·다른 항목 취소 확인 중) 또는 `ORDER_INVALID_STATE_TRANSITION`(결제 전 등) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     cancelSellerOrderItem: {
