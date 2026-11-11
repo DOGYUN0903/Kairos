@@ -3249,6 +3249,8 @@ export interface components {
             productId: number;
             /** @description 주문 시점 스냅샷 */
             productName: string;
+            /** @description 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null */
+            thumbnailUrl: string | null;
             brandName: string;
             optionDisplayName: string;
             /** Format: int64 */
@@ -3490,6 +3492,10 @@ export interface components {
             /** Format: int32 */
             itemCount: number;
             firstProductName: string;
+            /** @description 첫 항목의 대표 이미지 URL. 없으면 null */
+            thumbnailUrl: string | null;
+            /** @description 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용 */
+            sellerOrderStatuses: components["schemas"]["SellerOrderStatus"][];
             /** Format: date-time */
             createdAt: string;
         };
@@ -3536,6 +3542,8 @@ export interface components {
             /** Format: int32 */
             itemCount: number;
             firstProductName: string;
+            /** @description 첫 항목의 대표 이미지 URL. 없으면 null */
+            thumbnailUrl: string | null;
             /** Format: date-time */
             orderedAt: string;
         };

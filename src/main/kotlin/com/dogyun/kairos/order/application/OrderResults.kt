@@ -48,6 +48,8 @@ data class OrderItemResult(
     val skuId: Long,
     val productId: Long,
     val productName: String,
+    /** 조회 시점 상품의 대표 이미지. 상품이 삭제됐거나 이미지가 없으면 null. */
+    val thumbnailUrl: String?,
     val brandName: String,
     val optionDisplayName: String,
     val salePrice: Long,
@@ -137,6 +139,10 @@ data class OrderSummary(
     val totalAmount: Long,
     val itemCount: Int,
     val firstProductName: String,
+    /** 첫 항목의 대표 이미지. 없으면 null. */
+    val thumbnailUrl: String?,
+    /** 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용. */
+    val sellerOrderStatuses: List<String>,
     val createdAt: LocalDateTime,
 )
 
@@ -167,6 +173,7 @@ data class SellerOrderSummary(
     val itemsAmount: Long,
     val itemCount: Int,
     val firstProductName: String,
+    val thumbnailUrl: String?,
     val orderedAt: LocalDateTime,
 )
 

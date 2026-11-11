@@ -74,6 +74,15 @@ class SkuQueryServiceTest {
     }
 
     @Test
+    fun 대표_이미지는_상품의_첫_이미지이고_없는_상품은_빠진다() {
+        val product = product()
+        val productId = requireNotNull(product.id).value
+
+        assertEquals(mapOf(productId to "http://files/100.png"), service.findThumbnailUrls(listOf(productId, 99_999L)))
+        assertEquals(emptyMap(), service.findThumbnailUrls(emptyList()))
+    }
+
+    @Test
     fun 재고_0은_SOLD_OUT_onSale_false는_PAUSED_PAUSED_상품도_PAUSED() {
         val soldOut = product(stock = 0)
         val soldOutId = requireNotNull(soldOut.skus.first().id).value

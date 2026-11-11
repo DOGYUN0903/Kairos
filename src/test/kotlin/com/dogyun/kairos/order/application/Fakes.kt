@@ -158,6 +158,15 @@ class FakeProductReader : ProductReader {
 
     override fun findOrderableSkus(skuIds: Collection<Long>): Map<Long, OrderableSkuInfo> =
         skuIds.mapNotNull { skus[it] }.associateBy { it.skuId }
+
+    /** 상품 ID → 대표 이미지. 여기 없는 상품(삭제 등)은 결과에서 빠진다. */
+    val thumbnails = mutableMapOf<Long, String>()
+    var thumbnailCalls = 0
+
+    override fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String> {
+        thumbnailCalls++
+        return productIds.mapNotNull { id -> thumbnails[id]?.let { id to it } }.toMap()
+    }
 }
 
 class FakeSellerReader : SellerReader {

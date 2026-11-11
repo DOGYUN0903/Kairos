@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component
 @Component("orderProductReader")
 class ProductReaderImpl(private val skuQueryService: SkuQueryService) : ProductReader {
 
+    override fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String> =
+        skuQueryService.findThumbnailUrls(productIds)
+
     override fun findOrderableSkus(skuIds: Collection<Long>): Map<Long, OrderableSkuInfo> =
         skuQueryService.findOrderableSkus(skuIds).mapValues { (_, sku) ->
             OrderableSkuInfo(

@@ -45,6 +45,21 @@ class SkuQueryService(
         }.toMap()
     }
 
+    /**
+     * 상품의 대표 이미지(첫 이미지) URL 을 한 번에 조회한다. 없거나 삭제된 상품, 이미지가 없는 상품은 결과에서 빠진다.
+     * [findOrderableSkus] 의 `thumbnailUrl` 과 같은 규칙이다.
+     */
+    @Transactional(readOnly = true)
+    fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String> {
+        if (productIds.isEmpty()) return emptyMap()
+        val products = productRepository.findAllByIds(productIds.toSet())
+        val thumbnails = imageFileReader.findImages(products.mapNotNull { it.content.imageFileIds.firstOrNull() }.toSet())
+        return products.mapNotNull { product ->
+            val url = product.content.imageFileIds.firstOrNull()?.let { thumbnails[it]?.url } ?: return@mapNotNull null
+            requireNotNull(product.id).value to url
+        }.toMap()
+    }
+
     /** 우선순위: 상품 종료 > SKU 단종 > 판매 중지(상품 비판매·SKU 비판매) > 품절. */
     private fun availability(product: Product, sku: Sku): SkuAvailability = when {
         product.status == ProductStatus.ENDED -> SkuAvailability.ENDED

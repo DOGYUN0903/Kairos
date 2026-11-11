@@ -156,4 +156,38 @@ class OrderQueryApiTest : CommerceTestSupport() {
         assertEquals(couponId, item.get("productCouponId").asLong())
         assertEquals(36_000L, item.get("paidAmount").asLong())
     }
+
+    private fun imageUrlOf(productId: Long): String =
+        json(get("/api/v1/products/$productId").andExpect { status { isOk() } }).get("data").get("imageUrls").get(0).asString()
+
+    @Test
+    fun 주문_목록과_상세에_상품_대표_이미지가_있다() {
+        val sellerToken = newUserToken()
+        approvedSeller(sellerToken)
+        val productId = onSaleProduct(sellerToken, approvedBrand(sellerToken), leafCategory(), listOf(uploadImage(sellerToken)), salePrice = 8_000, stock = 20)
+        val skuId = skuIdsOf(sellerToken, productId).sorted()[0]
+        val expected = imageUrlOf(productId)
+        val user = newUserToken()
+        val detail = paidOrder(user, listOf(skuId to 1), 11_000)
+
+        assertEquals(expected, detail.get("sellerOrders").get(0).get("items").get(0).get("thumbnailUrl").asString())
+        val list = json(get("/api/v1/orders", user).andExpect { status { isOk() } }).get("data")
+        assertEquals(expected, list.get("content").get(0).get("thumbnailUrl").asString())
+        val sellerList = json(get("/api/v1/seller/orders", sellerToken).andExpect { status { isOk() } }).get("data")
+        assertEquals(expected, sellerList.get("content").get(0).get("thumbnailUrl").asString())
+    }
+
+    @Test
+    fun 주문_목록에_판매자_주문_상태가_있다() {
+        val a = shop()
+        val b = shop()
+        val user = newUserToken()
+        val detail = paidOrder(user, listOf(a.skuId to 1, b.skuId to 1), 22_000)
+        val aOrderId = detail.get("sellerOrders").get(0).get("sellerOrderId").asLong() // 판매자 주문은 판매자 ID 순 = 상점을 만든 순서
+        patch("/api/v1/seller/orders/$aOrderId/ship", a.sellerToken, mapOf("carrierCode" to "04", "trackingNumber" to "T-1"))
+            .andExpect { status { isOk() } }
+
+        val summary = json(get("/api/v1/orders", user).andExpect { status { isOk() } }).get("data").get("content").get(0)
+        assertEquals(listOf("PAID", "SHIPPING"), summary.get("sellerOrderStatuses").let { st -> (0 until st.size()).map { st.get(it).asString() } }.sorted())
+    }
 }
