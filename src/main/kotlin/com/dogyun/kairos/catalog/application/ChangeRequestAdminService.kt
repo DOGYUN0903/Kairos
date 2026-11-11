@@ -88,6 +88,7 @@ class ChangeRequestAdminService(
             productId = request.productId,
             sellerId = request.sellerId,
             status = request.status.name,
+            requestedAt = requireNotNull(request.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
             rejectReason = request.rejectReason,
             originalPrice = request.originalPrice,
             content = toContentResult(content, urls),

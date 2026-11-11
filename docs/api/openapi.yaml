@@ -5509,7 +5509,7 @@ components:
           $ref: '#/components/schemas/ChangeRequestStatus'
     ChangeRequestDetail:
       type: object
-      required: [changeRequestId, productId, sellerId, status, originalPrice, content]
+      required: [changeRequestId, productId, sellerId, status, requestedAt, originalPrice, content]
       properties:
         changeRequestId:
           type: integer
@@ -5522,6 +5522,9 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 요청 일시 (KST LocalDateTime, 오프셋 없음)
         rejectReason:
           type: [string, 'null']
         originalPrice:

@@ -71,6 +71,7 @@ class ChangeRequestApiTest : CommerceTestSupport() {
         assertEquals(id, json(get("/api/v1/admin/products/${f.productId}", adminToken())).get("data").get("pendingChangeRequestId").asLong())
         val request = json(get("/api/v1/admin/change-requests/$id", adminToken()).andExpect { status { isOk() } }).get("data")
         assertEquals("PENDING", request.get("status").asString())
+        assertTrue(request.get("requestedAt").asString().matches(Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?""")), "상세도 요청 일시를 준다")
         assertEquals(16000, request.get("originalPrice").asLong())
         assertEquals("새 티셔츠", request.get("content").get("name").asString())
         assertTrue(request.get("content").get("images").get(0).get("url").asString().contains("/files/"))

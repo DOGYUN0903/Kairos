@@ -84,6 +84,7 @@ data class ChangeRequestDetail(
     val productId: Long,
     val sellerId: Long,
     val status: String,
+    val requestedAt: LocalDateTime,
     val rejectReason: String?,
     /** 요청한 정가. */
     val originalPrice: Long,

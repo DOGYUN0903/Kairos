@@ -2656,6 +2656,8 @@ export interface components {
             /** Format: int64 */
             sellerId: number;
             status: components["schemas"]["ChangeRequestStatus"];
+            /** @description 요청 일시 (KST LocalDateTime, 오프셋 없음) */
+            requestedAt: components["schemas"]["LocalDateTime"];
             rejectReason?: string | null;
             /**
              * Format: int64
