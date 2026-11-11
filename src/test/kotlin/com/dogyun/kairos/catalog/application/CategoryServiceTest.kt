@@ -125,4 +125,27 @@ class CategoryServiceTest {
         assertEquals(ErrorCode.CATEGORY_NOT_LEAF, notLeaf.errorCode)
         assertEquals(ErrorCode.CATEGORY_NOT_FOUND, missing.errorCode)
     }
+
+    @Test
+    fun 순서_변경은_목록_순서대로_0부터_다시_매긴다() {
+        val a = service.create(CreateCategoryCommand(null, "패션", 5))
+        val b = service.create(CreateCategoryCommand(null, "뷰티", 5))
+
+        service.reorder(null, listOf(b, a))
+
+        assertEquals(listOf("뷰티", "패션"), queryService.tree().map { it.name })
+        assertEquals(listOf(0, 1), queryService.tree().map { it.displayOrder })
+    }
+
+    @Test
+    fun 순서_변경_목록에_다른_부모의_ID가_섞이면_CATEGORY_INVALID이고_변경이_없다() {
+        val a = service.create(CreateCategoryCommand(null, "패션", 1))
+        val b = service.create(CreateCategoryCommand(null, "뷰티", 2))
+        val child = service.create(CreateCategoryCommand(a, "상의", 1))
+
+        val e = assertFailsWith<DomainException> { service.reorder(null, listOf(b, a, child)) }
+
+        assertEquals(ErrorCode.CATEGORY_INVALID, e.errorCode)
+        assertEquals(listOf(1, 2), queryService.tree().map { it.displayOrder })
+    }
 }

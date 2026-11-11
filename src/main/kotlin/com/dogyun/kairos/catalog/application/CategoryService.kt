@@ -33,6 +33,28 @@ class CategoryService(
         categoryRepository.save(category)
     }
 
+    /** 같은 부모 아래 카테고리 전부를 주어진 순서대로 0.. 으로 다시 매긴다. 목록이 정확히 일치하지 않으면 아무것도 바꾸지 않는다. */
+    @Transactional
+    fun reorder(parentId: Long?, orderedIds: List<Long>) {
+        val siblings = if (parentId == null) {
+            categoryRepository.findAll().filter { it.parentId == null }
+        } else {
+            val parent = find(parentId)
+            categoryRepository.findChildren(requireNotNull(parent.id))
+        }
+        val byId = siblings.associateBy { requireNotNull(it.id).value }
+        if (orderedIds.size != orderedIds.toSet().size || orderedIds.toSet() != byId.keys) {
+            throw DomainException(ErrorCode.CATEGORY_INVALID)
+        }
+        orderedIds.forEachIndexed { index, id ->
+            val category = requireNotNull(byId[id])
+            if (category.displayOrder != index) {
+                category.rename(category.name, index)
+                categoryRepository.save(category)
+            }
+        }
+    }
+
     @Transactional
     fun delete(categoryId: Long) {
         val category = find(categoryId)

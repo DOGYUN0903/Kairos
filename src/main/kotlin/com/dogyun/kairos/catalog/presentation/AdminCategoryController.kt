@@ -20,6 +20,12 @@ class AdminCategoryController(private val categoryService: CategoryService) {
     fun create(@Valid @RequestBody request: CategoryRequest): ResponseEntity<ApiResponse<CreateCategoryResponse>> =
         ApiResponse.created(CreateCategoryResponse(categoryService.create(request.toCreateCommand())))
 
+    @PutMapping("/order")
+    fun reorder(@Valid @RequestBody request: CategoryOrderRequest): ResponseEntity<ApiResponse<Nothing?>> {
+        categoryService.reorder(request.parentId, request.categoryIds)
+        return ApiResponse.ok(null)
+    }
+
     @PutMapping("/{categoryId}")
     fun update(
         @PathVariable categoryId: Long,

@@ -80,4 +80,58 @@ class CategoryApiTest : CommerceTestSupport() {
         val children = json(get("/api/v1/categories")).get("data")[0].get("children")
         assertEquals(leaf, children[0].get("categoryId").asLong())
     }
+
+    private fun order(parentId: Long?, ids: List<Long>, token: String = adminToken()) =
+        put("/api/v1/admin/categories/order", token, mapOf("parentId" to parentId, "categoryIds" to ids))
+
+    @Test
+    fun 대분류_순서를_한_번에_바꾼다() {
+        val a = createCategory(null, "패션", 0)
+        val b = createCategory(null, "뷰티", 1)
+        val c = createCategory(null, "가전", 2)
+
+        order(null, listOf(c, a, b)).andExpect { status { isOk() } }
+
+        assertEquals(listOf("가전", "패션", "뷰티"), names(json(get("/api/v1/categories")).get("data")))
+    }
+
+    @Test
+    fun 소분류_순서를_부모_기준으로_바꾼다() {
+        val root = createCategory(null, "패션", 0)
+        val x = createCategory(root, "상의", 0)
+        val y = createCategory(root, "신발", 1)
+
+        order(root, listOf(y, x)).andExpect { status { isOk() } }
+
+        assertEquals(listOf("신발", "상의"), names(json(get("/api/v1/categories")).get("data")[0].get("children")))
+    }
+
+    @Test
+    fun 순서_목록이_부모_아래_전부와_다르면_400이고_아무것도_바뀌지_않는다() {
+        val a = createCategory(null, "패션", 0)
+        val b = createCategory(null, "뷰티", 1)
+        val root = createCategory(a, "상의", 0)
+
+        for (ids in listOf(listOf(b), listOf(b, a, a), listOf(b, a, root), listOf(b, a, 99999L))) {
+            val r = order(null, ids).andExpect { status { isBadRequest() } }
+            assertEquals("CATEGORY_INVALID", json(r).get("code").asString())
+        }
+        assertEquals(listOf("패션", "뷰티"), names(json(get("/api/v1/categories")).get("data")))
+    }
+
+    @Test
+    fun 없는_부모의_순서_변경은_404이고_일반_회원은_403이다() {
+        val a = createCategory(null, "패션", 0)
+        order(99999, listOf(a)).andExpect { status { isNotFound() } }
+        order(null, listOf(a), newUserToken()).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun 음수_displayOrder는_400이다() {
+        post("/api/v1/admin/categories", adminToken(), mapOf("name" to "패션", "displayOrder" to -1))
+            .andExpect { status { isBadRequest() } }
+        val id = createCategory(null, "패션", 0)
+        put("/api/v1/admin/categories/$id", adminToken(), mapOf("name" to "패션", "displayOrder" to -1))
+            .andExpect { status { isBadRequest() } }
+    }
 }
