@@ -8,9 +8,10 @@
 - C2 스펙: `docs/superpowers/specs/2026-11-09-c2-purchase-design.md`
 - C3 스펙: `docs/superpowers/specs/2026-11-10-c3-benefits-reviews-design.md`
 - C4 스펙: `docs/superpowers/specs/2026-11-10-c4-returns-settlement-design.md`
-- 현재 구현 계획: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md` (이전: `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
+- F1 스펙: `docs/superpowers/specs/2026-11-11-frontend-f1-foundation-design.md`
+- 현재 구현 계획: `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md` (이전: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`, `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: **C4 반품·정산**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1, C2, C3는 완료
+- 현재 단계: **F1 프론트엔드 기반·C1 화면**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1~C4는 완료
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
@@ -20,10 +21,13 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - 뮤테이션 테스트: `./gradlew pitest` (돈 계산 순수 클래스 대상, `check`/`test`와 별개, 1분 이내). 리포트는 `build/reports/pitest/index.html`(XML: `mutations.xml`)
 - 로컬 실행: `.env.example`을 `.env`로 복사해 값을 채운 뒤 `docker compose up -d`, `./gradlew bootRun`
 - 모니터링: `docker compose up -d` 후 Grafana(localhost:3000, 대시보드 "Kairos 타임딜"), Prometheus(localhost:9090). 메트릭은 관리 포트 8081, 로그는 `logs/kairos.log`(traceId 포함).
+- 데모 데이터: `SPRING_PROFILES_ACTIVE=local,demo` + `KAIROS_DEMO_PASSWORD` (demo 프로필에서만 `DemoDataInitializer`·`POST /api/v1/demo/reseed`가 있다. prod와 demo 동시 활성은 기동 실패)
 - 설정값(DB, Redis, JWT 비밀키, 관리자 계정, `TOSS_SECRET_KEY`, `SWEETTRACKER_API_KEY`)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
 
 ## 아키텍처: 4계층 DDD
 모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `cart`, `payment`, `seller`, `catalog`, `file`, `benefit`, `review`, `settlement`, `common`
+
+`demo` 패키지는 바운디드 컨텍스트가 아니라 demo 프로필 전용 시더·엔드포인트이며 다른 모듈의 application만 호출한다(`ArchitectureTest` demoUsesOnlyApplication).
 
 ```
 com.dogyun.kairos.{module}/
@@ -58,7 +62,21 @@ com.dogyun.kairos.{module}/
 - 성공 응답은 `ApiResponse(message, data, timestamp)`, 에러는 `ErrorResponse(code, message, timestamp)`, 목록은 `?page&size` + `PageResponse`.
 - API 일시는 오프셋 없는 LocalDateTime(KST 기준, 예: 2026-12-09T10:00:00). 서버 기본 시간대는 Asia/Seoul로 고정한다.
 - application 계층은 Spring `Page`가 아니라 `PageResult`를 반환한다.
+- 인증: 액세스 토큰 Bearer(30분), 리프레시 토큰은 본문과 httpOnly 쿠키 `kairos_refresh`(Path=/api/v1/auth, SameSite=Strict) 둘 다. 쿠키 기반 reissue·logout은 `X-Requested-With: kairos-web` 헤더를 요구한다. `GET /auth/me`가 역할·이름을 준다(프론트는 JWT를 해석하지 않는다).
 - 에러 코드는 `ErrorCode` enum과 OpenAPI의 `ErrorResponse.code`가 일치해야 한다.
+
+## 프론트엔드
+위치 `frontend/`. Next.js 15(App Router) · React 19 · TypeScript strict · TanStack Query · react-hook-form + zod · Tailwind 3.4(shadcn/ui) · openapi-typescript/openapi-fetch. 데스크톱 전용(1280px 이상).
+- 명령(`frontend/`에서): `pnpm dev`, `build`(check:api 포함), `lint`, `typecheck`, `test`(vitest), `e2e`(Playwright), `gen:api`, `check:api`, `check:bundle`. 포트: E2E 기본 `:3100`(Grafana가 `:3000`), 백엔드 `:8080`.
+- 로컬 실행: 백엔드를 띄우고 `pnpm dev`. 프론트는 `BACKEND_URL`(기본 `http://localhost:8080`)로 `/api`를 rewrite 한다.
+- OpenAPI가 바뀌면 `pnpm gen:api`로 `src/api/schema.d.ts`를 재생성해 **같은 커밋**에 넣는다(`check:api`가 build·CI를 막는다).
+- API 클라이언트(`src/api/client.ts`): 액세스 토큰은 메모리에만 둔다(storage 금지). 리프레시는 httpOnly 쿠키 + `X-Requested-With: kairos-web`. 401이면 reissue를 한 번만(단일 비행) 시도하고 `/auth/*`는 절대 재시도하지 않는다. 에러 메시지는 `src/api/errors.ts` 표로만 만든다.
+- 금액은 정수만. 계산·표시는 `src/lib/money.ts`로만 하고 나눗셈(`/`, `%`)은 거기서만 쓴다(ESLint가 막는다).
+- 모든 POST는 `useIdempotentSubmit`: 제출마다 새 `Idempotency-Key`, 중복 제출 가드, 생성 성공 뒤 `form.reset`.
+- 로그인 `next` 파라미터는 `safeNext`(`features/auth/redirect.ts`)를 거친다(오픈 리다이렉트 방지). 가드는 클라이언트 레이아웃이며 `middleware`는 없다.
+- 데모 기능은 `features/demo`에만 두고 `NEXT_PUBLIC_DEMO_MODE`(빌드 타임) 리터럴 비교로 감싼다. 데모 백엔드는 demo 프로필에서만 동작하고 prod+demo는 기동 실패다. 번들에 실제 관리자 자격증명을 절대 넣지 않으며, `check:bundle`이 운영 번들에 데모 코드·계정이 없고 데모 빌드에는 있음을 확인한다.
+- `app/`은 조립만, 기능은 `features/`. 시안은 `design/`에 기록으로 두고 고치지 않는다. 핵심 화면은 시안 → 사용자 확인 → 구현, CRUD 화면은 시안의 디자인 토큰을 따른다.
+- 테스트 이름은 한국어. 단위 테스트는 순수 유틸·훅, 화면 흐름은 E2E(로컬 `pnpm e2e`, CI 제외).
 
 ## 단계 전환 원칙
 - 구조는 **단일 인스턴스 모놀리식 → ALB 다중 인스턴스 → MSA** 순서로 진화한다.
