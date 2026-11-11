@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, reissueOnce, setOnAuthLost } from "@/api/client";
 import { setAccessToken } from "@/auth/token-store";
+import { isAuthPage } from "@/features/auth/redirect";
 import { fetchMe, loginRequest, logoutRequest, type Me } from "@/features/auth/api";
 
 export type AuthStatus = "loading" | "anonymous" | "authenticated";
@@ -17,8 +18,6 @@ export type AuthContextValue = {
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
-
-const AUTH_PAGES = ["/login", "/signup"];
 
 /** 재시도된 요청까지 401 이면 세션이 끝난 것으로 본다. 로그인 실패(AUTH_INVALID_CREDENTIALS)는 제외. */
 function isSessionLost(err: unknown): boolean {
@@ -42,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("anonymous");
     queryClient.clear();
     const { pathname, search } = window.location;
-    if (!AUTH_PAGES.includes(pathname)) {
+    if (!isAuthPage(pathname)) {
       router.replace(`/login?next=${encodeURIComponent(pathname + search)}`);
     }
   }, [queryClient, router]);

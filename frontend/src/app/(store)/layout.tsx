@@ -8,11 +8,10 @@ import type { components } from "@/api/schema";
 import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer } from "@/components/layout/Footer";
 import { StoreHeader } from "@/components/layout/StoreHeader";
+import { isAuthPage } from "@/features/auth/redirect";
 import { queryKeys } from "@/lib/query-keys";
 
 type CategoryNode = components["schemas"]["CategoryNode"];
-
-const AUTH_PAGES = ["/login", "/signup"];
 
 function StoreCategoryNav() {
   const params = useSearchParams();
@@ -31,7 +30,7 @@ function StoreCategoryNav() {
 export default function StoreLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   // 로그인·가입은 시안처럼 로고만 있는 헤더 + surface 배경.
-  if (AUTH_PAGES.includes(pathname)) {
+  if (isAuthPage(pathname)) {
     return (
       <div className="min-h-screen bg-surface">
         <StoreHeader minimal />
