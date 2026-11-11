@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api } from "./fixtures/api";
+import { api, DEMO_PASSWORD, leafCategory } from "./fixtures/api";
 
 type Page_ = { totalElements: number };
 
@@ -12,12 +12,15 @@ async function cardPrices(page: import("@playwright/test").Page): Promise<number
 
 test("구매자 목록: 카테고리·정렬·검색·페이지가 URL 에 실리고 뒤로 가기로 복원된다", async ({ page, request }) => {
   const all = await api.get<Page_>(request, "/api/v1/products?size=20", null);
-  test.skip(all.totalElements < 21, `상품이 ${all.totalElements}개뿐이라 2페이지가 없습니다(데모 데이터 필요).`);
+  const reason = `상품이 ${all.totalElements}개뿐이라 2페이지가 없습니다(데모 데이터 필요).`;
+  // 데모 백엔드(비밀번호가 주어진 경우)라면 데이터가 있어야 하므로 건너뛰지 않고 실패시킨다.
+  if (DEMO_PASSWORD) expect(all.totalElements, reason).toBeGreaterThanOrEqual(21);
+  else test.skip(all.totalElements < 21, reason);
 
   await page.goto("/products");
-  const nav = page.getByRole("navigation", { name: "카테고리" });
-  await nav.getByRole("link").nth(1).click();
-  await page.waitForURL(/categoryId=\d+/);
+  const { parentId, parentName } = await leafCategory(request);
+  await page.getByRole("navigation", { name: "카테고리" }).getByRole("link", { name: parentName, exact: true }).click();
+  await page.waitForURL(new RegExp(`categoryId=${parentId}(&|$)`));
 
   await page.goto("/products");
   await page.getByRole("group", { name: "정렬" }).getByRole("button", { name: "낮은 가격순" }).click();

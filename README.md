@@ -36,7 +36,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - `pnpm check:bundle`(운영 빌드에 데모 코드·관리자 계정 문자열이 없는지 확인)
 - `pnpm e2e`(Playwright, 아래 전제 필요)
 
-E2E 전제: `local,demo` 프로필 백엔드가 떠 있고 `KAIROS_DEMO_PASSWORD`를 같은 값으로 넘긴다(데모 관리자 `admin@kairos.demo`로 승인 단계를 진행한다). 처음 한 번 `pnpm exec playwright install chromium`. 주소는 환경변수로 바꾼다: `E2E_BASE_URL`(기본 http://localhost:3000, 비어 있으면 dev 서버를 직접 띄운다), `BACKEND_URL`(기본 http://localhost:8080). 예: `KAIROS_DEMO_PASSWORD=… pnpm e2e`. 데이터는 실행마다 고유한 이름으로 만들므로 재시드 상태에 기대지 않는다. CI(`.github/workflows/frontend.yml`)는 백엔드가 필요한 E2E를 빼고 check:api·lint·typecheck·test·build·check:bundle을 돌린다.
+E2E 전제: `local,demo` 프로필 백엔드가 떠 있고 `KAIROS_DEMO_PASSWORD`를 같은 값으로 넘긴다(데모 관리자 `admin@kairos.demo`로 승인 단계를 진행한다). 처음 한 번 `pnpm exec playwright install chromium`. 주소는 환경변수로 바꾼다: `E2E_BASE_URL`(기본 http://localhost:3100, Grafana의 3000과 겹치지 않게), `BACKEND_URL`(기본 http://localhost:8080). 그 주소에 서버가 없으면 `scripts/e2e-server.sh`가 `.next-e2e`에 운영 빌드한 뒤 `next start`로 띄운다(추적 파일을 건드리지 않는다). 이미 떠 있는 서버가 있으면 그대로 재사용하므로(`reuseExistingServer`), 시작 전에 그 주소가 KAIROS 화면인지 확인하고 아니면 바로 실패한다. 재사용한 서버는 `BACKEND_URL`과 같은 백엔드를 보고 있어야 한다. 예: `KAIROS_DEMO_PASSWORD=… pnpm e2e`. 데이터는 실행마다 고유한 이름으로 만들므로 재시드 상태에 기대지 않는다. CI(`.github/workflows/frontend.yml`)는 백엔드가 필요한 E2E를 빼고 check:api·lint·typecheck·test·build·check:bundle을 돌린다.
 
 > 경고: `NEXT_PUBLIC_DEMO_*`는 운영 빌드에 두지 않는다. 빌드 시점에 번들에 들어가 데모 계정이 노출된다.
 

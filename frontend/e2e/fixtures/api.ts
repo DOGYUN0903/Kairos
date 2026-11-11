@@ -110,11 +110,11 @@ export async function uploadImage(request: APIRequestContext, token: string, pat
 type CategoryNode = { categoryId: number; name: string; children: CategoryNode[] };
 
 /** 소분류가 있는 첫 대분류와 그 첫 소분류. */
-export async function leafCategory(request: APIRequestContext): Promise<{ parentId: number; leafId: number }> {
+export async function leafCategory(request: APIRequestContext): Promise<{ parentId: number; parentName: string; leafId: number }> {
   const tree = await api.get<CategoryNode[]>(request, "/api/v1/categories", null);
   const root = tree.find((t) => t.children.length > 0);
   if (!root || !root.children[0]) throw new Error("소분류가 있는 카테고리가 없습니다");
-  return { parentId: root.categoryId, leafId: root.children[0].categoryId };
+  return { parentId: root.categoryId, parentName: root.name, leafId: root.children[0].categoryId };
 }
 
 export async function leafCategoryId(request: APIRequestContext): Promise<number> {

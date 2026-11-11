@@ -172,7 +172,7 @@ test("판매자 입점 → 관리자 승인(키보드) → 브랜드 → 상품 
     await page.getByRole("button", { name: "일시 중지" }).click();
     await expect(page.getByRole("button", { name: "판매 재개" })).toBeVisible();
     await page.goto(`/products?keyword=${encodeURIComponent(productName)}`);
-    await expect(page.getByText("조건에 맞는 상품이 없습니다").or(page.getByText(/없습니다/)).first()).toBeVisible();
+    await expect(page.getByText("조건에 맞는 상품이 없습니다.", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: new RegExp(productName) })).toHaveCount(0);
   });
 
@@ -181,6 +181,7 @@ test("판매자 입점 → 관리자 승인(키보드) → 브랜드 → 상품 
     await page.getByRole("button", { name: "판매 재개" }).click();
     await expect(page.getByRole("button", { name: "일시 중지" })).toBeVisible();
     await setStock(page, "블랙 / S", "7");
+    await setStock(page, "블랙 / M", "3");
     await page.getByRole("link", { name: "내용 수정(재검수)" }).click();
     await page.getByRole("button", { name: "블랙 이름 변경" }).click();
     await page.getByLabel("블랙 새 이름").fill("차콜");
@@ -203,7 +204,8 @@ test("판매자 입점 → 관리자 승인(키보드) → 브랜드 → 상품 
 
     await page.reload();
     await expect(page.getByLabel("차콜 / S 재고")).toHaveValue("7");
-    await expect(page.getByLabel("차콜 / M 재고")).toHaveValue("0");
+    await expect(page.getByLabel("차콜 / M 재고")).toHaveValue("3");
+    await expect(page.getByLabel("화이트 / M 재고")).toHaveValue("0");
     await expect(page.getByRole("button", { name: /단종/ })).toHaveCount(0);
   });
 
