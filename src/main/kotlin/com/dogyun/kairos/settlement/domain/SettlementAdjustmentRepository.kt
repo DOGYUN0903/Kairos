@@ -17,7 +17,7 @@ interface SettlementAdjustmentRepository {
     fun attach(sellerId: Long, settlementId: Long, createdBefore: LocalDateTime): Int
     fun findBySettlementId(settlementId: Long): List<SettlementAdjustment>
 
-    /** [attach]와 같은 조건(CARRY_OVER는 created_at 무관)으로 붙일 조정이 있는 판매자. */
+    /** 정산을 만들게 하는 조정이 있는 판매자: 미부착 `MANUAL`(created_at < 기준). CARRY_OVER만 있는 판매자는 제외한다(다음 정산이 생길 때 [attach]가 가져간다). */
     fun findSellerIdsWithUnattached(createdBefore: LocalDateTime): Set<Long>
     fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<SettlementAdjustment>
 

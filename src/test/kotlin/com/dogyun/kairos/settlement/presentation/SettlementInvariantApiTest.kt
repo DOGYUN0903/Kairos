@@ -183,7 +183,7 @@ class SettlementInvariantApiTest : CommerceTestSupport() {
     private fun standardFixture(): List<Shop> {
         val shops = shops()
         seed(shops, periodA)
-        seed(shops.take(2), periodB, listOf(listOf(Kind.PLAIN), listOf(Kind.PLAIN)))
+        seed(shops, periodB, List(3) { listOf(Kind.PLAIN) }) // 이월만 있는 판매자는 정산이 없으므로 판매자 3도 B 에 매출을 둔다
         manualAdjustment(shops[0].sellerId, -10_000, periodA.plusDays(1).atTime(12, 0))
         manualAdjustment(shops[2].sellerId, -200_000, periodA.plusDays(2).atTime(12, 0))
         return shops

@@ -206,6 +206,46 @@ class SettlementGenerationServiceTest {
     }
 
     @Test
+    fun 이월만_있는_판매자는_정산이_생기지_않고_이월은_미부착으로_남는다() {
+        val env = Env(now = LocalDateTime.of(2026, 12, 8, 3, 0), doneRuns = listOf(p0))
+        env.reader.sources += simple(1, 7, inP1, amount = 10_000)
+        env.adjust(7, -30_000, inP1)
+        env.service.generate(p1)
+        val carry = env.adjustments.rows.values.single { it.type == AdjustmentType.CARRY_OVER }
+
+        val r2 = env.service.generate(p2)
+        val r3 = env.service.generate(p2.plusDays(7))
+
+        assertEquals(0, r2.sellerCount)
+        assertEquals(0, r3.sellerCount)
+        assertNull(env.settlements.bySeller(7, p2))
+        assertNull(env.settlements.bySeller(7, p2.plusDays(7)))
+        assertNull(env.adjustments.findById(carry.id!!)!!.settlementId)
+    }
+
+    @Test
+    fun 이월은_그_판매자의_다음_정산이_생길_때_한_번만_붙는다_라인이_생긴_경우와_MANUAL_조정만_있는_경우() {
+        val env = Env(now = LocalDateTime.of(2026, 12, 15, 3, 0))
+        env.reader.sources += simple(1, 7, inP1, amount = 10_000)
+        env.adjust(7, -30_000, inP1)
+        env.reader.sources += simple(3, 8, inP1, amount = 10_000)
+        env.adjust(8, -30_000, inP1)
+        env.service.generate(p1)
+        env.service.generate(p2) // 이월만 → 정산 없음
+        val carry7 = env.adjustments.rows.values.single { it.type == AdjustmentType.CARRY_OVER && it.sellerId == 7L }
+        val carry8 = env.adjustments.rows.values.single { it.type == AdjustmentType.CARRY_OVER && it.sellerId == 8L }
+        val p3 = p2.plusDays(7)
+        env.reader.sources += simple(2, 7, LocalDateTime.of(2026, 12, 2, 10, 0), amount = 30_000)
+        env.adjust(8, 1_000, LocalDateTime.of(2026, 12, 3, 10, 0))
+
+        env.service.generate(p3)
+
+        assertEquals(env.settlements.bySeller(7, p3)!!.id, env.adjustments.findById(carry7.id!!)!!.settlementId)
+        assertEquals(env.settlements.bySeller(8, p3)!!.id, env.adjustments.findById(carry8.id!!)!!.settlementId)
+        assertEquals(2, env.adjustments.rows.values.count { it.type == AdjustmentType.CARRY_OVER && it.settlementId != null })
+    }
+
+    @Test
     fun 기간_끝_뒤_등록한_조정은_붙지_않는다() {
         val env = Env()
         env.reader.sources += simple(1, 7, inP1)

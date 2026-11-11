@@ -41,7 +41,7 @@ interface SettlementAdjustmentJpaRepository : JpaRepository<SettlementAdjustment
 
     @Query(
         "select distinct a.sellerId from SettlementAdjustmentEntity a where a.settlementId is null " +
-            "and (a.adjustmentType = com.dogyun.kairos.settlement.domain.AdjustmentType.CARRY_OVER or a.createdAt < :createdBefore)",
+            "and a.adjustmentType = com.dogyun.kairos.settlement.domain.AdjustmentType.MANUAL and a.createdAt < :createdBefore",
     )
     fun findSellerIdsWithUnattached(@Param("createdBefore") createdBefore: LocalDateTime): List<Long>
 

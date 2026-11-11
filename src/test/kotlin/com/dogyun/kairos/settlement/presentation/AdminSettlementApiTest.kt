@@ -187,11 +187,13 @@ class AdminSettlementApiTest : CommerceTestSupport() {
         assertEquals(-9_000L, (carry1["amount"] as Number).toLong())
         assertEquals(null, carry1["settlement_id"])
 
+        // 이월만 있는 판매자는 정산이 없다 — 다음 정산은 매출 또는 MANUAL 조정이 있어야 생긴다(s2 도 음수가 되게 -30,000).
+        setCreatedAt(createAdjustment(shop.sellerId, -30_000), t.plusDays(7).atTime(10, 0))
         offsetClock.advanceTo(t.plusDays(14).atTime(0, 30))
         generateSettlement(adminToken(), t.plusDays(7))
         val s2 = settlementId(shop.sellerId, t.plusDays(7))
         assertEquals(s2, attachedTo((carry1["id"] as Number).toLong()))
-        assertEquals(-9_000L, adjustmentAmountOf(s2))
+        assertEquals(-39_000L, adjustmentAmountOf(s2))
         // 이월은 정산당 최대 하나: s2 도 음수라 하나를 더 만들고, 같은 source 가 둘인 행은 없다.
         val dup = jdbcTemplate.queryForList(
             "select source_settlement_id from settlement_adjustment where source_settlement_id is not null group by source_settlement_id having count(*) > 1",

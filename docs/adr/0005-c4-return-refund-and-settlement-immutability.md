@@ -9,7 +9,7 @@ C4는 반품 환불(구매자 돈)과 판매자 정산(판매자 돈)을 추가�
 
 ## 결정
 1. **반품 환불은 ADR 0003의 tx1 → PG → tx2와 ADR 0004의 락 순서를 그대로 쓴다.** `return_request`는 `Order` 애그리거트 안에 있고 주문 행 락(`FOR UPDATE`) 아래에서만 바뀐다. tx2 락 순서는 `orders → member_point → coupon → sku → product`(benefit 되돌림 → `CHANGE_OF_MIND`면 재고 복구 → 판매량 감소). PG 부분 취소는 트랜잭션 밖이고, 현금 환불이 0원이거나 `paymentKey`가 없으면 PG 호출 없이 tx2만 한다.
-2. **정산은 생성 시점 스냅샷이며 불변이다.** 정산과 라인은 삭제·수정하지 않고, 보정은 `settlement_adjustment` 행으로만 한다. 합계가 음수면 정산은 `payable_amount = 0`으로 만들고 부족분을 `CARRY_OVER` 조정으로 다음 정산에 넘긴다(정산당 최대 1개).
+2. **정산은 생성 시점 스냅샷이며 불변이다.** 정산과 라인은 삭제·수정하지 않고, 보정은 `settlement_adjustment` 행으로만 한다. 합계가 음수면 정산은 `payable_amount = 0`으로 만들고 부족분을 `CARRY_OVER` 조정으로 다음 정산에 넘긴다(정산당 최대 1개). `CARRY_OVER`만 있는 판매자에게는 정산을 만들지 않고, 그 판매자의 정산이 다음에 생길 때(라인 또는 `MANUAL` 조정이 있는 기간) 붙는다(사용자 결정).
 3. **정산 생성은 `order` 데이터를 포트로 읽고 판매자별 한 트랜잭션으로 쓴다.** UNIQUE 세 개(`settlement(seller_id, period_start)`, `settlement_line(seller_order_id)`, `settlement_run(period_start)`)로 재실행·동시 실행을 멱등하게 만든다. 작업 전체를 감싸는 트랜잭션은 없다. `settlement_run`은 모든 판매자가 성공한 뒤 별도 트랜잭션에서 남긴다. 주문 행 락은 잡지 않는다(읽기만).
 4. **`settlement ↔ settlement_line`은 `@OneToMany` 예외**로 허용한다. 라인은 정산 없이 존재하지 않고 생성 시 함께 저장되며 이후 바뀌지 않는 한 애그리거트다.
 5. **Spring Batch는 보류한다.** 판매자별 트랜잭션과 UNIQUE 멱등으로 충분한지는 정산 규모 측정(스펙 §8-9) 뒤에 판단한다.

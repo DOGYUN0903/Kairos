@@ -141,7 +141,7 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 - 판매자별 **한 트랜잭션**: 대상 판매자 주문을 판매자 ID로 묶은 뒤, 판매자마다 `tx.run { settlement INSERT(UNIQUE) → line INSERT(UNIQUE) → 조정 붙이기(§8-6) → 합계 계산 }`. UNIQUE 위반(동시 실행·재실행)은 그 판매자를 건너뛰고 다음 판매자로 간다. 스케줄러는 서비스를 감싸는 `@Transactional`을 붙이지 않는다(ADR 0003). keyset 순회는 `sweepByKeyset`을 `common`으로 옮기거나 settlement에 같은 함수를 둔다(빌더 선택).
 - 생성 중 판매자 주문 수가 많으면 한 판매자 트랜잭션이 길어진다. 라인 INSERT는 배치(`saveAll`)로 하고, 3-2에서 측정한다. 대용량 집계·배치 최적화는 로드맵대로 3-2.
 - 정지·탈퇴(소프트 딜리트) 판매자도 확정 판매자 주문이 있으면 정산을 **만든다**(Claude 결정: 받을 돈은 판매자 상태와 무관. 지급 여부는 관리자가 `PAID` 처리로 결정). 틀렸을 때 비용: 정지 판매자 정산이 목록에 섞인다(상세에 판매자 상태 표시).
-- **정산이 없는 판매자**(이번 기간 확정 0건)는 정산을 만들지 않는다. 단 **붙일 조정이 있으면** 라인 0개짜리 정산을 만든다(조정이 다음 정산으로 미뤄지지 않게).
+- **정산이 없는 판매자**(이번 기간 확정 0건)는 정산을 만들지 않는다. 단 **붙일 `MANUAL` 조정**(`created_at < periodEnd`, 미부착)이 있으면 라인 0개짜리 정산을 만든다(조정이 다음 정산으로 미뤄지지 않게). **`CARRY_OVER`만 있는 판매자는 정산을 만들지 않는다**(사용자 결정): 이월은 미부착으로 남았다가 그 판매자의 정산이 다음에 생길 때(라인 또는 `MANUAL` 조정이 있는 기간) 붙는다. 틀렸을 때 비용: 매출이 다시 없는 판매자의 이월(음수)은 계속 미부착으로 남는다(관리자가 조정 이력에서 본다).
 
 ### 8-4. 불변성과 상태 (Claude 결정)
 
@@ -151,12 +151,12 @@ C2 구매, C3 혜택 위에 **배송 후 반품**과 **판매자 정산**을 얹
 
 ### 8-5. 음수 정산 (Claude 결정)
 
-`total_amount < 0`(예: 매출 0에 판매자 귀책 반품비·조정만 있는 주)이면 정산은 그대로 만들고 `payable_amount = max(total_amount, 0)`, 부족분(`total_amount − payable_amount`, 음수)을 **생성 트랜잭션 안에서 시스템 조정 `CARRY_OVER`로 다음 정산에 넘긴다**(`settlement_adjustment` 행, `adjustment_type = CARRY_OVER`, `source_settlement_id`). 지급 표시는 `payable_amount` 기준. 틀렸을 때 비용: 판매자가 영영 매출이 없으면 받을 돈이 소멸한다(관리자가 조정 이력에서 본다). 대안(판매자에게 청구)은 이체가 없는 C4에서 구현할 수 없다.
+`total_amount < 0`(예: 매출 0에 판매자 귀책 반품비·조정만 있는 주)이면 정산은 그대로 만들고 `payable_amount = max(total_amount, 0)`, 부족분(`total_amount − payable_amount`, 음수)을 **생성 트랜잭션 안에서 시스템 조정 `CARRY_OVER`로 다음 정산에 넘긴다**(`settlement_adjustment` 행, `adjustment_type = CARRY_OVER`, `source_settlement_id`). 지급 표시는 `payable_amount` 기준. 이월은 그 판매자의 정산이 다음에 생길 때까지(라인 또는 `MANUAL` 조정이 있는 기간) 미부착으로 남고, 이월만 있는 판매자에게는 정산을 만들지 않는다(사용자 결정). 틀렸을 때 비용: 판매자가 영영 매출이 없으면 받을 돈이 소멸한다(관리자가 조정 이력에서 본다). 대안(판매자에게 청구)은 이체가 없는 C4에서 구현할 수 없다.
 
 ### 8-6. 관리자 조정 (Claude 결정, 사용자 규칙 구체화)
 
 - `POST /api/v1/admin/sellers/{sellerId}/settlement-adjustments`(Idempotency-Key) 본문 `amount`(0 아닌 부호 있는 정수, 원), `reason`(≤500자), 선택 `refSellerOrderId`(근거 주문). `adjustment_type = MANUAL`.
-- 생성 시 `settlement_id NULL`. 정산 생성 트랜잭션이 `settlement_id IS NULL`인 조정을 **조건부 UPDATE**로 붙이고, 붙은 행만 합계에 더한다. `MANUAL` 조정은 `created_at < periodEnd`인 것만 붙인다(`SET settlement_id = ? WHERE seller_id = ? AND settlement_id IS NULL AND adjustment_type = 'MANUAL' AND created_at < ?`). `CARRY_OVER`는 `created_at`과 무관하게 다음으로 생성되는 정산에 붙인다(작업이 밀려 여러 기간을 한 번에 따라잡을 때 CARRY_OVER가 한 기간을 건너뛰는 것을 막기 위해서다). 붙은 조정은 바꾸거나 지울 수 없다(정산 불변). 아직 안 붙은 조정은 관리자가 **삭제**(소프트, `status = DELETED`)할 수 있다. 틀렸을 때 비용: 기간 종료 직후·생성 직전에 넣은 조정은 이번 정산에 들어간다(`MANUAL`은 `created_at < periodEnd` 조건으로 막는다. 즉 기간이 끝난 뒤 넣은 조정은 다음 정산).
+- 생성 시 `settlement_id NULL`. 정산 생성 트랜잭션이 `settlement_id IS NULL`인 조정을 **조건부 UPDATE**로 붙이고, 붙은 행만 합계에 더한다. `MANUAL` 조정은 `created_at < periodEnd`인 것만 붙인다(`SET settlement_id = ? WHERE seller_id = ? AND settlement_id IS NULL AND adjustment_type = 'MANUAL' AND created_at < ?`). `CARRY_OVER`는 `created_at`과 무관하게 그 판매자의 다음으로 생성되는 정산에 붙인다(CARRY_OVER만으로는 정산이 생성되지 않는다 — §8-3, 사용자 결정)(작업이 밀려 여러 기간을 한 번에 따라잡을 때 CARRY_OVER가 한 기간을 건너뛰는 것을 막기 위해서다). 붙은 조정은 바꾸거나 지울 수 없다(정산 불변). 아직 안 붙은 조정은 관리자가 **삭제**(소프트, `status = DELETED`)할 수 있다. 틀렸을 때 비용: 기간 종료 직후·생성 직전에 넣은 조정은 이번 정산에 들어간다(`MANUAL`은 `created_at < periodEnd` 조건으로 막는다. 즉 기간이 끝난 뒤 넣은 조정은 다음 정산).
 - 정산 합계: `total_amount = Σ line_amount + Σ adjustment.amount`(MANUAL + CARRY_OVER).
 
 ### 8-7. 정산 예시 (숫자로 고정)
