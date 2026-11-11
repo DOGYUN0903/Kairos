@@ -28,7 +28,7 @@ class ReturnAutoApproveService(
             try {
                 orderReturnService.approveBySystem(orderId, returnId)
             } catch (e: RuntimeException) {
-                log.error(e) { "반품 자동 승인에 실패했다: orderId=$orderId, returnId=$returnId" }
+                log.warn(e) { "반품 자동 승인에 실패했다: orderId=$orderId, returnId=$returnId" }
                 false
             }
         }

@@ -26,7 +26,7 @@ class PurchaseAutoConfirmService(
                 orderShippingService.autoConfirm(sellerOrderId)
                 true
             } catch (e: RuntimeException) {
-                log.error(e) { "자동 구매 확정에 실패했다: sellerOrderId=$sellerOrderId" }
+                log.warn(e) { "자동 구매 확정에 실패했다: sellerOrderId=$sellerOrderId" }
                 false
             }
         }

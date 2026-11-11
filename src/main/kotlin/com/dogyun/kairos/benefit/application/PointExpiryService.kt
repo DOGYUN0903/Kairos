@@ -27,7 +27,7 @@ class PointExpiryService(
                 try {
                     if (pointService.expireLot(memberId, lotId)) handled++
                 } catch (e: RuntimeException) {
-                    log.error(e) { "포인트 로트 만료에 실패했다: memberId=$memberId, lotId=$lotId" }
+                    log.warn(e) { "포인트 로트 만료에 실패했다: memberId=$memberId, lotId=$lotId" }
                 }
             }
             if (page.size < limit) return handled

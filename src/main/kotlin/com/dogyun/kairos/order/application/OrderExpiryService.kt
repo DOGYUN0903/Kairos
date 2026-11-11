@@ -33,7 +33,7 @@ class OrderExpiryService(
             try {
                 expire(orderId)
             } catch (e: RuntimeException) {
-                log.error(e) { "주문 만료 처리에 실패했다: orderId=$orderId" }
+                log.warn(e) { "주문 만료 처리에 실패했다: orderId=$orderId" }
                 false
             }
         }

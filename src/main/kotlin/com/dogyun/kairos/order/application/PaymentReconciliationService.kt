@@ -33,7 +33,7 @@ class PaymentReconciliationService(
             try {
                 reconcileApproval(payment)
             } catch (e: RuntimeException) {
-                log.error(e) { "결제 승인 대사에 실패했다: orderId=${payment.orderId}" }
+                log.warn(e) { "결제 승인 대사에 실패했다: orderId=${payment.orderId}" }
                 false
             }
         }
@@ -67,7 +67,7 @@ class PaymentReconciliationService(
             try {
                 revoid(candidate)
             } catch (e: RuntimeException) {
-                log.error(e) { "닫힌 주문 재취소에 실패했다: orderId=${candidate.orderId}" }
+                log.warn(e) { "닫힌 주문 재취소에 실패했다: orderId=${candidate.orderId}" }
                 false
             }
         }
@@ -113,7 +113,7 @@ class PaymentReconciliationService(
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
-                log.error(e) { "환불 대사에 실패했다: orderId=$orderId, itemId=$itemId" }
+                log.warn(e) { "환불 대사에 실패했다: orderId=$orderId, itemId=$itemId" }
                 false
             }
         }
