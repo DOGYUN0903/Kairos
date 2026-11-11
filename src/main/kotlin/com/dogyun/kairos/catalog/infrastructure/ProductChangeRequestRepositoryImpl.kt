@@ -3,6 +3,7 @@ package com.dogyun.kairos.catalog.infrastructure
 import com.dogyun.kairos.catalog.domain.ChangeRequestStatus
 import com.dogyun.kairos.catalog.domain.ProductChangeRequest
 import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
@@ -36,10 +37,21 @@ class ProductChangeRequestRepositoryImpl(
     override fun findPendingByProductId(productId: Long): ProductChangeRequest? =
         jpaRepository.findFirstByProductIdAndChangeStatus(productId, ChangeRequestStatus.PENDING)?.let(::toDomain)
 
-    override fun findPage(status: ChangeRequestStatus?, page: Int, size: Int): PageResult<ProductChangeRequest> {
+    override fun findLatestByProductId(productId: Long): ProductChangeRequest? =
+        jpaRepository.findFirstByProductIdOrderByIdDesc(productId)?.let(::toDomain)
+
+    override fun findPendingProductIds(productIds: Collection<Long>): Set<Long> =
+        if (productIds.isEmpty()) emptySet()
+        else jpaRepository.findAllByProductIdInAndChangeStatus(productIds, ChangeRequestStatus.PENDING).map { it.productId }.toSet()
+
+    override fun findPage(status: ChangeRequestStatus?, order: ListOrder, page: Int, size: Int): PageResult<ProductChangeRequest> {
         val pageable = PageRequest.of(page, size)
-        val result = if (status == null) jpaRepository.findAllByOrderByIdDesc(pageable)
-        else jpaRepository.findAllByChangeStatusOrderByIdDesc(status, pageable)
+        val result = when {
+            status == null && order == ListOrder.OLDEST -> jpaRepository.findAllByOrderByIdAsc(pageable)
+            status == null -> jpaRepository.findAllByOrderByIdDesc(pageable)
+            order == ListOrder.OLDEST -> jpaRepository.findAllByChangeStatusOrderByIdAsc(status, pageable)
+            else -> jpaRepository.findAllByChangeStatusOrderByIdDesc(status, pageable)
+        }
         return PageResult.of(result.content.map(::toDomain), page, size, result.totalElements)
     }
 
@@ -51,5 +63,6 @@ class ProductChangeRequestRepositoryImpl(
         originalPrice = entity.originalPrice,
         status = entity.changeStatus,
         rejectReason = entity.rejectReason,
+        createdAt = entity.createdAt,
     )
 }

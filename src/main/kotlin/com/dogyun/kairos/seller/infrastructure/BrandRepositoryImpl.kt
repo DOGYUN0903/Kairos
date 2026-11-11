@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.infrastructure
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.Brand
 import com.dogyun.kairos.seller.domain.BrandId
@@ -47,18 +48,28 @@ class BrandRepositoryImpl(
 
     override fun findAllBySellerId(sellerId: Long): List<Brand> = toDomains(jpaRepository.findAllBySellerIdOrderByIdDesc(sellerId))
 
-    override fun findPage(status: BrandStatus?, page: Int, size: Int): PageResult<Brand> {
+    override fun findPage(status: BrandStatus?, order: ListOrder, page: Int, size: Int): PageResult<Brand> {
         val brand = QBrandEntity.brandEntity
         // status가 null이면 where 조건이 붙지 않는다(QueryDSL where는 null을 무시한다).
         val where = status?.let { brand.brandStatus.eq(it) }
         val content = queryFactory.selectFrom(brand)
             .where(where)
-            .orderBy(brand.id.desc())
+            .orderBy(if (order == ListOrder.OLDEST) brand.id.asc() else brand.id.desc())
             .offset(page.toLong() * size)
             .limit(size.toLong())
             .fetch()
         val total = queryFactory.select(brand.count()).from(brand).where(where).fetchOne() ?: 0L
         return PageResult.of(toDomains(content), page, size, total)
+    }
+
+    override fun findApprovedOrderByName(limit: Int): List<Brand> {
+        val brand = QBrandEntity.brandEntity
+        val content = queryFactory.selectFrom(brand)
+            .where(brand.brandStatus.eq(BrandStatus.APPROVED))
+            .orderBy(brand.name.asc(), brand.id.asc())
+            .limit(limit.toLong())
+            .fetch()
+        return toDomains(content)
     }
 
     override fun findAllByIds(ids: Collection<Long>): List<Brand> =
@@ -94,5 +105,6 @@ class BrandRepositoryImpl(
         description = entity.description,
         status = entity.brandStatus,
         rejectReason = entity.rejectReason,
+        createdAt = entity.createdAt,
     )
 }

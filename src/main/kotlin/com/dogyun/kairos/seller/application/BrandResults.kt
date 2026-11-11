@@ -1,6 +1,7 @@
 package com.dogyun.kairos.seller.application
 
 import com.dogyun.kairos.seller.domain.Brand
+import java.time.LocalDateTime
 
 data class BrandDetail(
     val brandId: Long,
@@ -8,10 +9,17 @@ data class BrandDetail(
     val name: String,
     val englishName: String?,
     val logoUrl: String?,
+    /** 재신청 시 로고 유지를 위해 내려준다. */
+    val logoFileId: Long?,
     val description: String?,
     val status: String,
     val rejectReason: String?,
+    /** 신청 일시. */
+    val createdAt: LocalDateTime,
 )
+
+/** 공개 브랜드 목록의 한 줄(필터용). */
+data class BrandListItem(val brandId: Long, val name: String)
 
 data class BrandPublic(
     val brandId: Long,
@@ -39,9 +47,11 @@ internal fun toBrandDetails(brands: List<Brand>, imageFileReader: ImageFileReade
             name = it.name,
             englishName = it.englishName,
             logoUrl = it.logoFileId?.let(urls::get),
+            logoFileId = it.logoFileId,
             description = it.description,
             status = it.status.name,
             rejectReason = it.rejectReason,
+            createdAt = requireNotNull(it.createdAt) { "저장소에서 읽은 브랜드에는 신청 일시가 있어야 합니다" },
         )
     }
 }

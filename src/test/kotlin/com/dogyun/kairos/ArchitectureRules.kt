@@ -50,6 +50,14 @@ class ArchitectureRules(private val root: String) {
             )
             .allowEmptyShould(true)
 
+    /** demo(시더)는 modules 밖이지만 각 모듈의 application 만 쓴다. */
+    fun demoUsesOnlyApplication(): ArchRule =
+        noClasses().that().resideInAPackage("$root.demo..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                *modules.flatMap { listOf("$root.$it.domain..", "$root.$it.presentation..", "$root.$it.infrastructure..") }.toTypedArray(),
+            )
+            .allowEmptyShould(true)
+
     fun crossModuleApplicationOnlyFromInfrastructure(): List<ArchRule> =
         pairs.map { (a, b) -> crossModuleApplicationOnlyFromInfrastructure(a, b) }
 

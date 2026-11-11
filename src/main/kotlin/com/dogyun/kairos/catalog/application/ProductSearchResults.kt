@@ -7,6 +7,7 @@ import com.dogyun.kairos.catalog.domain.averageRatingOf
 data class ProductSummary(
     val productId: Long,
     val thumbnailUrl: String,
+    val brandId: Long,
     val brandName: String,
     val name: String,
     val originalPrice: Long,
@@ -34,6 +35,8 @@ data class ProductDetail(
     val productId: Long,
     val brandId: Long,
     val brandName: String,
+    /** 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)". */
+    val sellerName: String,
     val categoryId: Long,
     val name: String,
     val description: String,
@@ -55,6 +58,7 @@ data class ProductDetail(
 internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String, liked: Boolean?) = ProductSummary(
     productId = row.productId,
     thumbnailUrl = thumbnailUrl,
+    brandId = row.brandId,
     brandName = row.brandName,
     name = row.name,
     originalPrice = row.originalPrice,
@@ -67,7 +71,7 @@ internal fun toProductSummary(row: ProductListRow, thumbnailUrl: String, liked: 
     liked = liked,
 )
 
-internal fun toProductDetail(product: Product, brandName: String, imageUrls: Map<Long, String>, liked: Boolean?): ProductDetail {
+internal fun toProductDetail(product: Product, brandName: String, sellerName: String, imageUrls: Map<Long, String>, liked: Boolean?): ProductDetail {
     val content = product.content
     val orderedValues = content.options.flatMap { it.values }
     val valueNames = orderedValues.associate { requireNotNull(it.id) to it.name }
@@ -75,6 +79,7 @@ internal fun toProductDetail(product: Product, brandName: String, imageUrls: Map
         productId = requireNotNull(product.id).value,
         brandId = product.brandId,
         brandName = brandName,
+        sellerName = sellerName,
         categoryId = content.categoryId,
         name = content.name,
         description = content.description,

@@ -3,6 +3,7 @@ package com.dogyun.kairos.catalog.application
 import com.dogyun.kairos.catalog.domain.Category
 import com.dogyun.kairos.catalog.domain.CategoryId
 import com.dogyun.kairos.catalog.domain.CategoryRepository
+import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.security.SellerPrincipal
@@ -34,6 +35,7 @@ class ProductServiceTest {
         override fun findBrand(brandId: Long): BrandSnapshot? = brands[brandId]
         override fun getBrandNames(brandIds: Collection<Long>): Map<Long, String> =
             brands.filterKeys { it in brandIds }.mapValues { it.value.name }
+        override fun getSellerNames(sellerIds: Collection<Long>): Map<Long, String> = emptyMap()
     }
 
     private class FakeImageFileReader(private val files: Map<Long, ImageFileRef>) : ImageFileReader {
@@ -50,6 +52,7 @@ class ProductServiceTest {
             10L to BrandSnapshot(10L, sellerId = 1L, name = "키로스", approved = true),
             11L to BrandSnapshot(11L, sellerId = 2L, name = "남의브랜드", approved = true),
             12L to BrandSnapshot(12L, sellerId = 1L, name = "심사중", approved = false),
+            13L to BrandSnapshot(13L, sellerId = 1L, name = "키로스2", approved = true),
         ),
     )
     private val files = FakeImageFileReader(
@@ -105,6 +108,32 @@ class ProductServiceTest {
         val summary = query.listMine(me, null, 0, 20).content.single()
         assertEquals("http://files/a.png", summary.thumbnailUrl)
         assertEquals("키로스", summary.brandName)
+    }
+
+    @Test
+    fun 목록_요약에_정가와_반려_사유가_담긴다() {
+        val productId = register()
+        assertEquals(10000L, query.listMine(me, null, 0, 20).content.single().originalPrice)
+        assertEquals(null, query.listMine(me, null, 0, 20).content.single().rejectReason)
+
+        products.save(products.findById(ProductId(productId))!!.apply { reject("타 브랜드명 포함") })
+
+        assertEquals("타 브랜드명 포함", query.listMine(me, null, 0, 20).content.single().rejectReason)
+    }
+
+    @Test
+    fun 목록은_검색어와_브랜드로_좁힌다() {
+        register(content = content().copy(name = "헤비 코튼 티셔츠"))
+        register(brandId = 13L, content = content().copy(name = "린넨 셔츠"))
+
+        assertEquals(listOf("헤비 코튼 티셔츠"), query.listMine(me, null, 0, 20, keyword = "  코튼 ").content.map { it.name })
+        assertEquals(listOf("린넨 셔츠"), query.listMine(me, null, 0, 20, brandId = 13L).content.map { it.name })
+        assertEquals(2, query.listMine(me, null, 0, 20, keyword = "   ").totalElements)
+    }
+
+    @Test
+    fun 검색어가_100자를_넘으면_INVALID_REQUEST() {
+        assertCode(ErrorCode.INVALID_REQUEST) { query.listMine(me, null, 0, 20, keyword = "가".repeat(101)) }
     }
 
     @Test

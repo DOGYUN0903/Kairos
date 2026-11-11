@@ -1,6 +1,7 @@
 package com.dogyun.kairos.catalog.application
 
 import com.dogyun.kairos.catalog.domain.ChangeRequestStatus
+import com.dogyun.kairos.catalog.domain.ChangedField
 import com.dogyun.kairos.catalog.domain.ProductChangeRequest
 import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
@@ -11,6 +12,7 @@ import com.dogyun.kairos.catalog.domain.ProductReviewResult
 import com.dogyun.kairos.catalog.domain.ProductReviewTarget
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,6 +27,7 @@ class ChangeRequestAdminService(
     private val categoryQueryService: CategoryQueryService,
     private val historyRepository: ProductReviewHistoryRepository,
     private val imageFileReader: ImageFileReader,
+    private val sellerReader: SellerReader,
     private val clock: Clock,
 ) {
 
@@ -57,11 +60,23 @@ class ChangeRequestAdminService(
     }
 
     @Transactional(readOnly = true)
-    fun listForAdmin(status: ChangeRequestStatus?, page: Int, size: Int): PageResult<ChangeRequestSummary> {
+    fun listForAdmin(status: ChangeRequestStatus?, order: ListOrder, page: Int, size: Int): PageResult<ChangeRequestSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = changeRequestRepository.findPage(status, page, size)
+        val result = changeRequestRepository.findPage(status, order, page, size)
+        val sellerNames = sellerReader.getSellerNames(result.content.map { it.sellerId }.toSet())
+        val products = productRepository.findAllByIds(result.content.map { it.productId }.toSet()).associateBy { it.id?.value }
         val summaries = result.content.map {
-            ChangeRequestSummary(requireNotNull(it.id), it.productId, it.sellerId, it.content.name, it.originalPrice, it.status.name)
+            ChangeRequestSummary(
+                changeRequestId = requireNotNull(it.id),
+                productId = it.productId,
+                sellerId = it.sellerId,
+                name = it.content.name,
+                originalPrice = it.originalPrice,
+                status = it.status.name,
+                requestedAt = requireNotNull(it.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
+                sellerName = sellerNames[it.sellerId] ?: DELETED_SELLER_NAME,
+                changedFields = products[it.productId]?.let { product -> it.changedFields(product).map(ChangedField::name) }.orEmpty(),
+            )
         }
         return PageResult(summaries, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
     }
@@ -76,19 +91,10 @@ class ChangeRequestAdminService(
             productId = request.productId,
             sellerId = request.sellerId,
             status = request.status.name,
+            requestedAt = requireNotNull(request.createdAt) { "저장소에서 읽은 변경 요청에는 요청 일시가 있어야 합니다" },
             rejectReason = request.rejectReason,
             originalPrice = request.originalPrice,
-            content = ProductContentResult(
-                name = content.name,
-                description = content.description,
-                categoryId = content.categoryId,
-                images = content.imageFileIds.mapIndexed { index, fileId ->
-                    ProductImageResult(fileId, urls[fileId].orEmpty(), isMain = index == 0)
-                },
-                options = content.options.map { option ->
-                    ChangeOptionResult(option.id, option.name, option.values.map { ChangeOptionValueResult(it.id, it.name) })
-                },
-            ),
+            content = toContentResult(content, urls),
         )
     }
 

@@ -42,8 +42,10 @@ class SellerProductController(
         @RequestParam(required = false) status: ProductStatus?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) keyword: String?,
+        @RequestParam(required = false) brandId: Long?,
     ): ResponseEntity<ApiResponse<PageResponse<SellerProductSummary>>> =
-        ApiResponse.ok(PageResponse.from(productQueryService.listMine(seller, status, page, size)))
+        ApiResponse.ok(PageResponse.from(productQueryService.listMine(seller, status, page, size, keyword, brandId)))
 
     @GetMapping("/{productId}")
     fun getMine(

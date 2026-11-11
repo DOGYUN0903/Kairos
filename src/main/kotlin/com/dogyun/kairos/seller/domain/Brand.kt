@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.domain
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import java.time.LocalDateTime
 
 class Brand(
     val id: BrandId?,
@@ -12,6 +13,8 @@ class Brand(
     description: String?,
     status: BrandStatus,
     rejectReason: String?,
+    /** 신청 일시. 읽기 전용이며 저장소에서 읽어 온 애그리거트에만 값이 있다. */
+    val createdAt: LocalDateTime? = null,
 ) {
     var name: String = name
         private set
@@ -78,7 +81,8 @@ class Brand(
             description: String?,
             status: BrandStatus,
             rejectReason: String?,
-        ) = Brand(id, sellerId, name, englishName, logoFileId, description, status, rejectReason)
+            createdAt: LocalDateTime? = null,
+        ) = Brand(id, sellerId, name, englishName, logoFileId, description, status, rejectReason, createdAt)
 
         private fun validate(name: String, englishName: String?, description: String?) {
             if (name.isBlank() || name.length > MAX_NAME_LENGTH) throw DomainException(ErrorCode.BRAND_INVALID)

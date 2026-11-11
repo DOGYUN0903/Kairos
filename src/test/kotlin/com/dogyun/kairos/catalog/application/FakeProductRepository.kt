@@ -6,8 +6,10 @@ import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductOption
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.catalog.domain.Sku
 import com.dogyun.kairos.catalog.domain.SkuId
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 
 /** 실제 저장소처럼 새 옵션 값·SKU 에 순번 ID 를 주고, 값 ID 확정 후 [Product.rebuildSkus] 를 호출한다. */
@@ -35,6 +37,7 @@ internal class FakeProductRepository : ProductRepository {
         val saved = Product.restore(
             id, product.sellerId, product.brandId, content, product.originalPrice, product.salePrice,
             product.status, product.rejectReason, product.onSaleAt, product.salesCount, skus,
+            createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
         )
         store[id.value] = saved
         return saved
@@ -49,18 +52,25 @@ internal class FakeProductRepository : ProductRepository {
     override fun findByIdAndSellerId(id: ProductId, sellerId: Long): Product? =
         store[id.value]?.takeIf { it.sellerId == sellerId }
 
-    override fun findPageBySellerId(sellerId: Long, status: ProductStatus?, page: Int, size: Int): PageResult<Product> {
-        val all = store.values.filter { it.sellerId == sellerId && (status == null || it.status == status) }.reversed()
+    override fun findPageBySellerId(sellerId: Long, filter: SellerProductFilter, page: Int, size: Int): PageResult<Product> {
+        val all = store.values.filter {
+            it.sellerId == sellerId &&
+                (filter.status == null || it.status == filter.status) &&
+                (filter.brandId == null || it.brandId == filter.brandId) &&
+                (filter.keyword == null || it.content.name.contains(filter.keyword))
+        }.reversed()
         return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
     }
 
-    override fun findPageByStatus(status: ProductStatus?, page: Int, size: Int): PageResult<Product> {
-        val all = store.values.filter { status == null || it.status == status }.reversed()
+    override fun findPageByStatus(status: ProductStatus?, order: ListOrder, page: Int, size: Int): PageResult<Product> {
+        val all = store.values.filter { status == null || it.status == status }.let { if (order == ListOrder.OLDEST) it else it.reversed() }
         return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
     }
 
     override fun findAllBySkuIds(skuIds: Collection<Long>): List<Product> =
         store.values.filter { product -> product.skus.any { it.id?.value in skuIds } }
+
+    override fun findAllByIds(ids: Collection<Long>): List<Product> = ids.toSet().mapNotNull { store[it] }
 
     override fun existsByCategoryId(categoryId: Long): Boolean = store.values.any { it.content.categoryId == categoryId }
 }

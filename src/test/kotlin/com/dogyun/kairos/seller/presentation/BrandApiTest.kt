@@ -5,6 +5,7 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class BrandApiTest : CommerceTestSupport() {
 
@@ -113,6 +114,7 @@ class BrandApiTest : CommerceTestSupport() {
         assertEquals("PENDING", mine.get("status").asString())
         assertEquals("키로스2", mine.get("name").asString())
         assertNotNull(mine.get("logoUrl").asString())
+        assertEquals(fileId, mine.get("logoFileId").asLong())
         val pending = json(get("/api/v1/admin/brands?status=PENDING", admin)).get("data")
         assertEquals(1, pending.get("totalElements").asInt())
         // 승인된 브랜드는 재신청할 수 없다.
@@ -138,5 +140,40 @@ class BrandApiTest : CommerceTestSupport() {
 
         post("/api/v1/seller/brands", token, mapOf("name" to "키로스", "logoFileId" to others))
             .expectCode(400, "FILE_NOT_OWNED")
+    }
+
+    private fun brandList(): List<Pair<Long, String>> {
+        val data = json(get("/api/v1/brands").andExpect { status { isOk() } }).get("data")
+        return (0 until data.size()).map { data.get(it).get("brandId").asLong() to data.get(it).get("name").asString() }
+    }
+
+    @Test
+    fun 공개_브랜드_목록은_비로그인으로_승인_브랜드만_이름순으로_준다() {
+        val token = newUserToken()
+        approvedSeller(token)
+        val b = approvedBrand(token, "가나다-목록테스트")
+        val a = approvedBrand(token, "AAA-목록테스트")
+        val pendingId = applyBrand(token, "대기-목록테스트")
+
+        val list = brandList()
+
+        val ids = list.map { it.first }
+        assertTrue(a in ids && b in ids)
+        assertTrue(pendingId !in ids)
+        assertTrue(ids.indexOf(a) < ids.indexOf(b), "이름 오름차순: AAA < 가나다")
+        assertEquals(list.map { it.second }, list.map { it.second }.sorted())
+    }
+
+    @Test
+    fun 정지된_판매자의_브랜드는_공개_목록에서_빠지고_해제하면_돌아온다() {
+        val token = newUserToken()
+        val sellerId = approvedSeller(token)
+        val brandId = approvedBrand(token)
+
+        suspendSeller(sellerId)
+        assertTrue(brandId !in brandList().map { it.first })
+
+        unsuspendSeller(sellerId)
+        assertTrue(brandId in brandList().map { it.first })
     }
 }

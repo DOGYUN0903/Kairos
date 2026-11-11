@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 관리자 — 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  body { min-width: 1280px; }
+  .waits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .waits a { display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; min-height: 104px; color: var(--text); }
+  .waits a:hover { border-color: var(--navy); text-decoration: none; }
+  .waits .l { font-size: 12px; color: var(--text-2); }
+  .waits .n { display: block; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .waits .n small { font-size: 13px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+  .waits .go { display: block; font-size: 12px; color: var(--navy); margin-top: 6px; }
+  .waits a.zero .n { color: var(--text-3); }
+  .dash-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; margin-top: 24px; }
+  .quick { display: flex; flex-direction: column; gap: 8px; }
+  .name { font-weight: 500; }
+  .meta { font-size: 12px; color: var(--text-2); }
+  .state { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--border); }
+  .state > h2 { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 16px; }
+  .skeleton { display: block; background: var(--surface-2); border-radius: var(--radius); height: 14px; }
+</style>
+</head>
+<body>
+<div class="console">
+  <aside class="console__side">
+    <a class="logo" href="index.html">KAIROS</a>
+    <div class="console__role">관리자 콘솔</div>
+    <nav class="side-nav" aria-label="관리자 메뉴">
+      <a href="admin-dashboard.html" aria-current="page"></a>
+      <a href="admin-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>검수<span class="count" aria-label="대기 23건">23</span></a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 20V10l8-6 8 6v10"/><path d="M4 10h16"/></svg>카테고리</a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>판매자</a>
+      <a href="#" aria-disabled="true"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>핫딜<span class="soon">준비 중</span></a>
+    </nav>
+  </aside>
+
+  <div class="console__main">
+    <header class="console__top">
+      <h1>대시보드</h1>
+      <div class="console__user"><span>admin</span><span class="avatar" aria-hidden="true">AD</span></div>
+    </header>
+
+    <main class="console__content">
+      <div class="waits" role="group" aria-label="검수 대기 건수">
+        <a href="admin-review.html#sellers"><span class="l">판매자 입점 대기</span><span class="n">2<small>건</small></span><span class="go">검수 열기 →</span></a>
+        <a href="admin-review.html#brands"><span class="l">브랜드 대기</span><span class="n">4<small>건</small></span><span class="go">검수 열기 →</span></a>
+        <a href="admin-review.html#products"><span class="l">상품 검수 대기</span><span class="n">12<small>건</small></span><span class="go">검수 열기 →</span></a>
+        <a href="admin-review.html#change-requests"><span class="l">변경 요청 대기</span><span class="n">5<small>건</small></span><span class="go">검수 열기 →</span></a>
+      </div>
+      <p class="hint mt-8">각 숫자는 <code>GET /admin/{sellers|brands|products|change-requests}?status=PENDING|PENDING_REVIEW&amp;size=1</code>의 <code>totalElements</code>입니다.</p>
+
+      <div class="dash-cols">
+        <section class="card" aria-labelledby="old-h">
+          <div class="card__head"><h2 id="old-h">오래된 대기 건 5개</h2><span class="small muted">큐별 <code>sort=OLDEST</code> 첫 행</span></div>
+          <div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">종류</th><th scope="col">이름</th><th scope="col">판매자</th><th scope="col">요청일</th><th scope="col"><span class="sr-only">열기</span></th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip chip-info">상품</span></td><td><span class="name">베이직 크루넥 반팔 티셔츠 2팩</span><br><span class="meta">#1018 · [브랜드 B]</span></td><td>[판매자 B]</td><td class="muted">2026-11-03</td><td><a class="btn btn-ghost btn-sm" href="admin-review.html">열기</a></td></tr>
+              <tr><td><span class="chip chip-info">브랜드</span></td><td><span class="name">노드 어패럴</span><br><span class="meta">NODE APPAREL</span></td><td>[판매자 C]</td><td class="muted">2026-11-04</td><td><a class="btn btn-ghost btn-sm" href="admin-review.html">열기</a></td></tr>
+              <tr><td><span class="chip chip-info">판매자</span></td><td><span class="name">주식회사 무드웨어</span><br><span class="meta">사업자 214-86-11223</span></td><td>—</td><td class="muted">2026-11-05</td><td><a class="btn btn-ghost btn-sm" href="admin-review.html">열기</a></td></tr>
+              <tr><td><span class="chip chip-info">변경 요청</span></td><td><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span><br><span class="meta">#CR-301 · 상품 #1024</span></td><td>[판매자 A 주식회사]</td><td class="muted">2026-11-07</td><td><a class="btn btn-ghost btn-sm" href="admin-review.html">열기</a></td></tr>
+              <tr><td><span class="chip chip-info">상품</span></td><td><span class="name">헨리넥 와플 티셔츠</span><br><span class="meta">#1033 · [브랜드 C]</span></td><td>[판매자 C]</td><td class="muted">2026-11-08</td><td><a class="btn btn-ghost btn-sm" href="admin-review.html">열기</a></td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section class="card" aria-labelledby="quick-h">
+          <div class="card__head"><h2 id="quick-h">바로 가기</h2></div>
+          <div class="card__body quick">
+            <a class="btn btn-primary btn-block" href="admin-review.html">검수</a>
+            <a class="btn btn-ghost btn-block" href="#">카테고리 관리</a>
+            <a class="btn btn-ghost btn-block" href="#">판매자 관리</a>
+          </div>
+        </section>
+      </div>
+
+      <section class="state" aria-labelledby="st-h">
+        <h2 id="st-h">로딩 · 빈 상태</h2>
+        <div class="waits" aria-busy="true" aria-label="불러오는 중">
+          <a><span class="skeleton" style="width:60%"></span><span class="skeleton mt-8" style="width:30%;height:26px"></span></a><a><span class="skeleton" style="width:60%"></span><span class="skeleton mt-8" style="width:30%;height:26px"></span></a><a><span class="skeleton" style="width:60%"></span><span class="skeleton mt-8" style="width:30%;height:26px"></span></a><a><span class="skeleton" style="width:60%"></span><span class="skeleton mt-8" style="width:30%;height:26px"></span></a>
+        </div>
+        <div class="waits mt-24">
+          <a class="zero" href="admin-review.html"><span class="l">판매자 입점 대기</span><span class="n">0<small>건</small></span><span class="go">검수 열기 →</span></a>
+          <a class="zero" href="admin-review.html"><span class="l">브랜드 대기</span><span class="n">0<small>건</small></span><span class="go">검수 열기 →</span></a>
+          <a class="zero" href="admin-review.html"><span class="l">상품 검수 대기</span><span class="n">0<small>건</small></span><span class="go">검수 열기 →</span></a>
+          <a class="zero" href="admin-review.html"><span class="l">변경 요청 대기</span><span class="n">0<small>건</small></span><span class="go">검수 열기 →</span></a>
+        </div>
+        <div class="card mt-16"><div class="card__body" style="text-align:center;padding:40px 20px"><p class="muted">대기 중인 검수가 없습니다.</p></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

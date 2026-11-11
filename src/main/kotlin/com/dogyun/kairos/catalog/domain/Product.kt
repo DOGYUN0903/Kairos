@@ -25,6 +25,8 @@ class Product(
     val likeCount: Long = 0,
     val reviewCount: Long = 0,
     val ratingSum: Long = 0,
+    /** 등록 일시. 읽기 전용이며 저장소에서 읽어 온 애그리거트에만 값이 있다. */
+    val createdAt: LocalDateTime? = null,
 ) {
     var content: ProductContent = content
         private set
@@ -186,7 +188,11 @@ class Product(
             likeCount: Long = 0,
             reviewCount: Long = 0,
             ratingSum: Long = 0,
-        ) = Product(id, sellerId, brandId, content, originalPrice, salePrice, status, rejectReason, onSaleAt, salesCount, skus, likeCount, reviewCount, ratingSum)
+            createdAt: LocalDateTime? = null,
+        ) = Product(
+            id, sellerId, brandId, content, originalPrice, salePrice, status, rejectReason, onSaleAt, salesCount, skus,
+            likeCount, reviewCount, ratingSum, createdAt,
+        )
 
         /** 0 < 판매가 ≤ 정가. */
         private fun validatePrice(originalPrice: Long, salePrice: Long) {

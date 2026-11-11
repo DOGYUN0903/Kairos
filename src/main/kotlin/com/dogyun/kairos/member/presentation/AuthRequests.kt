@@ -21,4 +21,5 @@ data class LoginRequest(
     fun toCommand() = LoginCommand(email, password)
 }
 
-data class ReissueRequest(@field:NotBlank val refreshToken: String)
+/** refreshToken 이 없으면 쿠키 kairos_refresh 를 쓴다. */
+data class ReissueRequest(val refreshToken: String? = null)

@@ -63,9 +63,10 @@ class ProductSearchService(
         val product = searchRepository.findExposedDetail(ProductId(productId))
             ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND)
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
+        val sellerName = sellerReader.getSellerNames(listOf(product.sellerId))[product.sellerId] ?: DELETED_SELLER_NAME
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
         val liked = memberId?.let { likeRepository.findLikedProductIds(it, listOf(productId)).contains(productId) }
-        return toProductDetail(product, brandName, urls, liked)
+        return toProductDetail(product, brandName, sellerName, urls, liked)
     }
 
     /** 대표 이미지 URL 을 페이지 단위로 한 번에 조회한다. */

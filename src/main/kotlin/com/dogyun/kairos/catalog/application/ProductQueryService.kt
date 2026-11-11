@@ -5,6 +5,7 @@ import com.dogyun.kairos.catalog.domain.ProductChangeRequestRepository
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
@@ -29,16 +30,26 @@ class ProductQueryService(
         val brandName = sellerReader.getBrandNames(listOf(product.brandId))[product.brandId].orEmpty()
         val urls = imageFileReader.findImages(product.content.imageFileIds).mapValues { it.value.url }
         val pending = changeRequestRepository.findPendingByProductId(productId)?.id
-        return toSellerProductDetail(product, brandName, urls, pending)
+        val latest = changeRequestRepository.findLatestByProductId(productId)
+        return toSellerProductDetail(product, brandName, urls, pending, latest)
     }
 
     /** 다른 모듈(benefit)이 상품의 존재와 판매자만 확인할 때 쓴다. 삭제된 상품은 없는 것으로 본다. */
     fun findProductRef(productId: Long): ProductRefResult? =
         productRepository.findById(ProductId(productId))?.let { ProductRefResult(productId, it.sellerId) }
 
-    fun listMine(seller: SellerPrincipal, status: ProductStatus?, page: Int, size: Int): PageResult<SellerProductSummary> {
+    fun listMine(
+        seller: SellerPrincipal,
+        status: ProductStatus?,
+        page: Int,
+        size: Int,
+        keyword: String? = null,
+        brandId: Long? = null,
+    ): PageResult<SellerProductSummary> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = productRepository.findPageBySellerId(seller.sellerId, status, page, size)
+        val trimmed = keyword?.trim()?.takeIf { it.isNotEmpty() }
+        if (trimmed != null && trimmed.length > MAX_KEYWORD_LENGTH) throw DomainException(ErrorCode.INVALID_REQUEST)
+        val result = productRepository.findPageBySellerId(seller.sellerId, SellerProductFilter(status, trimmed, brandId), page, size)
         return PageResult(
             content = toSummaries(result.content),
             page = result.page,
@@ -49,16 +60,21 @@ class ProductQueryService(
         )
     }
 
-    /** 브랜드명과 대표 이미지 URL 을 상품 목록 단위로 한 번씩 조회한다. */
+    /** 브랜드명·대표 이미지 URL·대기 변경 요청 여부를 상품 목록 단위로 한 번씩 조회한다. */
     private fun toSummaries(products: List<Product>): List<SellerProductSummary> {
         val brandNames = sellerReader.getBrandNames(products.map { it.brandId }.toSet())
         val urls = imageFileReader.findImages(products.map { it.content.imageFileIds.first() }).mapValues { it.value.url }
+        val pendingProductIds = changeRequestRepository.findPendingProductIds(products.mapNotNull { it.id?.value })
         return products.map {
-            toSellerProductSummary(it, brandNames[it.brandId].orEmpty(), urls[it.content.imageFileIds.first()].orEmpty())
+            toSellerProductSummary(
+                it, brandNames[it.brandId].orEmpty(), urls[it.content.imageFileIds.first()].orEmpty(),
+                hasPendingChangeRequest = requireNotNull(it.id).value in pendingProductIds,
+            )
         }
     }
 
     private companion object {
         const val MAX_SIZE = 100
+        const val MAX_KEYWORD_LENGTH = 100
     }
 }

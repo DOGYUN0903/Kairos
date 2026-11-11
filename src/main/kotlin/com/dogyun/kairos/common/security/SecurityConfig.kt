@@ -55,6 +55,7 @@ class SecurityConfig {
                         "/api/v1/auth/signup",
                         "/api/v1/auth/login",
                         "/api/v1/auth/reissue",
+                        "/api/v1/auth/logout",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                     ).permitAll()
@@ -68,6 +69,8 @@ class SecurityConfig {
                         "/files/**",
                     ).permitAll()
                     .requestMatchers("/api/v1/admin/**").hasRole(Role.ADMIN.name)
+                    // demo 프로필에서만 컨트롤러가 있다. 다른 프로필에서도 ADMIN 외에는 막아 둔다.
+                    .requestMatchers("/api/v1/demo/**").hasRole(Role.ADMIN.name)
                     .anyRequest().authenticated()
             }
             .exceptionHandling {

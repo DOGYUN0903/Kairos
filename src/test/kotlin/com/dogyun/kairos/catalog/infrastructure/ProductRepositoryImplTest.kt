@@ -6,6 +6,8 @@ import com.dogyun.kairos.catalog.domain.Product
 import com.dogyun.kairos.catalog.domain.ProductContent
 import com.dogyun.kairos.catalog.domain.ProductId
 import com.dogyun.kairos.catalog.domain.ProductOption
+import com.dogyun.kairos.catalog.domain.ProductStatus
+import com.dogyun.kairos.catalog.domain.SellerProductFilter
 import com.dogyun.kairos.catalog.domain.ProductRepository
 import com.dogyun.kairos.catalog.domain.SkuStatus
 import org.springframework.beans.factory.annotation.Autowired
@@ -95,8 +97,25 @@ class ProductRepositoryImplTest : IntegrationTestSupport() {
         assertEquals(productId, tx { repository.findByIdAndSellerId(productId, 1L) }?.id)
         assertNull(tx { repository.findByIdAndSellerId(productId, 99L) })
         assertTrue(repository.existsByCategoryId(5L))
-        assertEquals(1, tx { repository.findPageBySellerId(1L, null, 0, 20) }.totalElements)
-        assertEquals(0, tx { repository.findPageBySellerId(2L, null, 0, 20) }.totalElements)
+        assertEquals(1, tx { repository.findPageBySellerId(1L, SellerProductFilter(), 0, 20) }.totalElements)
+        assertEquals(0, tx { repository.findPageBySellerId(2L, SellerProductFilter(), 0, 20) }.totalElements)
+    }
+
+    @Test
+    fun 판매자_목록은_상품명_부분_일치와_브랜드로_좁히고_와일드카드는_글자로_본다() {
+        fun named(name: String, brandId: Long) =
+            tx { repository.save(Product.register(1L, brandId, ProductContent(name, "설명", 5L, listOf(10L), emptyList()), 10000, 9000)) }
+        named("헤비 코튼 티셔츠", 2L)
+        named("린넨 셔츠", 3L)
+        named("100% 코튼 셔츠", 3L)
+
+        fun names(filter: SellerProductFilter) = tx { repository.findPageBySellerId(1L, filter, 0, 20) }.content.map { it.content.name }
+        assertEquals(listOf("100% 코튼 셔츠", "헤비 코튼 티셔츠"), names(SellerProductFilter(keyword = "코튼")))
+        assertEquals(listOf("100% 코튼 셔츠", "린넨 셔츠"), names(SellerProductFilter(brandId = 3L)))
+        assertEquals(listOf("100% 코튼 셔츠"), names(SellerProductFilter(keyword = "%", brandId = 3L)))
+        assertEquals(listOf("100% 코튼 셔츠", "린넨 셔츠"), names(SellerProductFilter(ProductStatus.PENDING_REVIEW, keyword = "셔츠", brandId = 3L)))
+        assertEquals(emptyList(), names(SellerProductFilter(ProductStatus.ON_SALE, keyword = "셔츠")))
+        assertEquals(0, tx { repository.findPageBySellerId(1L, SellerProductFilter(keyword = "_"), 0, 20) }.totalElements)
     }
 
     @Test

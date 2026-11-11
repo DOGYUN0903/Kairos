@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 로그인 · 회원가입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  body { min-width: 1280px; background: var(--surface); }
+  .auth { width: 420px; margin: 56px auto 80px; }
+  .auth .card__body { padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+  .auth h2 { font-size: 13px; font-weight: 700; color: var(--text-2); margin-top: 40px; }
+  .auth .tabs button { flex: 1; justify-content: center; }
+  .field-error { font-size: 12px; color: var(--danger); }
+  .auth .alt { text-align: center; font-size: 13px; color: var(--text-2); }
+  .state-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--text-3); margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+  </div>
+</header>
+
+<main class="auth">
+  <p class="state-label">상태 1 · 로그인 (오류 표시)</p>
+  <div class="card">
+    <div class="tabs" role="tablist" aria-label="로그인 또는 회원가입">
+      <button type="button" role="tab" id="tab-login" aria-controls="panel-login" aria-selected="true">로그인</button>
+      <button type="button" role="tab" id="tab-signup" aria-controls="panel-signup" aria-selected="false">회원가입</button>
+    </div>
+    <form class="card__body" id="panel-login" role="tabpanel" aria-labelledby="tab-login" action="#" onsubmit="return false">
+      <div class="notice notice-warn" role="alert"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>이메일 또는 비밀번호가 올바르지 않습니다.</span></div>
+      <div class="field"><label for="l-email">이메일</label><input id="l-email" class="input" type="email" autocomplete="email" value="minji.kim@example.com"></div>
+      <div class="field"><label for="l-pw">비밀번호</label><input id="l-pw" class="input" type="password" autocomplete="current-password" value="password1"></div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">로그인</button>
+      <p class="alt">아직 회원이 아니신가요? <a href="#tab-signup">회원가입</a></p>
+    </form>
+    <!-- 회원가입 패널: 실제 화면에서는 탭 전환으로 보인다 -->
+    <form class="card__body" id="panel-signup" role="tabpanel" aria-labelledby="tab-signup" hidden></form>
+  </div>
+
+  <h2>상태 2 · 회원가입 (필드 오류 표시)</h2>
+  <div class="card mt-8">
+    <div class="tabs" role="tablist" aria-label="로그인 또는 회원가입 (예시)">
+      <button type="button" role="tab" aria-selected="false">로그인</button>
+      <button type="button" role="tab" aria-selected="true">회원가입</button>
+    </div>
+    <form class="card__body" role="tabpanel" action="#" onsubmit="return false">
+      <div class="field"><label for="s-email">이메일</label><input id="s-email" class="input" type="email" autocomplete="email" value="minji.kim@example.com" aria-invalid="true" aria-describedby="s-email-err"><span id="s-email-err" class="field-error">이미 가입된 이메일입니다.</span></div>
+      <div class="field"><label for="s-pw">비밀번호</label><input id="s-pw" class="input" type="password" autocomplete="new-password" aria-describedby="s-pw-hint"><span id="s-pw-hint" class="hint">8자 이상</span></div>
+      <div class="field"><label for="s-name">이름</label><input id="s-name" class="input" type="text" autocomplete="name" value="김민지"></div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">가입하기</button>
+      <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>판매를 원하시면 가입 후 <a href="seller-dashboard.html#state-apply">판매자 센터에서 입점 신청</a>을 해 주세요. 관리자 심사 후 상품을 등록할 수 있습니다.</span></div>
+    </form>
+  </div>
+
+  <p class="alt mt-24">비회원도 상품을 둘러볼 수 있습니다 → <a href="user-product-list.html">상품 보기</a></p>
+</main>
+</body>
+</html>

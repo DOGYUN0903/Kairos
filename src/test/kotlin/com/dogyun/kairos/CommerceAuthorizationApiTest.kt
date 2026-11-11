@@ -29,7 +29,7 @@ class CommerceAuthorizationApiTest : CommerceTestSupport() {
         post("/api/v1/admin/products/1/approve", sellerToken).andExpect { status { isForbidden() } }
         get("/api/v1/admin/change-requests", sellerToken).andExpect { status { isForbidden() } }
         post("/api/v1/admin/change-requests/1/approve", sellerToken).andExpect { status { isForbidden() } }
-        post("/api/v1/admin/categories", sellerToken, mapOf("parentId" to null, "name" to "x", "displayOrder" to 1))
+        postIdem("/api/v1/admin/categories", sellerToken, mapOf("parentId" to null, "name" to "x", "displayOrder" to 1))
             .andExpect { status { isForbidden() } }
     }
 

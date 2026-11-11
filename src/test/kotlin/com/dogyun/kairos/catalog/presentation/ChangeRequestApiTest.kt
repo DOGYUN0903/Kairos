@@ -33,6 +33,17 @@ class ChangeRequestApiTest : CommerceTestSupport() {
     private fun Fixture.sameContentRequest(name: String, originalPrice: Long = 10000): Map<String, Any?> =
         mapOf("content" to productContent(categoryId, fileIds, name = name), "originalPrice" to originalPrice)
 
+    /** 현재 옵션·값 ID 를 그대로 보내는(=옵션은 안 바뀌는) 요청. */
+    private fun Fixture.keepingOptions(name: String, originalPrice: Long = 10000): Map<String, Any?> {
+        val options = sellerProductDetail(token, productId).get("options").list().map { option ->
+            mapOf(
+                "optionId" to option.get("optionId").asLong(), "name" to option.get("name").asString(),
+                "values" to option.get("values").list().map { mapOf("valueId" to it.get("valueId").asLong(), "name" to it.get("name").asString()) },
+            )
+        }
+        return mapOf("content" to productContent(categoryId, fileIds, options = options, name = name), "originalPrice" to originalPrice)
+    }
+
     /** 색상[블랙(유지)·레드(새 값)] × 사이즈[M·L(유지)], 이름 "새 티셔츠". */
     private fun Fixture.blackRedRequest(): Map<String, Any?> {
         val options = sellerProductDetail(token, productId).get("options")
@@ -58,6 +69,37 @@ class ChangeRequestApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 변경_요청_목록_행은_바뀐_항목_changedFields를_준다() {
+        val f = onSaleFixture()
+        f.submit(f.keepingOptions(name = "새 티셔츠", originalPrice = 16000))
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken()).andExpect { status { isOk() } })
+            .get("data").get("content").get(0)
+
+        assertEquals(listOf("NAME", "ORIGINAL_PRICE"), row.get("changedFields").list().map { it.asString() })
+    }
+
+    @Test
+    fun 옵션_값을_바꾼_변경_요청의_changedFields에_OPTIONS가_들어간다() {
+        val f = onSaleFixture()
+        f.submit(f.blackRedRequest())
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken())).get("data").get("content").get(0)
+
+        assertEquals(listOf("NAME", "OPTIONS"), row.get("changedFields").list().map { it.asString() })
+    }
+
+    @Test
+    fun 내용이_같은_변경_요청의_changedFields는_빈_배열이다() {
+        val f = onSaleFixture()
+        f.submit(f.keepingOptions(name = "티셔츠"))
+
+        val row = json(get("/api/v1/admin/change-requests?status=PENDING", adminToken())).get("data").get("content").get(0)
+
+        assertEquals(0, row.get("changedFields").size())
+    }
+
+    @Test
     fun 변경_요청_중에도_판매자_상세는_기존_내용이고_pendingChangeRequestId가_있다() {
         val f = onSaleFixture()
 
@@ -71,6 +113,7 @@ class ChangeRequestApiTest : CommerceTestSupport() {
         assertEquals(id, json(get("/api/v1/admin/products/${f.productId}", adminToken())).get("data").get("pendingChangeRequestId").asLong())
         val request = json(get("/api/v1/admin/change-requests/$id", adminToken()).andExpect { status { isOk() } }).get("data")
         assertEquals("PENDING", request.get("status").asString())
+        assertTrue(request.get("requestedAt").asString().matches(Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?""")), "상세도 요청 일시를 준다")
         assertEquals(16000, request.get("originalPrice").asLong())
         assertEquals("새 티셔츠", request.get("content").get("name").asString())
         assertTrue(request.get("content").get("images").get(0).get("url").asString().contains("/files/"))
@@ -115,6 +158,30 @@ class ChangeRequestApiTest : CommerceTestSupport() {
         assertEquals(1, rows.size)
         assertEquals(id, (rows[0]["target_id"] as Number).toLong())
         assertEquals("APPROVED", rows[0]["result"])
+    }
+
+    @Test
+    fun 판매자는_자기_변경_요청을_조회하고_상세에서_최근_요청과_반려_사유를_본다() {
+        val f = onSaleFixture()
+        val id = f.submit(f.sameContentRequest(name = "새 티셔츠", originalPrice = 16000))
+
+        val mine = json(get("/api/v1/seller/products/${f.productId}/change-requests/$id", f.token).andExpect { status { isOk() } }).get("data")
+        assertEquals(id, mine.get("changeRequestId").asLong())
+        assertEquals("PENDING", mine.get("status").asString())
+        assertEquals(16000, mine.get("originalPrice").asLong())
+        assertEquals("새 티셔츠", mine.get("content").get("name").asString())
+        assertTrue(mine.get("requestedAt").asString().isNotBlank())
+        assertEquals(id, sellerProductDetail(f.token, f.productId).get("latestChangeRequest").get("changeRequestId").asLong())
+
+        val otherToken = newUserToken()
+        approvedSeller(otherToken)
+        get("/api/v1/seller/products/${f.productId}/change-requests/$id", otherToken).expectCode(404, "CHANGE_REQUEST_NOT_FOUND")
+
+        post("/api/v1/admin/change-requests/$id/reject", adminToken(), mapOf("reason" to "이미지가 흐립니다")).andExpect { status { isOk() } }
+        val latest = sellerProductDetail(f.token, f.productId).get("latestChangeRequest")
+        assertEquals("REJECTED", latest.get("status").asString())
+        assertEquals("이미지가 흐립니다", latest.get("rejectReason").asString())
+        assertTrue(latest.get("requestedAt").asString().isNotBlank())
     }
 
     @Test

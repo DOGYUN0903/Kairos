@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.5.0
+  version: 0.9.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
@@ -56,6 +56,8 @@ tags:
   - name: Admin Return
   - name: Seller Settlement
   - name: Admin Settlement
+  - name: Demo
+    description: demo 프로필에서만 존재한다. 운영에는 없다
 security:
   - bearerAuth: []
 paths:
@@ -110,6 +112,11 @@ paths:
       responses:
         '200':
           description: 토큰 발급
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=<리프레시 토큰>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600` (Secure는 `kairos.auth.cookie-secure`로 켠다, 로컬은 끔). 본문 `refreshToken`은 기존 클라이언트(k6·Swagger) 호환용으로 유지한다."
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -136,9 +143,17 @@ paths:
       tags: [Auth]
       operationId: reissue
       summary: 토큰 재발급
+      description: "본문이 없으면 쿠키 `kairos_refresh`를 쓴다(헤더 `X-Requested-With: kairos-web` 필수). 둘 다 없으면 400 `INVALID_REQUEST`"
       security: []
+      parameters:
+        - name: X-Requested-With
+          in: header
+          required: false
+          description: 쿠키 경로에서만 `kairos-web` 필수(CSRF 방어). 본문 refreshToken·액세스 토큰을 쓸 때는 필요 없다
+          schema:
+            type: string
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -146,6 +161,11 @@ paths:
       responses:
         '200':
           description: 토큰 재발급
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=<리프레시 토큰>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600` (Secure는 `kairos.auth.cookie-secure`로 켠다, 로컬은 끔). 본문 `refreshToken`은 기존 클라이언트(k6·Swagger) 호환용으로 유지한다."
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -171,12 +191,67 @@ paths:
     post:
       tags: [Auth]
       operationId: logout
-      summary: 로그아웃 (USER)
+      summary: 로그아웃
+      description: "액세스 토큰 또는 쿠키(+헤더)로 회원을 찾아 리프레시 토큰을 지우고 쿠키를 만료시킨다. 둘 다 없어도 204. 쿠키로 찾을 때는 제시한 리프레시 토큰이 현재 저장된 토큰과 같을 때만 지운다(회전된 옛 토큰으로 강제 로그아웃 방지)."
+      security: []
+      parameters:
+        - name: X-Requested-With
+          in: header
+          required: false
+          description: 쿠키 경로에서만 `kairos-web` 필수(CSRF 방어). 본문 refreshToken·액세스 토큰을 쓸 때는 필요 없다
+          schema:
+            type: string
       responses:
         '204':
-          description: 로그아웃 완료 (본문 없음)
+          description: 로그아웃 완료 (본문 없음). `Set-Cookie`로 `kairos_refresh`를 만료(`Max-Age=0`)시킨다.
+          headers:
+            Set-Cookie:
+              description: "`kairos_refresh=; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=0`"
+              schema:
+                type: string
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: me
+      summary: 내 정보
+      responses:
+        '200':
+          description: 로그인한 회원 정보
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MeResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/demo/reseed:
+    post:
+      tags: [Demo]
+      operationId: reseedDemo
+      summary: 데모 데이터 보충 (ADMIN, demo 프로필)
+      description: |
+        demo 프로필에서만 존재한다. 부족한 데모 데이터만 새로 만든다(멱등, 삭제하지 않음).
+        판매 중 데모 상품이 20개 미만이면 부족분만 등록·승인하고, 검수 대기 데모 상품이 없으면 3개를 만든다.
+      responses:
+        '200':
+          description: 이번 호출로 새로 만든 건수
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DemoReseedResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/admin/deals:
     post:
       tags: [Admin Deal]
@@ -473,7 +548,7 @@ paths:
     get:
       tags: [Admin Seller]
       operationId: listAdminSellers
-      summary: 판매자 심사 목록 (ADMIN, 최신 등록순)
+      summary: 판매자 심사 목록 (ADMIN, `sort` 기본 최신순)
       parameters:
         - name: status
           in: query
@@ -482,6 +557,7 @@ paths:
             $ref: '#/components/schemas/SellerStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 판매자 목록
@@ -507,6 +583,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/sellers/{sellerId}:
+    get:
+      tags: [Admin Seller]
+      operationId: getAdminSeller
+      summary: 판매자 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관)
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 판매자 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/SellerNotFound'
   /api/v1/admin/sellers/{sellerId}/approve:
     post:
       tags: [Admin Seller]
@@ -784,6 +890,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/brands:
+    get:
+      tags: [Brand]
+      operationId: listBrands
+      summary: 공개 브랜드 목록 (승인된 브랜드, 승인 상태 판매자만, 이름순)
+      description: 상품 목록의 브랜드 필터용. 페이징 없이 최대 200개까지 이름 오름차순으로 준다.
+      security: []
+      responses:
+        '200':
+          description: 브랜드 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BrandListItem'
   /api/v1/brands/{brandId}:
     get:
       tags: [Brand]
@@ -815,7 +942,7 @@ paths:
     get:
       tags: [Admin Brand]
       operationId: listAdminBrands
-      summary: 브랜드 심사 목록 (ADMIN, 최신 등록순)
+      summary: 브랜드 심사 목록 (ADMIN, `sort` 기본 최신순)
       parameters:
         - name: status
           in: query
@@ -824,6 +951,7 @@ paths:
             $ref: '#/components/schemas/BrandStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 브랜드 목록
@@ -849,6 +977,36 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/brands/{brandId}:
+    get:
+      tags: [Admin Brand]
+      operationId: getAdminBrand
+      summary: 브랜드 심사 상세 (ADMIN, 목록 행과 같은 형식, 상태 무관)
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 브랜드 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BrandDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/BrandNotFound'
   /api/v1/admin/brands/{brandId}/approve:
     post:
       tags: [Admin Brand]
@@ -1182,6 +1340,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/categories/order:
+    put:
+      tags: [Admin Category]
+      operationId: reorderCategories
+      summary: 같은 부모 아래 카테고리 순서 일괄 변경 (ADMIN, 한 트랜잭션)
+      description: |
+        `categoryIds` 의 순서대로 displayOrder 를 0, 1, 2… 로 다시 매긴다. `parentId` 가 null 이면 대분류들이다.
+        `categoryIds` 는 그 부모 아래 (삭제되지 않은) 카테고리 전부와 정확히 일치해야 한다(중복·누락·다른 부모의 ID 는 `CATEGORY_INVALID`). 하나라도 어긋나면 아무것도 바꾸지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryOrderRequest'
+      responses:
+        '200':
+          description: 처리 완료 (`data`는 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyApiResponse'
+        '400':
+          description: "`INVALID_REQUEST` 또는 `CATEGORY_INVALID` ID 목록이 부모 아래 카테고리와 정확히 일치하지 않는다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`CATEGORY_NOT_FOUND` 부모 카테고리가 없다"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/admin/categories/{categoryId}:
     put:
       tags: [Admin Category]
@@ -1312,6 +1507,20 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/ProductStatus'
+        - name: keyword
+          in: query
+          required: false
+          description: 상품명 부분 일치(앞뒤 공백 제거, 비면 무시). 최대 100자, 넘으면 `INVALID_REQUEST`.
+          schema:
+            type: string
+            maxLength: 100
+        - name: brandId
+          in: query
+          required: false
+          description: 내 브랜드로 좁힌다. 남의 브랜드 ID 면 빈 결과.
+          schema:
+            type: integer
+            format: int64
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
       responses:
@@ -1567,7 +1776,7 @@ paths:
     get:
       tags: [Admin Product]
       operationId: listAdminProducts
-      summary: 상품 심사 목록 (ADMIN, 최신 등록순, status 필터)
+      summary: 상품 심사 목록 (ADMIN, `sort` 기본 최신순, status 필터)
       parameters:
         - name: status
           in: query
@@ -1576,6 +1785,7 @@ paths:
             $ref: '#/components/schemas/ProductStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 상품 목록
@@ -1732,6 +1942,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/v1/seller/products/{productId}/change-requests/{changeRequestId}:
+    get:
+      tags: [Seller Change Request]
+      operationId: getMyChangeRequest
+      summary: 내 변경 요청 상세 (APPROVED·SUSPENDED 판매자)
+      description: 요청한 내용·정가·상태·반려 사유. 남의 요청이나 다른 상품의 요청은 `CHANGE_REQUEST_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ChangeRequestId'
+      responses:
+        '200':
+          description: 변경 요청 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SellerChangeRequestDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ChangeRequestNotFound'
     delete:
       tags: [Seller Change Request]
       operationId: withdrawChangeRequest
@@ -1758,7 +1994,7 @@ paths:
     get:
       tags: [Admin Change Request]
       operationId: listChangeRequests
-      summary: 변경 요청 목록 (ADMIN, 최신순, status 필터)
+      summary: 변경 요청 목록 (ADMIN, `sort` 기본 최신순, status 필터)
       parameters:
         - name: status
           in: query
@@ -1767,6 +2003,7 @@ paths:
             $ref: '#/components/schemas/ChangeRequestStatus'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/QueueSort'
       responses:
         '200':
           description: 변경 요청 목록
@@ -4213,6 +4450,15 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    QueueSort:
+      name: sort
+      in: query
+      required: false
+      description: 심사 큐 정렬. LATEST 는 id 내림차순(최신 등록순), OLDEST 는 id 오름차순(오래된 대기 건 먼저).
+      schema:
+        type: string
+        enum: [LATEST, OLDEST]
+        default: LATEST
     ProductId:
       name: productId
       in: path
@@ -4434,6 +4680,31 @@ components:
             message: 같은 요청이 처리 중입니다.
             timestamp: '2026-11-08T12:00:00'
   schemas:
+    DemoReseedResult:
+      type: object
+      description: 이번 호출로 새로 만든 수(이미 있던 것은 세지 않는다)
+      required: [members, sellers, brands, categories, products, pendingReviews]
+      properties:
+        members:
+          type: integer
+          format: int32
+        sellers:
+          type: integer
+          format: int32
+        brands:
+          type: integer
+          format: int32
+        categories:
+          type: integer
+          format: int32
+        products:
+          type: integer
+          format: int32
+          description: 새로 등록·승인해 판매 중으로 만든 상품 수
+        pendingReviews:
+          type: integer
+          format: int32
+          description: 새로 만든 검수 대기 상품 수
     CreateSettlementAdjustmentRequest:
       type: object
       required: [amount, reason]
@@ -4755,10 +5026,24 @@ components:
           format: password
     ReissueRequest:
       type: object
-      required: [refreshToken]
       properties:
         refreshToken:
           type: string
+          description: 없으면 쿠키 `kairos_refresh`를 쓴다
+    MeResponse:
+      type: object
+      required: [memberId, email, name, role]
+      properties:
+        memberId:
+          type: integer
+          format: int64
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [USER, ADMIN]
     TokenResponse:
       type: object
       required: [accessToken, refreshToken]
@@ -4814,8 +5099,11 @@ components:
           type: string
     SellerDetail:
       type: object
-      required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status]
+      required: [sellerId, memberId, companyName, businessNumber, representativeName, phone, bank, accountNumber, holder, commissionRateBp, status, createdAt]
       properties:
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 신청 일시 (KST LocalDateTime, 오프셋 없음)
         sellerId:
           type: integer
           format: int64
@@ -4894,8 +5182,11 @@ components:
           format: int64
     BrandDetail:
       type: object
-      required: [brandId, sellerId, name, status]
+      required: [brandId, sellerId, name, status, createdAt]
       properties:
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 신청 일시 (KST LocalDateTime, 오프셋 없음)
         brandId:
           type: integer
           format: int64
@@ -4908,6 +5199,10 @@ components:
           type: [string, 'null']
         logoUrl:
           type: [string, 'null']
+        logoFileId:
+          type: [integer, 'null']
+          format: int64
+          description: 로고 파일 ID. 반려된 브랜드를 재신청할 때 그대로 다시 보내면 로고가 유지된다.
         description:
           type: [string, 'null']
         status:
@@ -4929,6 +5224,23 @@ components:
         displayOrder:
           type: integer
           format: int32
+          minimum: 0
+    CategoryOrderRequest:
+      type: object
+      required: [categoryIds]
+      properties:
+        parentId:
+          type: [integer, 'null']
+          format: int64
+          description: 순서를 바꿀 카테고리들의 부모(null이면 대분류)
+        categoryIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: integer
+            format: int64
+          description: 원하는 순서대로 나열한 그 부모 아래 카테고리 ID 전부
     CreateCategoryResponse:
       type: object
       required: [categoryId]
@@ -5200,6 +5512,46 @@ components:
           type: [integer, 'null']
           format: int64
           description: 대기 중인 변경 요청 ID. 없으면 null.
+        latestChangeRequest:
+          description: 가장 최근 변경 요청(상태 무관). 없으면 null.
+          oneOf:
+            - $ref: '#/components/schemas/LatestChangeRequest'
+            - type: 'null'
+    LatestChangeRequest:
+      type: object
+      required: [changeRequestId, status, requestedAt]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        rejectReason:
+          type: [string, 'null']
+    SellerChangeRequestDetail:
+      type: object
+      required: [changeRequestId, productId, status, requestedAt, originalPrice, content]
+      properties:
+        changeRequestId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        rejectReason:
+          type: [string, 'null']
+        originalPrice:
+          type: integer
+          format: int64
+          description: 요청한 정가
+        content:
+          $ref: '#/components/schemas/ProductContentResult'
     ChangeRequestStatus:
       type: string
       enum: [PENDING, APPROVED, REJECTED, WITHDRAWN]
@@ -5243,8 +5595,20 @@ components:
             $ref: '#/components/schemas/OptionRequest'
     ChangeRequestSummary:
       type: object
-      required: [changeRequestId, productId, sellerId, name, originalPrice, status]
+      required: [changeRequestId, productId, sellerId, name, originalPrice, status, requestedAt, sellerName, changedFields]
       properties:
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 요청 일시 (KST LocalDateTime, 오프셋 없음)
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
+        changedFields:
+          type: array
+          description: 현재 상품과 다른 항목(고정 순서). 이미지는 순서까지, 옵션은 ID·이름까지 비교한다. 상품을 찾을 수 없으면 빈 배열.
+          items:
+            type: string
+            enum: [NAME, DESCRIPTION, CATEGORY, IMAGES, OPTIONS, ORIGINAL_PRICE]
         changeRequestId:
           type: integer
           format: int64
@@ -5265,7 +5629,7 @@ components:
           $ref: '#/components/schemas/ChangeRequestStatus'
     ChangeRequestDetail:
       type: object
-      required: [changeRequestId, productId, sellerId, status, originalPrice, content]
+      required: [changeRequestId, productId, sellerId, status, requestedAt, originalPrice, content]
       properties:
         changeRequestId:
           type: integer
@@ -5278,6 +5642,9 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/ChangeRequestStatus'
+        requestedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 요청 일시 (KST LocalDateTime, 오프셋 없음)
         rejectReason:
           type: [string, 'null']
         originalPrice:
@@ -5293,7 +5660,7 @@ components:
       default: LATEST
     ProductSummary:
       type: object
-      required: [productId, thumbnailUrl, brandName, name, originalPrice, salePrice, discountRate, soldOut, likeCount, reviewCount, averageRating]
+      required: [productId, thumbnailUrl, brandId, brandName, name, originalPrice, salePrice, discountRate, soldOut, likeCount, reviewCount, averageRating]
       properties:
         productId:
           type: integer
@@ -5301,6 +5668,9 @@ components:
         thumbnailUrl:
           type: string
           description: 대표 이미지 URL
+        brandId:
+          type: integer
+          format: int64
         brandName:
           type: string
         name:
@@ -5462,6 +5832,7 @@ components:
         - productId
         - brandId
         - brandName
+        - sellerName
         - categoryId
         - name
         - description
@@ -5479,6 +5850,9 @@ components:
         brandId:
           type: integer
           format: int64
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
         brandName:
           type: string
         categoryId:
@@ -5528,7 +5902,7 @@ components:
           description: 로그인한 경우 내 좋아요 여부, 비로그인이면 null
     SellerProductSummary:
       type: object
-      required: [productId, name, thumbnailUrl, brandName, salePrice, status, soldOut]
+      required: [productId, name, thumbnailUrl, brandName, originalPrice, salePrice, status, rejectReason, soldOut, stockTotal, createdAt, hasPendingChangeRequest]
       properties:
         productId:
           type: integer
@@ -5540,16 +5914,33 @@ components:
           description: 대표 이미지 URL
         brandName:
           type: string
+        originalPrice:
+          type: integer
+          format: int64
+          description: 정가(원)
         salePrice:
           type: integer
           format: int64
         status:
           $ref: '#/components/schemas/ProductStatus'
+        rejectReason:
+          type: [string, 'null']
+          description: 반려 사유(REJECTED 일 때). 없으면 null.
         soldOut:
           type: boolean
+        stockTotal:
+          type: integer
+          format: int32
+          description: ACTIVE SKU 재고 합
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 등록 일시 (KST LocalDateTime, 오프셋 없음)
+        hasPendingChangeRequest:
+          type: boolean
+          description: 심사 대기 중인 변경 요청이 있는지
     AdminProductSummary:
       type: object
-      required: [productId, sellerId, brandName, name, thumbnailUrl, originalPrice, salePrice, status]
+      required: [productId, sellerId, brandName, name, thumbnailUrl, originalPrice, salePrice, status, createdAt, sellerName]
       properties:
         productId:
           type: integer
@@ -5571,6 +5962,21 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/ProductStatus'
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+          description: 등록 일시 (KST LocalDateTime, 오프셋 없음)
+        sellerName:
+          type: string
+          description: 판매자 회사명. 판매자를 찾을 수 없으면 "(삭제된 판매자)"
+    BrandListItem:
+      type: object
+      required: [brandId, name]
+      properties:
+        brandId:
+          type: integer
+          format: int64
+        name:
+          type: string
     BrandPublic:
       type: object
       required: [brandId, name]

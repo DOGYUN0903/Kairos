@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.common.security.SellerPrincipal
 import com.dogyun.kairos.seller.domain.BusinessNumber
@@ -28,7 +29,7 @@ class BrandServiceTest {
             val id = brand.id ?: BrandId(++sequence)
             val saved = Brand.restore(
                 id, brand.sellerId, brand.name, brand.englishName, brand.logoFileId,
-                brand.description, brand.status, brand.rejectReason,
+                brand.description, brand.status, brand.rejectReason, createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
             )
             store[id.value] = saved
             return saved
@@ -37,12 +38,14 @@ class BrandServiceTest {
         override fun findById(id: BrandId): Brand? = store[id.value]
         override fun existsByName(name: String): Boolean = store.values.any { it.name == name }
         override fun findAllBySellerId(sellerId: Long): List<Brand> = store.values.filter { it.sellerId == sellerId }
-        override fun findPage(status: BrandStatus?, page: Int, size: Int): PageResult<Brand> {
+        override fun findPage(status: BrandStatus?, order: ListOrder, page: Int, size: Int): PageResult<Brand> {
             val all = store.values.filter { status == null || it.status == status }
             return PageResult.of(all.drop(page * size).take(size), page, size, all.size.toLong())
         }
 
         override fun findAllByIds(ids: Collection<Long>): List<Brand> = store.values.filter { it.id!!.value in ids }
+        override fun findApprovedOrderByName(limit: Int): List<Brand> =
+            store.values.filter { it.status == BrandStatus.APPROVED }.sortedBy { it.name }.take(limit)
     }
 
     private class FakeSellerRepository : SellerRepository {
@@ -53,7 +56,7 @@ class BrandServiceTest {
             val saved = Seller.restore(
                 id, seller.memberId, seller.companyName, seller.businessNumber, seller.representativeName,
                 seller.phone, seller.settlementAccount, seller.commissionRateBp, seller.status,
-                seller.rejectReason, seller.suspendReason,
+                seller.rejectReason, seller.suspendReason, createdAt = java.time.LocalDateTime.of(2026, 11, 9, 9, 0),
             )
             store[id.value] = saved
             return saved
@@ -63,7 +66,7 @@ class BrandServiceTest {
         override fun findAllByIds(ids: Collection<SellerId>): List<Seller> = ids.mapNotNull { store[it.value] }
         override fun findByMemberId(memberId: Long): Seller? = store.values.firstOrNull { it.memberId == memberId }
         override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean = false
-        override fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller> =
+        override fun findPage(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<Seller> =
             PageResult.of(store.values.toList(), page, size, store.size.toLong())
     }
 
@@ -148,6 +151,7 @@ class BrandServiceTest {
         val detail = service.listMine(me).single()
 
         assertEquals("http://files/a.png", detail.logoUrl)
+        assertEquals(10L, detail.logoFileId)
         assertEquals("PENDING", detail.status)
     }
 }

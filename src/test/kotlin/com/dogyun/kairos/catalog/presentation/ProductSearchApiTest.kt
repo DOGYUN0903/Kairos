@@ -337,4 +337,18 @@ class ProductSearchApiTest : CommerceTestSupport() {
         assertEquals(0L, detail(liked).get("reviewCount").asLong())
         assertEquals(0.0, detail(liked).get("averageRating").asDouble())
     }
+
+    @Test
+    fun 목록과_상세는_브랜드_ID와_판매자명을_준다() {
+        val token = newUserToken()
+        approvedSeller(token, companyName = "노출테스트상사")
+        val brandId = approvedBrand(token)
+        val s = Scene(token, 0L, brandId, leafCategory())
+        val productId = onSale(s)
+
+        val row = listPage("?brandId=$brandId").get("content").list().single { it.get("productId").asLong() == productId }
+
+        assertEquals(brandId, row.get("brandId").asLong())
+        assertEquals("노출테스트상사", detail(productId).get("sellerName").asString())
+    }
 }

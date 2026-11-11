@@ -1,0 +1,3 @@
+kairos:
+  demo:
+    password: ${KAIROS_DEMO_PASSWORD}

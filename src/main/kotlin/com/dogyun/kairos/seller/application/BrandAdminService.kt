@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.application
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.Brand
 import com.dogyun.kairos.seller.domain.BrandId
@@ -34,9 +35,15 @@ class BrandAdminService(
         review(brandId, ReviewResult.REJECTED, reason, reviewerId) { it.reject(reason) }
 
     @Transactional(readOnly = true)
-    fun listForAdmin(status: BrandStatus?, page: Int, size: Int): PageResult<BrandDetail> {
+    fun getForAdmin(brandId: Long): BrandDetail {
+        val brand = brandRepository.findById(BrandId(brandId)) ?: throw DomainException(ErrorCode.BRAND_NOT_FOUND)
+        return toBrandDetails(listOf(brand), imageFileReader).single()
+    }
+
+    @Transactional(readOnly = true)
+    fun listForAdmin(status: BrandStatus?, order: ListOrder, page: Int, size: Int): PageResult<BrandDetail> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
-        val result = brandRepository.findPage(status, page, size)
+        val result = brandRepository.findPage(status, order, page, size)
         return PageResult(
             content = toBrandDetails(result.content, imageFileReader),
             page = result.page,

@@ -2,6 +2,7 @@ package com.dogyun.kairos.seller.infrastructure
 
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
+import com.dogyun.kairos.common.domain.ListOrder
 import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.seller.domain.BusinessNumber
 import com.dogyun.kairos.seller.domain.Seller
@@ -60,13 +61,13 @@ class SellerRepositoryImpl(
     override fun existsByBusinessNumber(businessNumber: BusinessNumber): Boolean =
         jpaRepository.existsByBusinessNumber(businessNumber.value)
 
-    override fun findPage(status: SellerStatus?, page: Int, size: Int): PageResult<Seller> {
+    override fun findPage(status: SellerStatus?, order: ListOrder, page: Int, size: Int): PageResult<Seller> {
         val seller = QSellerEntity.sellerEntity
         // status가 null이면 where 조건이 붙지 않는다(QueryDSL where는 null을 무시한다).
         val where = status?.let { seller.sellerStatus.eq(it) }
         val content = queryFactory.selectFrom(seller)
             .where(where)
-            .orderBy(seller.id.desc())
+            .orderBy(if (order == ListOrder.OLDEST) seller.id.asc() else seller.id.desc())
             .offset(page.toLong() * size)
             .limit(size.toLong())
             .fetch()
@@ -86,5 +87,6 @@ class SellerRepositoryImpl(
         status = entity.sellerStatus,
         rejectReason = entity.rejectReason,
         suspendReason = entity.suspendReason,
+        createdAt = entity.createdAt,
     )
 }
