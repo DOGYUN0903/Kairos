@@ -3,8 +3,10 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.SellerOrderStatus
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
+
+private val log = KotlinLogging.logger {}
 
 /** 배송 중인 판매자 주문을 택배사에 조회해 배송 완료를 반영한다. 택배사 호출은 트랜잭션 밖이다. */
 @Service
@@ -21,7 +23,7 @@ class DeliveryTrackingService(
             try {
                 poll(sellerOrderId)
             } catch (e: RuntimeException) {
-                log.error("배송 조회 처리에 실패했다: sellerOrderId={}", sellerOrderId, e)
+                log.warn(e) { "배송 조회 처리에 실패했다: sellerOrderId=$sellerOrderId" }
                 false
             }
         }
@@ -34,9 +36,5 @@ class DeliveryTrackingService(
         if (deliveryTracker.track(carrierCode, trackingNumber) != TrackingResult.DELIVERED) return false
         orderShippingService.deliverBySystem(sellerOrderId)
         return true
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(DeliveryTrackingService::class.java)
     }
 }

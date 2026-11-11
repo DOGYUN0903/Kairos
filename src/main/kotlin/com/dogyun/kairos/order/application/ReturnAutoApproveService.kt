@@ -2,10 +2,12 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.order.domain.OrderRepository
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /**
  * 판매자가 [OrderProperties.returnAutoApproveAfter] 동안 응답하지 않은 반품을 시스템이 승인한다.
@@ -26,13 +28,9 @@ class ReturnAutoApproveService(
             try {
                 orderReturnService.approveBySystem(orderId, returnId)
             } catch (e: RuntimeException) {
-                log.error("반품 자동 승인에 실패했다: orderId={}, returnId={}", orderId, returnId, e)
+                log.warn(e) { "반품 자동 승인에 실패했다: orderId=$orderId, returnId=$returnId" }
                 false
             }
         }
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(ReturnAutoApproveService::class.java)
     }
 }

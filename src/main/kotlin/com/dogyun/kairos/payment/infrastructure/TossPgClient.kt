@@ -5,10 +5,12 @@ import com.dogyun.kairos.payment.application.PgClient
 import com.dogyun.kairos.payment.application.PgPayment
 import com.dogyun.kairos.payment.application.PgResult
 import com.dogyun.kairos.payment.application.PgStatus
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.MediaType
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
+
+private val log = KotlinLogging.logger {}
 
 /**
  * 토스페이먼츠 PG. 4xx 는 토스 에러 본문(`code`, `message`)을 [PgResult.Failed] 로, 5xx·타임아웃·IO 예외는 [PgResult.Unknown] 으로 옮긴다.
@@ -45,7 +47,7 @@ class TossPgClient(private val restClient: RestClient) : PgClient {
             }
         } ?: PgResult.Unknown("빈 응답")
     } catch (e: Exception) {
-        log.warn("토스 {} 호출 실패: cause={}", operation, e.javaClass.simpleName)
+        log.warn { "토스 $operation 호출 실패: cause=${e.javaClass.simpleName}" }
         PgResult.Unknown(e.javaClass.simpleName)
     }
 
@@ -93,7 +95,6 @@ class TossPgClient(private val restClient: RestClient) : PgClient {
             "FAILED_INTERNAL_SYSTEM_PROCESSING",
             "PROVIDER_ERROR",
         )
-        val log = LoggerFactory.getLogger(TossPgClient::class.java)
         val JSON = tools.jackson.databind.json.JsonMapper.builder().build()
     }
 }

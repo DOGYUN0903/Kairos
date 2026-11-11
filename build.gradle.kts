@@ -37,6 +37,7 @@ dependencies {
     // Boot 4에서는 OTel 브리지 자동설정이 별도 모듈이다. 없으면 NOOP Tracer가 되어 traceId가 비어 있다.
     implementation("org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.14")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.github.openfeign.querydsl:querydsl-jpa:7.7")
     ksp("io.github.openfeign.querydsl:querydsl-ksp-codegen:7.7")

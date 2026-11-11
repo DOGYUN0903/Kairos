@@ -4,7 +4,7 @@ import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -17,6 +17,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.multipart.MaxUploadSizeExceededException
 import org.springframework.web.servlet.resource.NoResourceFoundException
+
+private val log = KotlinLogging.logger {}
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -63,10 +65,10 @@ class GlobalExceptionHandler {
     ): ResponseEntity<ErrorResponse> {
         val status = e.statusCode
         if (status.is5xxServerError) {
-            log.error("프레임워크 서버 예외 {} {}", request.method, request.requestURI, e as Throwable)
+            log.error(e as Throwable) { "프레임워크 서버 예외 ${request.method} ${request.requestURI}" }
             return error(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.message)
         }
-        log.warn("클라이언트 오류 {} {} -> {}: {}", request.method, request.requestURI, status.value(), (e as Throwable).message)
+        log.warn { "클라이언트 오류 ${request.method} ${request.requestURI} -> ${status.value()}: ${(e as Throwable).message}" }
         return ResponseEntity.status(status)
             .headers(e.headers)
             .body(ErrorResponse(ErrorCode.INVALID_REQUEST.name, ErrorCode.INVALID_REQUEST.message))
@@ -75,7 +77,7 @@ class GlobalExceptionHandler {
     /** 업로드 크기 초과는 ErrorResponse를 구현하지 않으므로 별도로 413으로 매핑한다. */
     @ExceptionHandler(MaxUploadSizeExceededException::class)
     fun handleUploadTooLarge(e: MaxUploadSizeExceededException, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
-        log.warn("클라이언트 오류 {} {} -> 413: {}", request.method, request.requestURI, e.message)
+        log.warn { "클라이언트 오류 ${request.method} ${request.requestURI} -> 413: ${e.message}" }
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
             .body(ErrorResponse(ErrorCode.INVALID_REQUEST.name, ErrorCode.INVALID_REQUEST.message))
     }
@@ -83,12 +85,8 @@ class GlobalExceptionHandler {
     @ExceptionHandler(Exception::class)
     fun handleUnexpected(e: Exception, request: HttpServletRequest): ResponseEntity<ErrorResponse> {
         if (e is org.springframework.web.ErrorResponse) return handleFrameworkError(e, request)
-        log.error("처리되지 않은 예외 {} {}", request.method, request.requestURI, e)
+        log.error(e) { "처리되지 않은 예외 ${request.method} ${request.requestURI}" }
         return error(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.message)
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
     }
 
     private fun error(code: ErrorCode, message: String): ResponseEntity<ErrorResponse> =

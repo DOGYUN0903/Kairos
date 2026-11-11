@@ -2,10 +2,12 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.order.domain.OrderRepository
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /** 배송 완료 후 [OrderProperties.autoConfirmAfter] 가 지난 판매자 주문을 자동으로 구매 확정한다. */
 @Service
@@ -24,13 +26,9 @@ class PurchaseAutoConfirmService(
                 orderShippingService.autoConfirm(sellerOrderId)
                 true
             } catch (e: RuntimeException) {
-                log.error("자동 구매 확정에 실패했다: sellerOrderId={}", sellerOrderId, e)
+                log.warn(e) { "자동 구매 확정에 실패했다: sellerOrderId=$sellerOrderId" }
                 false
             }
         }
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(PurchaseAutoConfirmService::class.java)
     }
 }

@@ -4,10 +4,12 @@ import com.dogyun.kairos.common.application.sweepByKeyset
 import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.order.domain.OrderRepository
 import com.dogyun.kairos.order.domain.OrderStatus
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /**
  * 결제 대기 시간이 지난 주문을 닫는다. 대상 id 는 트랜잭션 밖에서 찾고, 건별 트랜잭션이 주문 행을 먼저 잠근 뒤 현재 상태를 다시 확인한다.
@@ -31,7 +33,7 @@ class OrderExpiryService(
             try {
                 expire(orderId)
             } catch (e: RuntimeException) {
-                log.error("주문 만료 처리에 실패했다: orderId={}", orderId, e)
+                log.warn(e) { "주문 만료 처리에 실패했다: orderId=$orderId" }
                 false
             }
         }
@@ -48,9 +50,5 @@ class OrderExpiryService(
         benefitReverter.revertAll(orderId, order.memberId, order.usedCouponIds(), order.pointsUsed)
         stockManager.restore(order.skuQuantities.map { (skuId, quantity) -> SkuQuantity(skuId, quantity) })
         true
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(OrderExpiryService::class.java)
     }
 }

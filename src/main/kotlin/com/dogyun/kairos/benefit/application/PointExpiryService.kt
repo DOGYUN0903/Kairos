@@ -1,10 +1,12 @@
 package com.dogyun.kairos.benefit.application
 
 import com.dogyun.kairos.benefit.domain.PointRepository
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /** 만료된 포인트 로트를 건별로 정리한다. 이 서비스는 트랜잭션을 열지 않는다(건별 트랜잭션은 [PointService.expireLot]). */
 @Service
@@ -25,15 +27,11 @@ class PointExpiryService(
                 try {
                     if (pointService.expireLot(memberId, lotId)) handled++
                 } catch (e: RuntimeException) {
-                    log.error("포인트 로트 만료에 실패했다: memberId={}, lotId={}", memberId, lotId, e)
+                    log.warn(e) { "포인트 로트 만료에 실패했다: memberId=$memberId, lotId=$lotId" }
                 }
             }
             if (page.size < limit) return handled
             afterId = page.last().second
         }
-    }
-
-    private companion object {
-        val log = LoggerFactory.getLogger(PointExpiryService::class.java)
     }
 }

@@ -48,7 +48,13 @@ server:
       enabled: true
 
 # 콘솔은 사람이 읽는 형식, 파일은 JSON(ECS). ECS 파일 로그에는 MDC 키가 최상위 traceId/spanId 필드로 포함된다.
+# 로그 레벨 기본값은 운영 안전값(INFO)이다. 환경변수로 덮어쓸 수 있다(Spring relaxed binding).
+# 예: LOGGING_LEVEL_COM_DOGYUN_KAIROS=DEBUG, LOGGING_LEVEL_ORG_HIBERNATE_SQL=DEBUG
+# 프로필별 값은 application-local.yaml, application-prod.yaml 참고(기본으로 활성화하는 프로필은 없다).
 logging:
+  level:
+    root: INFO
+    com.dogyun.kairos: INFO
   file:
     name: logs/kairos.log
   structured:

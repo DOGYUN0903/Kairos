@@ -12,12 +12,14 @@ import com.dogyun.kairos.settlement.domain.SettlementRepository
 import com.dogyun.kairos.settlement.domain.SettlementRun
 import com.dogyun.kairos.settlement.domain.SettlementRunRepository
 import com.dogyun.kairos.settlement.domain.SettlementSource
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalDateTime
+
+private val log = KotlinLogging.logger {}
 
 /**
  * 주간 정산 생성. 감싸는 트랜잭션이 없고 판매자마다 트랜잭션 하나다(정산 INSERT → 조정 붙이기 → 합계 반영 → CARRY_OVER).
@@ -73,11 +75,11 @@ class SettlementGenerationService(
                     skipped++
                 } else {
                     failed++
-                    log.error("정산 생성 중 제약 위반: periodStart={}, sellerId={}", periodStart, sellerId, e)
+                    log.error(e) { "정산 생성 중 제약 위반: periodStart=$periodStart, sellerId=$sellerId" }
                 }
             } catch (e: RuntimeException) {
                 failed++
-                log.error("정산 생성에 실패했다: periodStart={}, sellerId={}", periodStart, sellerId, e)
+                log.error(e) { "정산 생성에 실패했다: periodStart=$periodStart, sellerId=$sellerId" }
             }
         }
         if (failed > 0) return result(period, sellerIds.size, created, skipped, failed, alreadyGenerated = false)
@@ -133,6 +135,5 @@ class SettlementGenerationService(
 
     private companion object {
         const val PAGE = 200
-        val log = LoggerFactory.getLogger(SettlementGenerationService::class.java)
     }
 }
