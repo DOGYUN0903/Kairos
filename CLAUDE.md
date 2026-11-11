@@ -7,9 +7,10 @@
 - C1 스펙: `docs/superpowers/specs/2026-11-09-c1-seller-catalog-design.md`
 - C2 스펙: `docs/superpowers/specs/2026-11-09-c2-purchase-design.md`
 - C3 스펙: `docs/superpowers/specs/2026-11-10-c3-benefits-reviews-design.md`
-- 현재 구현 계획: `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md` (이전: `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
+- C4 스펙: `docs/superpowers/specs/2026-11-10-c4-returns-settlement-design.md`
+- 현재 구현 계획: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md` (이전: `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: **C3 혜택·후기**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1, C2는 완료
+- 현재 단계: **C4 반품·정산**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1, C2, C3는 완료
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
@@ -21,7 +22,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - 설정값(DB, Redis, JWT 비밀키, 관리자 계정, `TOSS_SECRET_KEY`, `SWEETTRACKER_API_KEY`)은 `.env`로만 주입한다. `.env`는 커밋하지 않고, 키를 추가하면 `.env.example`도 함께 고친다.
 
 ## 아키텍처: 4계층 DDD
-모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `cart`, `payment`, `seller`, `catalog`, `file`, `benefit`, `review`, `common`
+모듈(= 바운디드 컨텍스트 = 미래의 서비스): `member`, `deal`, `order`, `cart`, `payment`, `seller`, `catalog`, `file`, `benefit`, `review`, `settlement`, `common`
 
 ```
 com.dogyun.kairos.{module}/
@@ -43,9 +44,10 @@ com.dogyun.kairos.{module}/
 - 예외: `idempotency_key` 테이블은 JPA 엔티티 없이 `JdbcTemplate`으로만 다룬다. 멱등성 필터 안에서 주문 트랜잭션과 무관하게 기록해야 해서 `BaseEntity` 규칙의 예외로 사용자가 승인했다.
 - 예외: 읽기 전용 뷰 엔티티 `BrandView`/`SellerView`(`catalog.infrastructure`)는 `@Immutable`이며 `BaseEntity`를 상속하지 않는다(ADR 0002).
 - `review`는 `review_image`를 `@OneToMany`로 가진다. 후기와 이미지는 한 애그리거트이고 이미지 순서·교체를 후기 안에서만 다루기 때문에 양방향 규칙의 예외로 허용한다.
+- `settlement`는 `settlement_line`을 `@OneToMany`로 가진다. 정산과 라인은 생성 시점에 한 번 만들어지는 한 애그리거트이고 라인만 따로 바뀌지 않기 때문에 양방향 규칙의 예외로 허용한다.
 - SKU는 소프트 딜리트 대신 `sku_status = DISCONTINUED`로 단종 처리한다(C1 스펙 13장).
 - 소프트 딜리트만 쓴다(`status = DELETED`). 물리 삭제 금지. 엔티티에 `@SQLRestriction("status = 'ACTIVE'")`를 붙인다.
-- 도메인 상태 컬럼은 `status`가 아니라 `order_status`, `seller_order_status`, `order_item_status`, `deal_status`, `payment_status`, `seller_status`, `product_status`, `sku_status`, `policy_status`, `coupon_status`처럼 이름을 짓는다. 좋아요는 상태 컬럼이 아니라 `liked` 플래그다.
+- 도메인 상태 컬럼은 `status`가 아니라 `order_status`, `seller_order_status`, `order_item_status`, `deal_status`, `payment_status`, `seller_status`, `product_status`, `sku_status`, `policy_status`, `coupon_status`, `return_status`, `settlement_status`처럼 이름을 짓는다. 좋아요는 상태 컬럼이 아니라 `liked` 플래그다.
 - 연관관계는 같은 애그리거트 안에서만, `LAZY`, 기본 `@ManyToOne` 단방향. 양방향은 꼭 필요할 때만 쓰고 이유를 주석으로 남긴다. `@ManyToMany`, `@OneToOne` 금지.
 - 동적 쿼리·복잡한 조회는 QueryDSL로 작성하고, `{module}.infrastructure`의 Repository 구현에서만 사용한다. 단순 조회는 Spring Data 메서드 쿼리를 써도 된다.
 - 스키마는 Flyway로만 관리한다(`ddl-auto: validate`, `open-in-view: false`). 이미 적용된 마이그레이션 파일은 수정하지 않고 새 버전을 추가한다.
@@ -69,6 +71,9 @@ com.dogyun.kairos.{module}/
 - PG 결제 되돌리기(`voidMismatch`, `voidClosedOrder`)는 `OrderPaymentService` 한 곳에만 둔다. PG 취소 결과가 불확실하면 결제는 `UNKNOWN`, 항목은 `CANCEL_REQUESTED`로 두고 대사 작업이 맞춘다.
 - 쿠폰 수량·사용 상태·좋아요·상품 집계(별점·후기 수·좋아요 수)는 조건부 UPDATE의 영향 행 수로 판정한다. 집계·좋아요 카운터는 native 증감 쿼리로만 바꾼다(해당 컬럼은 `updatable=false`). 행 락은 `member_point`(FOR UPDATE)와 주문 행뿐이다.
 - 쓰기를 결정하는 포인트 조회(잔액·로트)는 `member_point` 락을 잡은 뒤 FOR UPDATE 현재 읽기로 한다(스냅샷 읽기 금지). 락 순서는 주문 생성 `member_point → coupon → sku`, 취소·만료·확정·결제 실패·승인 거절 `orders → member_point → coupon → sku`(benefit 되돌림이 재고 복구보다 먼저), 후기 `member_point(적립) → product(별점 집계)`(ADR 0004).
+- 반품 환불은 `OrderReturnService`가 C2 취소와 같은 tx1 → PG → tx2 패턴으로 한다. 락 순서는 `orders → member_point → coupon → sku → product`(ADR 0005). PG 불확실이면 `RETURN_REFUNDING`으로 두고 대사가 맞춘다.
+- 정산은 생성 시점 스냅샷이며 생성 뒤 불변이다. 금액은 저장된 스냅샷(수수료율, `line_amount`, 쿠폰 할인, 배송비, 반품 부담액)에서만 계산하고 상품·정책·판매자의 현재 값은 읽지 않는다. 판매자별 한 트랜잭션으로 만들고, UNIQUE 세 개(판매자·기간, 판매자 주문, `settlement_run` 기간)로 멱등을 보장하며, 주문 테이블에는 쓰지 않는다. 음수 정산은 지급 0과 `CARRY_OVER` 조정으로 다음 정산에 넘기고(소프트 딜리트 금지), 기간은 오래된 것부터 엄격히 생성한다. Spring Batch는 Phase 3-2 측정 뒤에 검토한다.
+- `sweepByKeyset`·`TransactionRunner`는 `common.application`에 두고 구현은 `common.infrastructure`에 둔다(다른 모듈 application이 order.application을 import하지 않도록).
 - 최적화, Kafka, Gateway, Resilience4j는 해당 Phase 전에 미리 넣지 않는다.
 
 ## 코드 스타일
@@ -90,4 +95,5 @@ com.dogyun.kairos.{module}/
 - ADR 0002: 상품 검색에서 `catalog`가 brand·seller 테이블을 읽기 전용 뷰 엔티티로 조인하는 예외(`docs/adr/0002-catalog-search-cross-module-read-join.md`).
 - ADR 0003: C2 주문 생성·승인·취소를 한 DB 트랜잭션으로 묶고 외부 호출은 트랜잭션 밖에서 하며, 주문 행 락으로 직렬화한다(`docs/adr/0003-c2-order-transaction-and-external-calls.md`).
 - ADR 0004: C3 주문 생성·취소가 order·catalog·benefit을 한 트랜잭션에서 바꾸는 확장과 락 순서, 0원 주문의 PG 없는 승인(`docs/adr/0004-c3-benefit-transaction-and-lock-order.md`).
+- ADR 0005: C4 반품 환불 트랜잭션(C2 취소와 같은 2-tx 패턴)과 정산 불변성(`docs/adr/0005-c4-return-refund-and-settlement-immutability.md`).
 - `idempotency_key` 테이블의 JPA 예외는 위 JPA 규칙 참고.

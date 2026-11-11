@@ -27,7 +27,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - [x] C1. 판매자와 상품
 - [x] C2. 구매
 - [x] C3. 혜택과 후기
-- [ ] C4. 정산
+- [x] C4. 반품과 정산
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
@@ -43,6 +43,9 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - C2 구현 계획: `docs/superpowers/plans/2026-11-09-c2-purchase.md`
 - C3 스펙: `docs/superpowers/specs/2026-11-10-c3-benefits-reviews-design.md`
 - C3 구현 계획: `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`
+- C4 스펙: `docs/superpowers/specs/2026-11-10-c4-returns-settlement-design.md`
+- C4 구현 계획: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`
+- ADR 0005(C4 반품 환불과 정산 불변성): `docs/adr/0005-c4-return-refund-and-settlement-immutability.md`
 - ADR 0004(C3 혜택 트랜잭션과 락 순서): `docs/adr/0004-c3-benefit-transaction-and-lock-order.md`
 - ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`
 - ADR 0002(카탈로그 검색의 읽기 전용 조인): `docs/adr/0002-catalog-search-cross-module-read-join.md`

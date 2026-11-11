@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.InlineTransactionRunner
 import com.dogyun.kairos.order.domain.Order
 import java.time.Clock
 import java.time.LocalDateTime
@@ -29,6 +30,7 @@ class OrderFlowFixture {
     val cancelService = OrderCancelService(orderRepository, paymentGateway, stockManager, benefitReverter, properties, tx, clock)
     val pointEarner = FakePointEarner()
     val shippingService = OrderShippingService(orderRepository, tx, clock, pointEarner)
+    val returnService = OrderReturnService(orderRepository, paymentGateway, stockManager, benefitReverter, pointEarner, properties, tx, clock)
 
     val memberId = 7L
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)

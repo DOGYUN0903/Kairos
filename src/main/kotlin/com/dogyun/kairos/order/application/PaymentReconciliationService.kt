@@ -1,5 +1,7 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.sweepByKeyset
+import com.dogyun.kairos.order.domain.OrderItemStatus
 import com.dogyun.kairos.order.domain.OrderRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -17,6 +19,7 @@ class PaymentReconciliationService(
     private val paymentGateway: PaymentGateway,
     private val orderPaymentService: OrderPaymentService,
     private val orderCancelService: OrderCancelService,
+    private val orderReturnService: OrderReturnService,
     private val properties: OrderProperties,
     private val clock: Clock,
 ) {
@@ -98,10 +101,13 @@ class PaymentReconciliationService(
         return orderPaymentService.voidClosedOrder(orderId, paymentKey, pg.balanceAmount)
     }
 
-    /** `CANCEL_REQUESTED` 로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED)한 항목 수. [limit] 은 keyset 페이지 크기다. */
+    /**
+     * `CANCEL_REQUESTED`·`RETURN_REFUNDING` 으로 정체된 항목을 PG 조회로 확정한다. 환불을 확정(CANCELED·RETURNED)한 항목 수.
+     * [limit] 은 keyset 페이지 크기다.
+     */
     fun reconcileCancels(limit: Int = 100): Int {
         val before = LocalDateTime.now(clock).minus(properties.cancelRequestTimeout)
-        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findCancelRequestedItems(before, after, limit) }) { (orderId, itemId) ->
+        return sweepByKeyset(limit, { it.second }, { after -> orderRepository.findItemsInStatusBefore(setOf(OrderItemStatus.CANCEL_REQUESTED, OrderItemStatus.RETURN_REFUNDING), before, after, limit) }) { (orderId, itemId) ->
             try {
                 reconcileCancel(orderId, itemId)
             } catch (e: RuntimeException) {
@@ -113,6 +119,12 @@ class PaymentReconciliationService(
 
     private fun reconcileCancel(orderId: Long, itemId: Long): Boolean {
         val item = orderRepository.findById(orderId)?.findItem(itemId) ?: return false
+        if (item.status == OrderItemStatus.RETURN_REFUNDING) {
+            val request = item.returnRequest ?: return false
+            val returnId = request.id ?: return false
+            val outcome = if (request.refundAmount == 0L) NO_REFUND else refundOutcome(orderId, itemId, request.refundAmount) ?: return false
+            return orderReturnService.finishReturn(orderId, returnId, outcome) == ReturnFinish.RETURNED
+        }
         // 환불 0원이면 PG 를 볼 필요가 없다(finishCancel 이 환불 0 을 먼저 확정한다).
         val outcome = if (item.refundAmount == 0L) NO_REFUND else refundOutcome(orderId, itemId, item.refundAmount) ?: return false
         // REVERTED(항목이 이미 ORDERED 로 돌아가 있음)와 PENDING 은 할 일이 없다.
@@ -121,7 +133,13 @@ class PaymentReconciliationService(
 
     /** PG 에 이 항목의 취소가 있으면 그 결과를, 없으면 같은 멱등 키로 다시 취소해 얻은 결과를 돌려준다. 확인할 수 없으면 null. */
     private fun refundOutcome(orderId: Long, itemId: Long, refundAmount: Long): PgOutcome? {
-        val paymentKey = paymentGateway.get(orderId).paymentKey ?: return null
+        val paymentKey = paymentGateway.get(orderId).paymentKey
+        if (paymentKey == null) {
+            // 현재 도달 불가: paymentKey 없는 주문(PG 미사용)은 현금 환불이 0원이라 여기까지 오지 않는다.
+            // 무PG 결제수단을 추가하면 이 항목은 영원히 건너뛰어지므로 관리자 종결 경로가 필요하다. 그때까지 매 주기 WARN 으로 드러낸다.
+            log.warn("PG 결제 키가 없는 환불 대기 항목을 건너뛴다(수동 확인 필요): orderId={}, itemId={}, refundAmount={}", orderId, itemId, refundAmount)
+            return null
+        }
         val found = paymentGateway.findFromPg(paymentKey)
         // 조회가 일시적으로 실패한 것일 수 있다(NOT_FOUND 만 PG 에 취소가 없다는 확실한 답이다). 취소를 다시 부르다 거절되면 환불이 되돌려지므로 이번 주기는 건너뛴다.
         if (found is PgOutcome.Unknown || (found is PgOutcome.Failed && found.code != "NOT_FOUND")) return null

@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.InlineTransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.order.domain.CancelActor
@@ -38,6 +39,9 @@ class OrderShippingServiceTest {
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), InlineTransactionRunner(), clock,
     )
     private val service = OrderShippingService(orderRepository, InlineTransactionRunner(), clock, pointEarner)
+    private val returnService = OrderReturnService(
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), pointEarner, OrderProperties(), InlineTransactionRunner(), clock,
+    )
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L
@@ -224,5 +228,46 @@ class OrderShippingServiceTest {
         service.autoConfirm(order.soId(1L))
 
         assertEquals(listOf(FakePointEarner.Earn(memberId, order.soId(1L), 21_438)), pointEarner.calls)
+    }
+
+    private fun requestOpenReturn(order: Order): Long {
+        val item = order.sellerOrders.first { it.sellerId == 1L }.items[0]
+        return returnService.request(memberId, order.id!!, item.id!!, RequestReturnCommand("CHANGE_OF_MIND", null)).returnId
+    }
+
+    @Test
+    fun 열린_반품이_있으면_autoConfirm은_건너뛰고_earnForPurchase를_부르지_않는다() {
+        val order = paidOrder()
+        deliverAll(order)
+        requestOpenReturn(order)
+
+        service.autoConfirm(order.soId(1L))
+
+        assertEquals(SellerOrderStatus.DELIVERED, reload(order).findSellerOrder(order.soId(1L)).status)
+        assertEquals(0, pointEarner.calls.size)
+    }
+
+    @Test
+    fun 열린_반품이_있으면_confirmPurchase는_SELLER_ORDER_HAS_OPEN_RETURN() {
+        val order = paidOrder()
+        deliverAll(order)
+        requestOpenReturn(order)
+
+        assertError(ErrorCode.SELLER_ORDER_HAS_OPEN_RETURN) { service.confirmPurchase(memberId, order.id!!, order.soId(1L)) }
+        assertEquals(0, pointEarner.calls.size)
+    }
+
+    @Test
+    fun 반품이_거절되면_다음_autoConfirm이_확정한다() {
+        val order = paidOrder()
+        deliverAll(order)
+        val returnId = requestOpenReturn(order)
+        service.autoConfirm(order.soId(1L))
+        returnService.rejectBySeller(1L, returnId, "불량 아님")
+
+        service.autoConfirm(order.soId(1L))
+
+        assertEquals(SellerOrderStatus.CONFIRMED, reload(order).findSellerOrder(order.soId(1L)).status)
+        assertEquals(1, pointEarner.calls.size)
     }
 }

@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.presentation
 import com.dogyun.kairos.CommerceTestSupport
 import com.dogyun.kairos.order.application.PurchaseAutoConfirmService
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.ResultActionsDsl
 import tools.jackson.databind.JsonNode
 import java.util.UUID
@@ -13,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@TestPropertySource(properties = ["kairos.order.return-window=30d"])
 class OrderShippingApiTest : CommerceTestSupport() {
 
     @Autowired
@@ -217,6 +219,96 @@ class OrderShippingApiTest : CommerceTestSupport() {
             assertEquals(200, statuses[0])
             assertEquals("CONFIRMED", sellerOrderStatus(p.sellerOrderId))
             assertEquals(listOf(200L), earnPurchaseAmounts(memberId))
+        }
+    }
+
+    private fun delivered(user: String, shop: Shop, price: Long = 20_000): Paid {
+        val p = paid(user, shop, price)
+        ship(shop.sellerToken, p.sellerOrderId).andExpect { status { isOk() } }
+        deliver(shop.sellerToken, p.sellerOrderId).andExpect { status { isOk() } }
+        return p
+    }
+
+    @Test
+    fun 열린_반품이_있는_판매자_주문은_자동_확정_작업이_건너뛰고_반품_완료_뒤_다음_실행에서_확정한다() {
+        val shop = shop()
+        val user = newUserToken()
+        val p = delivered(user, shop)
+        jdbcTemplate.update("update seller_order set delivered_at = ? where id = ?", java.time.LocalDateTime.now().minusDays(1), p.sellerOrderId)
+        val returnId = requestReturn(user, p.orderId, p.itemId)
+        jdbcTemplate.update("update seller_order set delivered_at = ? where id = ?", java.time.LocalDateTime.now().minusDays(8), p.sellerOrderId)
+
+        purchaseAutoConfirmService.confirmDelivered()
+        assertEquals("DELIVERED", sellerOrderStatus(p.sellerOrderId))
+
+        approveReturn(shop.sellerToken, returnId)
+        receiveReturn(shop.sellerToken, returnId)
+        // 유일한 항목이 반품 완료되면 판매자 주문은 그때 CONFIRMED 다. 다음 실행은 아무 일도 하지 않는다.
+        purchaseAutoConfirmService.confirmDelivered()
+        purchaseAutoConfirmService.confirmDelivered()
+        assertEquals("CONFIRMED", sellerOrderStatus(p.sellerOrderId))
+        assertEquals(0, pointTransactionCount(memberIdOf(user), "EARN_PURCHASE"))
+    }
+
+    @Test
+    fun 거절된_반품이_있으면_다음_자동_확정_실행이_확정한다() {
+        val shop = shop()
+        val user = newUserToken()
+        val p = delivered(user, shop)
+        val returnId = requestReturn(user, p.orderId, p.itemId)
+        jdbcTemplate.update("update seller_order set delivered_at = ? where id = ?", java.time.LocalDateTime.now().minusDays(8), p.sellerOrderId)
+        purchaseAutoConfirmService.confirmDelivered()
+        assertEquals("DELIVERED", sellerOrderStatus(p.sellerOrderId))
+
+        rejectReturn(shop.sellerToken, returnId)
+        purchaseAutoConfirmService.confirmDelivered()
+
+        assertEquals("CONFIRMED", sellerOrderStatus(p.sellerOrderId))
+    }
+
+    @Test
+    fun 열린_반품이_있는_수동_확정은_409_SELLER_ORDER_HAS_OPEN_RETURN() {
+        val shop = shop()
+        val user = newUserToken()
+        val p = delivered(user, shop)
+        requestReturn(user, p.orderId, p.itemId)
+
+        confirm(user, p).expectCode(409, "SELLER_ORDER_HAS_OPEN_RETURN")
+
+        assertEquals("DELIVERED", sellerOrderStatus(p.sellerOrderId))
+    }
+
+    @Test
+    fun 반품_요청과_자동_확정을_동시에_실행하면_반품_성공_확정_건너뜀_또는_확정_성공_반품_RETURN_NOT_ELIGIBLE_둘_중_하나다() {
+        repeat(5) {
+            val shop = shop()
+            val user = newUserToken()
+            val p = delivered(user, shop)
+            // 반품 가능 기간을 30일로 늘렸으므로(클래스 설정) 8일 전 배송 완료는 반품과 자동 확정이 둘 다 가능하다.
+            jdbcTemplate.update("update seller_order set delivered_at = ? where id = ?", java.time.LocalDateTime.now().minusDays(8), p.sellerOrderId)
+
+            val results = runConcurrently(2) { i ->
+                if (i == 0) {
+                    postIdem("/api/v1/orders/${p.orderId}/items/${p.itemId}/returns", user, mapOf("reason" to "CHANGE_OF_MIND"))
+                        .andReturn().response.let { it.status to it.contentAsString }
+                } else {
+                    purchaseAutoConfirmService.confirmDelivered()
+                    0 to ""
+                }
+            }
+
+            val returnResponse = results[0]
+            val so = sellerOrderStatus(p.sellerOrderId)
+            val itemState = itemStatus(p.itemId)
+            if (returnResponse.first == 201) {
+                assertEquals("DELIVERED", so)
+                assertEquals("RETURN_REQUESTED", itemState)
+            } else {
+                assertEquals(409, returnResponse.first, returnResponse.second)
+                assertTrue(returnResponse.second.contains("RETURN_NOT_ELIGIBLE"), returnResponse.second)
+                assertEquals("CONFIRMED", so)
+                assertEquals("ORDERED", itemState)
+            }
         }
     }
 

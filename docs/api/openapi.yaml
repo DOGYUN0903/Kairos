@@ -1,13 +1,14 @@
 openapi: 3.1.0
 info:
   title: Kairos Commerce API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Kairos 타임딜 API 기준 문서(SDD). 구현이 이 문서와 다르면 문서를 먼저 고치고 커밋한다.
 
     C1: 판매자·브랜드·카테고리·상품·파일
     C2: 장바구니·주문·결제·취소·배송
     C3: 쿠폰·포인트·후기·좋아요
+    C4: 반품·정산
 
     - 모든 성공 응답 본문은 `ApiResponse`로 감싼다. 각 엔드포인트 표의 응답 값은 `data`에 들어간다.
     - 모든 에러 응답은 `ErrorResponse`.
@@ -50,6 +51,11 @@ tags:
   - name: Review
   - name: Seller Review
   - name: Product Like
+  - name: Return
+  - name: Seller Return
+  - name: Admin Return
+  - name: Seller Settlement
+  - name: Admin Settlement
 security:
   - bearerAuth: []
 paths:
@@ -2537,7 +2543,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: "`SELLER_ORDER_INVALID_STATE_TRANSITION`(배송 완료 전)"
+          description: "`SELLER_ORDER_INVALID_STATE_TRANSITION`(배송 완료 전) 또는 `SELLER_ORDER_HAS_OPEN_RETURN`(열린 반품이 있다)"
           content:
             application/json:
               schema:
@@ -2705,6 +2711,526 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: "`REVIEW_NOT_ELIGIBLE` 미확정·취소 항목 또는 기한 경과, `REVIEW_ALREADY_WRITTEN` 이미 작성(삭제 포함), 또는 `IDEMPOTENCY_KEY_REUSED`/`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/orders/{orderId}/items/{orderItemId}/returns:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - $ref: '#/components/parameters/OrderItemId'
+    post:
+      tags: [Return]
+      operationId: requestReturn
+      summary: 반품 요청 (구매자)
+      description: |
+        `DELIVERED` 판매자 주문의 `ORDERED` 항목에, 배송 완료 후 `kairos.order.return-window`(7일) 안에 요청한다.
+        철회(`WITHDRAWN`)한 반품은 같은 행(같은 returnId)을 `REQUESTED` 로 되살린다. 거절된 항목은 다시 요청할 수 없다. `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestReturnRequest'
+      responses:
+        '201':
+          description: 요청된 반품
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          description: "`RETURN_INVALID`(사유·상세 길이), `INVALID_REQUEST` 또는 `IDEMPOTENCY_KEY_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_NOT_ELIGIBLE`(배송 완료 전·구매 확정 뒤·취소 항목), `RETURN_WINDOW_EXPIRED`, `RETURN_ALREADY_REQUESTED` 또는 `IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/returns/me:
+    get:
+      tags: [Return]
+      operationId: listMyReturns
+      summary: 내 반품 목록 (최신 요청순)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 반품 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Return]
+      operationId: getMyReturn
+      summary: 내 반품 상세
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Return]
+      operationId: withdrawMyReturn
+      summary: 반품 철회 (구매자)
+      description: "`REQUESTED` 일 때만 철회한다. 이미 `WITHDRAWN` 이면 200 으로 현재 상태를 돌려준다. 항목은 `ORDERED` 로 돌아간다."
+      responses:
+        '200':
+          description: 철회된 반품
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 승인·거절 뒤"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns:
+    get:
+      tags: [Seller Return]
+      operationId: listSellerReturns
+      summary: 판매자 반품 목록 (APPROVED·SUSPENDED 판매자, 최신 요청순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReturnStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 반품 목록(최신 요청순)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Seller Return]
+      operationId: getSellerReturn
+      summary: 판매자 반품 상세
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/SellerNotActive'
+  /api/v1/seller/returns/{returnId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: approveSellerReturn
+      summary: 반품 승인 (판매자)
+      description: "`REQUESTED` 반품을 승인한다(`APPROVED`). 이미 승인됐으면 200 으로 현재 상태를 돌려준다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns/{returnId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: rejectSellerReturn
+      summary: 반품 거절 (판매자)
+      description: "`REQUESTED` 반품을 거절한다(`REJECTED`, 항목은 `ORDERED` 로 돌아간다). 거절된 항목은 구매자가 다시 요청할 수 없다. 이미 거절됐으면 200."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectReturnRequest'
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          description: "`RETURN_INVALID`(rejectReason 누락·길이) 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/seller/returns/{returnId}/receive:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Seller Return]
+      operationId: receiveSellerReturn
+      summary: 반품 수거 확인과 환불 (판매자)
+      description: "`APPROVED` 반품의 수거를 확인하고 환불한다. PG 호출은 트랜잭션 밖이다. 응답 status 는 `COMPLETED` 또는 PG 결과가 불확실하면 `REFUNDING`(대사 작업이 맞춘다). 이미 `REFUNDING`/`COMPLETED` 면 현재 상태 그대로 200."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND` 없거나 남의 반품"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION`(승인 전), `PAYMENT_CANCEL_FAILED`(PG 가 거절해 승인 상태로 되돌림) 또는 `SELLER_NOT_ACTIVE`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns:
+    get:
+      tags: [Admin Return]
+      operationId: listAdminReturns
+      summary: 반품 목록 (관리자, 최신 요청순)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ReturnStatus'
+        - name: sellerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: memberId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 반품 목록(최신 요청순)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ReturnRequestResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/returns/{returnId}:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    get:
+      tags: [Admin Return]
+      operationId: getAdminReturn
+      summary: 반품 상세 (관리자)
+      responses:
+        '200':
+          description: 반품 상세
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: approveAdminReturn
+      summary: 반품 승인 (관리자)
+      description: "`REQUESTED` 또는 거절(`REJECTED`)된 반품을 승인한다. 판매자 주문이 이미 `CONFIRMED` 면 거절 반품은 다시 승인할 수 없다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_NOT_ELIGIBLE`(구매 확정된 판매자 주문) 또는 `RETURN_INVALID_STATE_TRANSITION`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/receive:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: receiveAdminReturn
+      summary: 반품 수거 확인과 환불 (관리자)
+      description: "판매자 수거 확인과 같은 환불을 한다."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION` 또는 `PAYMENT_CANCEL_FAILED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/returns/{returnId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ReturnId'
+    patch:
+      tags: [Admin Return]
+      operationId: cancelAdminReturn
+      summary: 반품 중단 (관리자)
+      description: "`APPROVED` 반품을 중단한다(`CANCELED_BY_ADMIN`, 항목은 `ORDERED`). 이미 중단됐으면 200."
+      responses:
+        '200':
+          description: 처리된 반품(이미 목표 상태면 현재 상태 그대로 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReturnRequestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`RETURN_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`RETURN_INVALID_STATE_TRANSITION`(환불 시작 뒤 등)"
           content:
             application/json:
               schema:
@@ -3259,6 +3785,394 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/settlements:
+    get:
+      tags: [Seller Settlement]
+      operationId: listSellerSettlements
+      summary: 내 정산 목록 (APPROVED·SUSPENDED 판매자, 기간 시작 최신순)
+      description: 라인은 포함하지 않고 `lineCount` 만 준다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 내 정산 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/seller/settlements/{settlementId}:
+    get:
+      tags: [Seller Settlement]
+      operationId: getSellerSettlement
+      summary: 내 정산 상세 (계산 내역·포함 판매자 주문·조정)
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 정산 상세(라인·조정 포함)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND` (남의 정산도 404)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements/generate:
+    post:
+      tags: [Admin Settlement]
+      operationId: generateSettlements
+      summary: 주간 정산 생성 (ADMIN)
+      description: |
+        `periodStart`(월요일) 주간 기간 `[periodStart 00:00, periodStart+7일 00:00)`(KST)의 정산을 판매자별 트랜잭션으로 만든다.
+        끝나지 않은 기간, `kairos.settlement.start-date` 이전 기간, 직전 기간이 아직 생성되지 않은 기간은 400 `SETTLEMENT_PERIOD_INVALID` 다(오래된 기간부터).
+        이미 생성 완료(`settlement_run`)된 기간이면 아무것도 만들지 않고 `alreadyGenerated=true` 로 응답한다.
+        일부 판매자가 실패하면 `failedCount > 0` 이고 완료 기록을 남기지 않는다(다시 요청하면 나머지만 만든다). `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateSettlementRequest'
+      responses:
+        '200':
+          description: 생성 결과
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GenerateSettlementResult'
+        '400':
+          description: "`SETTLEMENT_PERIOD_INVALID`, `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: "`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/admin/sellers/{sellerId}/settlement-adjustments:
+    parameters:
+      - name: sellerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    post:
+      tags: [Admin Settlement]
+      operationId: createSettlementAdjustment
+      summary: 정산 수동 조정 등록 (ADMIN)
+      description: |
+        판매자에게 가감 금액(양수 가산, 음수 차감)을 등록한다. 정지·탈퇴 판매자도 등록할 수 있다.
+        등록한 조정은 `created_at` 이 정산 기간 끝보다 이른 가장 가까운 다음 정산 생성 때 그 정산에 붙는다(기간 끝 뒤 등록분은 그 다음 정산).
+        `Idempotency-Key` 필수.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSettlementAdjustmentRequest'
+      responses:
+        '201':
+          description: 조정 등록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CreateSettlementAdjustmentResponse'
+        '400':
+          description: "`SETTLEMENT_ADJUSTMENT_INVALID`(금액 0, 사유 비어 있음·500자 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SELLER_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`IDEMPOTENCY_IN_PROGRESS`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
+    get:
+      tags: [Admin Settlement]
+      operationId: listSettlementAdjustments
+      summary: 판매자 정산 조정 목록 (ADMIN)
+      description: 최신 등록순. `settlementId` 가 null 이면 아직 정산에 붙지 않은 조정이다.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 조정 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementAdjustmentResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SELLER_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlement-adjustments/{adjustmentId}:
+    delete:
+      tags: [Admin Settlement]
+      operationId: deleteSettlementAdjustment
+      summary: 정산 조정 삭제 (ADMIN, 소프트 삭제)
+      description: |
+        아직 정산에 붙지 않은 `MANUAL` 조정만 지울 수 있다. 정산에 붙은 조정과 시스템이 만든 `CARRY_OVER` 는 바꿀 수 없다(409).
+        붙이기와 삭제는 조건부 UPDATE 로 직렬화되어 둘 중 하나만 성공한다.
+      parameters:
+        - $ref: '#/components/parameters/AdjustmentId'
+      responses:
+        '204':
+          description: 삭제 완료 (본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND` 없거나 이미 삭제됨"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`SETTLEMENT_ADJUSTMENT_APPLIED`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements:
+    get:
+      tags: [Admin Settlement]
+      operationId: listAdminSettlements
+      summary: 정산 목록 (ADMIN)
+      description: 기간 시작 최신순. 라인은 포함하지 않는다.
+      parameters:
+        - name: sellerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [GENERATED, CONFIRMED, PAID]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 정산 목록
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              content:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/SettlementSummary'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/admin/settlements/{settlementId}:
+    get:
+      tags: [Admin Settlement]
+      operationId: getAdminSettlement
+      summary: 정산 상세 (ADMIN)
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 정산 상세(라인·조정 포함)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements/{settlementId}/confirm:
+    patch:
+      tags: [Admin Settlement]
+      operationId: confirmSettlement
+      summary: 정산 확정 (ADMIN)
+      description: GENERATED → CONFIRMED. 이미 확정(또는 지급)된 정산은 변화 없이 200 이다(멱등). 정산 행을 잠근 뒤 현재 상태로 판단한다.
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      responses:
+        '200':
+          description: 확정된 정산
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/settlements/{settlementId}/pay:
+    patch:
+      tags: [Admin Settlement]
+      operationId: paySettlement
+      summary: 정산 지급 완료 처리 (ADMIN)
+      description: |
+        CONFIRMED → PAID. GENERATED 에서 바로 지급 처리할 수 없다(409). 이미 PAID 면 변화 없이 200 이다(멱등, 메모는 첫 값 유지).
+        메모는 200자 이하(초과 시 400 `INVALID_REQUEST`).
+      parameters:
+        - $ref: '#/components/parameters/SettlementId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaySettlementRequest'
+      responses:
+        '200':
+          description: 지급 처리된 정산
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SettlementDetail'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`SETTLEMENT_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`SETTLEMENT_INVALID_STATE_TRANSITION` GENERATED 에서 직행"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -3352,6 +4266,27 @@ components:
         format: int64
     ReviewId:
       name: reviewId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    AdjustmentId:
+      name: adjustmentId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ReturnId:
+      name: returnId
       in: path
       required: true
       schema:
@@ -3499,6 +4434,142 @@ components:
             message: 같은 요청이 처리 중입니다.
             timestamp: '2026-11-08T12:00:00'
   schemas:
+    CreateSettlementAdjustmentRequest:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount:
+          type: integer
+          format: int64
+          description: 가감 금액(0 불가, 양수 가산·음수 차감)
+        reason:
+          type: string
+          maxLength: 500
+        refSellerOrderId:
+          type: integer
+          format: int64
+          nullable: true
+    CreateSettlementAdjustmentResponse:
+      type: object
+      required: [adjustmentId]
+      properties:
+        adjustmentId:
+          type: integer
+          format: int64
+    PaySettlementRequest:
+      type: object
+      properties:
+        memo:
+          type: string
+          maxLength: 200
+          nullable: true
+    SettlementSummary:
+      type: object
+      required: [settlementId, sellerId, sellerName, sellerStatus, periodStart, periodEnd, payoutDate, status, totalAmount, payableAmount, lineCount]
+      properties:
+        settlementId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        sellerName: {type: string}
+        sellerStatus: {type: string}
+        periodStart: {type: string, format: date}
+        periodEnd: {type: string, format: date, description: '기간 끝(다음 월요일, 미포함)'}
+        payoutDate: {type: string, format: date}
+        status: {type: string, enum: [GENERATED, CONFIRMED, PAID]}
+        totalAmount: {type: integer, format: int64, description: 라인 합 + 조정 합(음수 가능)}
+        payableAmount: {type: integer, format: int64, description: 'max(totalAmount, 0)'}
+        lineCount: {type: integer}
+    SettlementLineResult:
+      type: object
+      required: [lineId, sellerOrderId, orderId, orderNo, confirmedAt, salesAmount, sellerCouponDiscount, commissionBase, commissionRateBp, commissionAmount, shippingFeeOwed, returnFeeBorne, lineAmount]
+      properties:
+        lineId: {type: integer, format: int64}
+        sellerOrderId: {type: integer, format: int64}
+        orderId: {type: integer, format: int64}
+        orderNo: {type: string}
+        confirmedAt: {type: string, format: date-time}
+        salesAmount: {type: integer, format: int64}
+        sellerCouponDiscount: {type: integer, format: int64}
+        commissionBase: {type: integer, format: int64}
+        commissionRateBp: {type: integer}
+        commissionAmount: {type: integer, format: int64}
+        shippingFeeOwed: {type: integer, format: int64}
+        returnFeeBorne: {type: integer, format: int64}
+        lineAmount: {type: integer, format: int64}
+    SettlementAdjustmentResult:
+      type: object
+      required: [adjustmentId, sellerId, type, amount, reason]
+      properties:
+        adjustmentId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        settlementId: {type: integer, format: int64, nullable: true, description: 붙은 정산(없으면 아직 미반영)}
+        type: {type: string, enum: [MANUAL, CARRY_OVER]}
+        amount: {type: integer, format: int64}
+        reason: {type: string}
+        refSellerOrderId: {type: integer, format: int64, nullable: true}
+        sourceSettlementId: {type: integer, format: int64, nullable: true, description: CARRY_OVER 를 만든 정산}
+        createdAt: {type: string, format: date-time, nullable: true}
+    SettlementDetail:
+      type: object
+      required: [settlementId, sellerId, sellerName, sellerStatus, periodStart, periodEnd, payoutDate, status, totalAmount, payableAmount, lineCount, salesAmount, sellerCouponDiscount, commissionAmount, shippingFeeOwed, returnFeeBorne, adjustmentAmount, lines, adjustments]
+      properties:
+        settlementId: {type: integer, format: int64}
+        sellerId: {type: integer, format: int64}
+        sellerName: {type: string}
+        sellerStatus: {type: string}
+        periodStart: {type: string, format: date}
+        periodEnd: {type: string, format: date}
+        payoutDate: {type: string, format: date}
+        status: {type: string, enum: [GENERATED, CONFIRMED, PAID]}
+        totalAmount: {type: integer, format: int64}
+        payableAmount: {type: integer, format: int64}
+        lineCount: {type: integer}
+        salesAmount: {type: integer, format: int64}
+        sellerCouponDiscount: {type: integer, format: int64}
+        commissionAmount: {type: integer, format: int64}
+        shippingFeeOwed: {type: integer, format: int64}
+        returnFeeBorne: {type: integer, format: int64}
+        adjustmentAmount: {type: integer, format: int64}
+        confirmedAt: {type: string, format: date-time, nullable: true}
+        paidAt: {type: string, format: date-time, nullable: true}
+        paidMemo: {type: string, nullable: true}
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementLineResult'
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettlementAdjustmentResult'
+    GenerateSettlementRequest:
+      type: object
+      required: [periodStart]
+      properties:
+        periodStart:
+          type: string
+          format: date
+          description: 기간 시작 월요일 (KST)
+    GenerateSettlementResult:
+      type: object
+      required: [periodStart, periodEnd, sellerCount, createdCount, skippedCount, failedCount, alreadyGenerated]
+      properties:
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+          description: 기간 끝(다음 월요일, 미포함)
+        sellerCount:
+          type: integer
+        createdCount:
+          type: integer
+        skippedCount:
+          type: integer
+          description: 이미 정산이 있어 건너뛴 판매자 수
+        failedCount:
+          type: integer
+        alreadyGenerated:
+          type: boolean
     ApiResponse:
       type: object
       description: 모든 성공 응답의 공통 래퍼. 엔드포인트별로 `data`를 allOf로 구체화한다.
@@ -3604,6 +4675,18 @@ components:
             - REVIEW_NOT_ELIGIBLE
             - REVIEW_ALREADY_WRITTEN
             - REVIEW_NOT_FOUND
+            - RETURN_INVALID
+            - RETURN_NOT_FOUND
+            - RETURN_NOT_ELIGIBLE
+            - RETURN_WINDOW_EXPIRED
+            - RETURN_ALREADY_REQUESTED
+            - RETURN_INVALID_STATE_TRANSITION
+            - SELLER_ORDER_HAS_OPEN_RETURN
+            - SETTLEMENT_NOT_FOUND
+            - SETTLEMENT_PERIOD_INVALID
+            - SETTLEMENT_INVALID_STATE_TRANSITION
+            - SETTLEMENT_ADJUSTMENT_INVALID
+            - SETTLEMENT_ADJUSTMENT_APPLIED
             - METHOD_NOT_ALLOWED
             - RESOURCE_NOT_FOUND
             - INTERNAL_ERROR
@@ -4961,7 +6044,7 @@ components:
           description: (salePrice + extraPrice) * quantity
         status:
           type: string
-          enum: [ORDERED, CANCEL_REQUESTED, CANCELED]
+          enum: [ORDERED, CANCEL_REQUESTED, CANCELED, RETURN_REQUESTED, RETURN_APPROVED, RETURN_REFUNDING, RETURNED]
         cancelActor:
           type: string
           nullable: true
@@ -5000,6 +6083,134 @@ components:
           type: integer
           format: int64
           description: 취소로 되돌려진 포인트
+        returnRequest:
+          allOf:
+            - $ref: '#/components/schemas/ReturnRequestSummary'
+          nullable: true
+          description: 이 항목의 반품 요청(없으면 null)
+    ReturnStatus:
+      type: string
+      enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
+    RejectReturnRequest:
+      type: object
+      required: [rejectReason]
+      properties:
+        rejectReason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    RequestReturnRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        detail:
+          type: string
+          maxLength: 500
+          nullable: true
+    ReturnRequestResponse:
+      type: object
+      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt]
+      properties:
+        returnId:
+          type: integer
+          format: int64
+        orderId:
+          type: integer
+          format: int64
+        sellerOrderId:
+          type: integer
+          format: int64
+        orderItemId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        feeBearer:
+          type: string
+          enum: [BUYER, SELLER]
+        status:
+          type: string
+          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
+        returnFee:
+          type: integer
+          format: int64
+          description: 구매자 부담 회수 구간 반품비(수거 확인 때 확정)
+        outboundFeeRecovered:
+          type: integer
+          format: int64
+          description: 무료배송 주문의 발송 구간 회수액(주문당 한 번)
+        shippingFeeRefund:
+          type: integer
+          format: int64
+          description: 판매자 귀책으로 돌려준 구매자 부담 배송비
+        sellerBorneFee:
+          type: integer
+          format: int64
+          description: 판매자 정산에서 빼는 반품비
+        refundAmount:
+          type: integer
+          format: int64
+          description: paidAmount - returnFee - outboundFeeRecovered + shippingFeeRefund (수거 확인 전에는 0)
+        pointsRefund:
+          type: integer
+          format: int64
+        rejectReason:
+          type: string
+          nullable: true
+        requestedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+          nullable: true
+        decidedBy:
+          type: string
+          enum: [SELLER, SYSTEM, ADMIN]
+          nullable: true
+        receivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    ReturnRequestSummary:
+      type: object
+      required: [returnId, reason, status, feeBearer, refundAmount, returnFee, requestedAt]
+      properties:
+        returnId:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum: [CHANGE_OF_MIND, DEFECTIVE, WRONG_DELIVERY]
+        status:
+          type: string
+          enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
+        feeBearer:
+          type: string
+          enum: [BUYER, SELLER]
+        refundAmount:
+          type: integer
+          format: int64
+        returnFee:
+          type: integer
+          format: int64
+          description: 구매자 부담 회수 구간 반품비(수거 확인 때 확정, 돈 불변식에 쓴다)
+        requestedAt:
+          type: string
+          format: date-time
     OrderShippingAddress:
       type: object
       required: [receiverName, phone, zipCode, address1, address2]
@@ -5019,7 +6230,7 @@ components:
           nullable: true
     SellerOrderResult:
       type: object
-      required: [sellerOrderId, sellerId, sellerName, status, shippingFee, shippingFeePayer, items]
+      required: [sellerOrderId, sellerId, sellerName, status, shippingFee, shippingFeePayer, allItemsReturned, hasOpenReturn, items]
       properties:
         sellerOrderId:
           type: integer
@@ -5055,6 +6266,17 @@ components:
           type: string
           format: date-time
           nullable: true
+        returnableUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: "`DELIVERED` 일 때 deliveredAt + return-window, 그 밖에는 null"
+        allItemsReturned:
+          type: boolean
+          description: 모든 항목이 반품 완료(`RETURNED`)이거나 취소·반품으로 남은 항목이 없다
+        hasOpenReturn:
+          type: boolean
+          description: 열린 반품(요청·승인·환불 중)이 있다
         items:
           type: array
           items:
@@ -5077,7 +6299,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     OrderDetail:
       type: object
-      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
       properties:
         orderId:
           type: integer
@@ -5103,6 +6325,14 @@ components:
         refundedAmount:
           type: integer
           format: int64
+        remainingPaidAmount:
+          type: integer
+          format: int64
+          description: 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합
+        remainingBuyerShippingFee:
+          type: integer
+          format: int64
+          description: 아직 환불되지 않은 구매자 부담 배송비(완료 반품의 배송비 환불 반영)
         productCouponDiscount:
           type: integer
           format: int64
@@ -5163,7 +6393,7 @@ components:
           format: date-time
     SellerOrderDetail:
       type: object
-      required: [sellerOrderId, orderId, orderNo, status, shippingFee, shippingFeePayer, shippingAddress, items, orderedAt]
+      required: [sellerOrderId, orderId, orderNo, status, shippingFee, shippingFeePayer, allItemsReturned, hasOpenReturn, shippingAddress, items, orderedAt]
       properties:
         sellerOrderId:
           type: integer
@@ -5199,6 +6429,17 @@ components:
           type: string
           format: date-time
           nullable: true
+        returnableUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: "`DELIVERED` 일 때 deliveredAt + return-window, 그 밖에는 null"
+        allItemsReturned:
+          type: boolean
+          description: 모든 항목이 반품 완료(`RETURNED`)이거나 취소·반품으로 남은 항목이 없다
+        hasOpenReturn:
+          type: boolean
+          description: 열린 반품(요청·승인·환불 중)이 있다
         shippingAddress:
           $ref: '#/components/schemas/OrderShippingAddress'
         items:

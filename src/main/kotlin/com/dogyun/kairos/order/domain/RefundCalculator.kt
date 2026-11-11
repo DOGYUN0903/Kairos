@@ -29,21 +29,22 @@ object RefundCalculator {
         if (item.status != OrderItemStatus.ORDERED || sellerOrder.status != SellerOrderStatus.PAID) {
             throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         }
-        // 다른 항목의 취소가 확인 중이면 그 결과(되돌림 포함)에 따라 이 계산이 틀어질 수 있어 한 번에 하나만 받는다.
-        if (order.allItems.any { it.status == OrderItemStatus.CANCEL_REQUESTED }) {
+        // 다른 항목의 취소 확인·반품 환불이 진행 중이면 그 결과(되돌림 포함)에 따라 이 계산이 틀어질 수 있어 한 번에 하나만 받는다.
+        if (order.allItems.any { it.status == OrderItemStatus.CANCEL_REQUESTED || it.status == OrderItemStatus.RETURN_REFUNDING }) {
             throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         }
 
         // 무료배송 기준은 할인 전 금액(lineAmount)으로 판정한다(스펙 4-3). 환불 현금은 실제로 낸 paidAmount 다.
+        // 열린 반품 항목도 '남은 항목'(isRemaining)으로 센다(C4 스펙 5장).
         val remainingAfter = order.remainingItemsAmount - item.lineAmount
-        val sellerOrderEmptied = sellerOrder.items.none { it.status == OrderItemStatus.ORDERED && it.id != itemId }
+        val sellerOrderEmptied = sellerOrder.items.none { it.status.isRemaining && it.id != itemId }
 
         // 구매자가 낸 배송비는 그 판매자 주문이 통째로 비면 돌려준다.
         val shippingFeeRefund =
             if (sellerOrderEmptied && sellerOrder.shippingFeePayer == ShippingFeePayer.BUYER) sellerOrder.shippingFee else 0L
 
-        val everDeducted = order.allItems.sumOf { it.shippingFeeDeducted }
-        val outstandingDeduction = everDeducted - order.allItems.sumOf { it.shippingFeeReturned }
+        // 마지막 취소의 차감 반환은 취소에서 차감한 금액만이다. 반품의 발송 구간 회수는 돌려주지 않는다.
+        val outstandingDeduction = order.allItems.sumOf { it.shippingFeeDeducted } - order.allItems.sumOf { it.shippingFeeReturned }
 
         var shippingFeeDeducted = 0L
         var shippingFeeReturned = 0L
@@ -52,7 +53,9 @@ object RefundCalculator {
             shippingFeeReturned = outstandingDeduction
         } else if (
             actor == CancelActor.BUYER && order.freeShippingApplied &&
-            remainingAfter < policy.freeShippingThreshold && everDeducted == 0L &&
+            remainingAfter < policy.freeShippingThreshold &&
+            // 발송 구간은 취소 차감과 반품 회수를 합쳐 주문당 한 번만 받는다(C4 스펙 5장).
+            order.outboundFeeRecoveredEver == 0L &&
             // 이 취소로 처음 기준 아래로 떨어질 때만. 판매자·관리자 취소로 이미 깨졌다면 구매자 책임이 아니다.
             order.remainingItemsAmount >= policy.freeShippingThreshold
         ) {

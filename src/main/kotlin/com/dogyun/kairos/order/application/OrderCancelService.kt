@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.order.domain.CancelActor
@@ -124,6 +125,8 @@ class OrderCancelService(
             OrderItemStatus.CANCELED -> return@run CancelFinish.CANCELED
             OrderItemStatus.ORDERED -> return@run CancelFinish.REVERTED
             OrderItemStatus.CANCEL_REQUESTED -> Unit
+            // 반품 항목은 취소 마무리 대상이 아니다(반품은 OrderReturnService 가 마무리한다).
+            else -> throw DomainException(ErrorCode.ORDER_ITEM_NOT_CANCELABLE)
         }
         val sellerOrder = order.sellerOrders.first { so -> so.items.any { it.id == orderItemId } }
         if (order.status != OrderStatus.PAID || sellerOrder.status != SellerOrderStatus.PAID) return@run CancelFinish.PENDING
@@ -135,11 +138,11 @@ class OrderCancelService(
                 order.confirmCancel(orderItemId, plan, LocalDateTime.now(clock))
                 orderRepository.save(order)
                 if (refundAmount > 0) paymentGateway.recordRefund(orderId, refundAmount)
-                // 구매자·판매자·관리자 모두 같다: 상품 쿠폰과 배분 포인트를 돌려준다. 장바구니 쿠폰은 마지막 항목 취소일 때만(스펙 7장).
+                // 구매자·판매자·관리자 모두 같다: 상품 쿠폰과 배분 포인트를 돌려준다. 장바구니 쿠폰은 마지막 항목이 닫힐 때만(취소·반품 합쳐 전부 닫힘, 스펙 7장).
                 // 쿠폰·포인트를 재고보다 먼저 되돌린다(락 순서: orders → member_point → coupon → sku).
                 benefitReverter.revertItem(
                     orderId, order.memberId, orderItemId, plan.pointsRefund, plan.productCouponReturn,
-                    if (order.allItemsCanceled) order.cartCouponId else null,
+                    if (order.allItemsClosed) order.cartCouponId else null,
                 )
                 stockManager.restore(listOf(SkuQuantity(item.skuId, item.quantity)))
                 stockManager.decreaseSales(listOf(ProductQuantity(item.productId, item.quantity)))

@@ -5,6 +5,7 @@ import com.dogyun.kairos.order.application.DeliveryTrackingService
 import com.dogyun.kairos.order.application.OrderExpiryService
 import com.dogyun.kairos.order.application.PaymentReconciliationService
 import com.dogyun.kairos.order.application.PurchaseAutoConfirmService
+import com.dogyun.kairos.order.application.ReturnAutoApproveService
 import com.dogyun.kairos.payment.application.PgClient
 import com.dogyun.kairos.payment.application.PgResult
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,10 +26,11 @@ class OrderJobsApiTest : CommerceTestSupport() {
     @Autowired private lateinit var reconciliationService: PaymentReconciliationService
     @Autowired private lateinit var deliveryTrackingService: DeliveryTrackingService
     @Autowired private lateinit var purchaseAutoConfirmService: PurchaseAutoConfirmService
+    @Autowired private lateinit var returnAutoApproveService: ReturnAutoApproveService
     @Autowired private lateinit var pgClient: PgClient
     @Autowired private lateinit var clock: Clock
     @Autowired private lateinit var benefitReverter: com.dogyun.kairos.order.application.BenefitReverter
-    @Autowired private lateinit var tx: com.dogyun.kairos.order.application.TransactionRunner
+    @Autowired private lateinit var tx: com.dogyun.kairos.common.application.TransactionRunner
 
     private class Shop(val sellerToken: String, val productId: Long, val skuId: Long)
 
@@ -353,6 +355,55 @@ class OrderJobsApiTest : CommerceTestSupport() {
             ),
         )
         assertBenefitsReturned(f)
+    }
+
+    // ---- C4: 반품 자동 승인 ----
+
+    /** 30,000원 한 개 배송 완료 주문에 반품을 요청하고 returnId 를 돌려준다. */
+    private fun requestedReturn(): Pair<Shop, Long> {
+        val shop = shop(30_000)
+        val buyer = newUserToken()
+        val order = deliveredOrder(buyer, shop.sellerToken, listOf(shop.skuId to 1), 33_000)
+        val itemId = order.get("sellerOrders").flatMap { it.get("items").toList() }[0].get("orderItemId").asLong()
+        return shop to requestReturn(buyer, order.get("orderId").asLong(), itemId)
+    }
+
+    private fun returnRow(returnId: Long) = jdbcTemplate.queryForMap("select return_status, decided_by, decided_at from return_request where id = ?", returnId)
+
+    private fun backdateReturn(returnId: Long, days: Long) {
+        jdbcTemplate.update("update return_request set requested_at = ? where id = ?", now().minusDays(days), returnId)
+    }
+
+    @Test
+    fun requested_at을_4일_전으로_바꾸고_작업을_돌리면_APPROVED_decidedBy_SYSTEM이다() {
+        val (_, returnId) = requestedReturn()
+        assertEquals(0, returnAutoApproveService.approveStale())
+        backdateReturn(returnId, 4)
+
+        assertEquals(1, returnAutoApproveService.approveStale())
+
+        val row = returnRow(returnId)
+        assertEquals("APPROVED", row["return_status"])
+        assertEquals("SYSTEM", row["decided_by"])
+        assertEquals(0, returnAutoApproveService.approveStale())
+    }
+
+    @Test
+    fun 판매자_승인과_자동_승인을_동시에_실행해도_decided_at은_한_번만_기록된다() {
+        repeat(5) {
+            val (shop, returnId) = requestedReturn()
+            backdateReturn(returnId, 4)
+
+            runConcurrently(2) { i ->
+                if (i == 0) patch("/api/v1/seller/returns/$returnId/approve", shop.sellerToken).andReturn().response.status
+                else returnAutoApproveService.approveStale()
+            }
+
+            val row = returnRow(returnId)
+            assertEquals("APPROVED", row["return_status"])
+            assertTrue(row["decided_by"] == "SELLER" || row["decided_by"] == "SYSTEM", "decided_by=${row["decided_by"]}")
+            assertTrue(row["decided_at"] != null)
+        }
     }
 
     private fun <T> runConcurrently(count: Int, task: (Int) -> T): List<T> {

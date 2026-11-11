@@ -66,6 +66,7 @@ data class OrderItemResult(
     val pointsAllocated: Long,
     val paidAmount: Long,
     val pointsRefunded: Long,
+    val returnRequest: ReturnRequestSummary?,
 )
 
 data class SellerOrderResult(
@@ -80,6 +81,9 @@ data class SellerOrderResult(
     val shippedAt: LocalDateTime?,
     val deliveredAt: LocalDateTime?,
     val confirmedAt: LocalDateTime?,
+    val returnableUntil: LocalDateTime?,
+    val allItemsReturned: Boolean,
+    val hasOpenReturn: Boolean,
     val items: List<OrderItemResult>,
 )
 
@@ -109,6 +113,10 @@ data class OrderDetail(
     val freeShippingApplied: Boolean,
     val shippingFeeRecovered: Long,
     val refundedAmount: Long,
+    /** 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합 */
+    val remainingPaidAmount: Long,
+    /** 아직 환불되지 않은 구매자 부담 배송비 */
+    val remainingBuyerShippingFee: Long,
     val productCouponDiscount: Long,
     val cartCouponId: Long?,
     val cartCouponDiscount: Long,
@@ -144,6 +152,9 @@ data class SellerOrderDetail(
     val shippedAt: LocalDateTime?,
     val deliveredAt: LocalDateTime?,
     val confirmedAt: LocalDateTime?,
+    val returnableUntil: LocalDateTime?,
+    val allItemsReturned: Boolean,
+    val hasOpenReturn: Boolean,
     val shippingAddress: ShippingAddressResult,
     val items: List<OrderItemResult>,
     val orderedAt: LocalDateTime,
@@ -177,4 +188,28 @@ data class ConfirmedItemResult(
     val sellerId: Long,
     val productName: String,
     val confirmedAt: LocalDateTime?,
+)
+
+/** 정산용 확정 판매자 주문. 저장된 스냅샷 값만 담는다. */
+data class ConfirmedSellerOrderResult(
+    val sellerOrderId: Long,
+    val sellerId: Long,
+    val orderId: Long,
+    val orderNo: String,
+    val confirmedAt: LocalDateTime,
+    val commissionRateBp: Int,
+    val shippingFee: Long,
+    /** 판매자 귀책 완료 반품으로 구매자에게 돌려준 발송 배송비. */
+    val buyerShippingFeeRefunded: Long,
+    val items: List<ConfirmedSellerOrderItemResult>,
+)
+
+data class ConfirmedSellerOrderItemResult(
+    val orderItemId: Long,
+    val status: String,
+    val lineAmount: Long,
+    val productCouponDiscount: Long,
+    val productCouponIssuer: String?,
+    /** 이 항목 `COMPLETED` 반품의 `sellerBorneFee`(없으면 0). */
+    val sellerBorneReturnFee: Long,
 )

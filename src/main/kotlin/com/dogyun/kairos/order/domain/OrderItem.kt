@@ -30,6 +30,7 @@ class OrderItem(
     /** 저장값. `lineAmount - productCouponDiscount - cartCouponAllocated - pointsAllocated` 를 만들 때 계산해 넣고 복원 시 그대로 읽는다. */
     val paidAmount: Long,
     pointsRefunded: Long,
+    returnRequest: ReturnRequest?,
 ) {
     var status: OrderItemStatus = status
         private set
@@ -46,6 +47,8 @@ class OrderItem(
     var canceledAt: LocalDateTime? = canceledAt
         private set
     var pointsRefunded: Long = pointsRefunded
+        private set
+    var returnRequest: ReturnRequest? = returnRequest
         private set
 
     val unitPrice: Long get() = salePrice + extraPrice
@@ -96,4 +99,64 @@ class OrderItem(
         status = OrderItemStatus.CANCELED
         cancelActor = CancelActor.SYSTEM
     }
+
+    /** 처음 요청하는 반품. 이미 반품 행이 있으면(거절·관리자 취소 포함) 새로 만들지 못한다. 철회한 반품은 [reopenReturn] 으로 되살린다. */
+    fun requestReturn(request: ReturnRequest) {
+        if (status != OrderItemStatus.ORDERED) throw DomainException(ErrorCode.RETURN_NOT_ELIGIBLE)
+        if (returnRequest != null) throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+        returnRequest = request
+        status = OrderItemStatus.RETURN_REQUESTED
+    }
+
+    fun reopenReturn(reason: ReturnReason, detail: String?, now: LocalDateTime) {
+        if (status != OrderItemStatus.ORDERED) throw DomainException(ErrorCode.RETURN_NOT_ELIGIBLE)
+        returnOrThrow().reopen(reason, detail, now)
+        status = OrderItemStatus.RETURN_REQUESTED
+    }
+
+    fun approveReturn(by: DecidedBy, now: LocalDateTime) {
+        returnOrThrow().approve(by, now)
+        status = OrderItemStatus.RETURN_APPROVED
+    }
+
+    fun rejectReturn(reason: String, now: LocalDateTime) {
+        returnOrThrow().reject(reason, now)
+        status = OrderItemStatus.ORDERED
+    }
+
+    fun withdrawReturn() {
+        returnOrThrow().withdraw()
+        status = OrderItemStatus.ORDERED
+    }
+
+    fun cancelReturnByAdmin() {
+        returnOrThrow().cancelByAdmin()
+        status = OrderItemStatus.ORDERED
+    }
+
+    fun startReturnRefund(plan: ReturnRefundPlan, now: LocalDateTime) {
+        val request = returnOrThrow()
+        if (status != OrderItemStatus.RETURN_APPROVED) throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
+        if (plan.itemId != id || plan.paidAmount != paidAmount || plan.pointsRefund != pointsAllocated) throw DomainException(ErrorCode.RETURN_INVALID)
+        request.startRefund(plan, now)
+        status = OrderItemStatus.RETURN_REFUNDING
+    }
+
+    fun revertReturnRefund() {
+        returnOrThrow().revertRefund()
+        status = OrderItemStatus.RETURN_APPROVED
+    }
+
+    fun completeReturn(now: LocalDateTime, pointsRefund: Long) {
+        val request = returnOrThrow()
+        if (status != OrderItemStatus.RETURN_REFUNDING) throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
+        request.complete(now)
+        status = OrderItemStatus.RETURNED
+        pointsRefunded = pointsRefund
+    }
+
+    /** 수거 확인 때 저장해 둔 값에서 반품 환불 계획을 복원한다. */
+    fun toReturnRefundPlan(): ReturnRefundPlan = returnOrThrow().toRefundPlan(paidAmount, productCouponId)
+
+    private fun returnOrThrow(): ReturnRequest = returnRequest ?: throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
 }

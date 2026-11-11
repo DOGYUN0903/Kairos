@@ -74,6 +74,9 @@ kairos:
     auto-confirm-after: 7d
     in-progress-timeout: 5m
     cancel-request-timeout: 1m
+    return-window: 7d
+    return-auto-approve-after: 3d
+    return-shipping-fee: 3000
   benefit:
     earn-rate-bp: 100
     min-usable-balance: 1000
@@ -85,6 +88,10 @@ kairos:
     review-reward-photo: 500
   review:
     write-deadline: 90d
+  settlement:
+    late-confirm-lookback: 28d
+    # 월요일이어야 한다. 운영 배포 전에 확정한다.
+    start-date: 2026-11-16
   jobs:
     enabled: true
     order-expiry-delay: 60s
@@ -93,6 +100,8 @@ kairos:
     auto-confirm-delay: 1h
     idempotency-cleanup-delay: 1h
     point-expiry-delay: 1h
+    return-auto-approve-delay: 1h
+    settlement-generate-cron: "0 0 3 * * MON"
   idempotency:
     ttl: 24h
     in-progress-timeout: 60s

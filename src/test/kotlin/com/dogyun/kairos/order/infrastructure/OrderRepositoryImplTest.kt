@@ -1,7 +1,14 @@
 package com.dogyun.kairos.order.infrastructure
 
 import com.dogyun.kairos.CommerceTestSupport
+import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderRepository
+import com.dogyun.kairos.order.domain.ReturnReason
+import com.dogyun.kairos.order.domain.ReturnStatus
+import com.dogyun.kairos.order.domain.ADDRESS
+import com.dogyun.kairos.order.domain.DiscountAllocation
+import com.dogyun.kairos.order.domain.NOW
+import com.dogyun.kairos.order.domain.POLICY
 import com.dogyun.kairos.order.domain.OrderStatus
 import com.dogyun.kairos.order.domain.SellerOrderStatus
 import com.dogyun.kairos.order.domain.CouponIssuer
@@ -16,6 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -135,6 +143,66 @@ class OrderRepositoryImplTest : CommerceTestSupport() {
         } finally {
             pool.shutdownNow()
         }
+    }
+
+    /** 결제·배송 완료까지 진행해 저장한 단일 판매자 주문. */
+    private fun savedDeliveredOrder(sku: Long, orderNo: String = "K20261110120000ABC123"): Order {
+        val o = repository.save(
+            Order.create(orderNo, 7L, listOf(line(sellerId = 1, price = 30_000, skuId = sku)), DiscountAllocation.none(listOf(line(sellerId = 1, price = 30_000, skuId = sku))), ADDRESS, POLICY, NOW, Duration.ofMinutes(15)),
+        )
+        o.markPaid(NOW)
+        val soId = requireNotNull(o.sellerOrders.first().id)
+        o.ship(soId, "CJ", "1", NOW)
+        o.deliver(soId, NOW)
+        return repository.save(o)
+    }
+
+    @Test
+    fun 반품_요청이_항목과_함께_저장되고_복원된다() {
+        val order = savedDeliveredOrder(10L)
+        val itemId = requireNotNull(order.allItems.first().id)
+        order.requestReturn(itemId, ReturnReason.DEFECTIVE, "불량", Duration.ofDays(7), NOW.plusDays(1))
+        val saved = repository.save(order)
+
+        val request = assertNotNull(saved.allItems.first().returnRequest)
+        assertNotNull(request.id)
+        assertEquals(ReturnStatus.REQUESTED, request.status)
+        assertEquals(ReturnReason.DEFECTIVE, request.reason)
+        assertEquals("불량", request.detail)
+        assertEquals(itemId, request.orderItemId)
+        assertEquals(saved.id, request.orderId)
+        assertEquals(saved.allItems.first().status.name, "RETURN_REQUESTED")
+        assertEquals(saved.id, repository.findOrderIdByReturnId(requireNotNull(request.id)))
+
+        // 상태 변경은 같은 행을 갱신한다.
+        saved.withdrawReturn(requireNotNull(request.id))
+        val withdrawn = repository.save(saved).allItems.first().returnRequest!!
+        assertEquals(request.id, withdrawn.id)
+        assertEquals(ReturnStatus.WITHDRAWN, withdrawn.status)
+        assertEquals(1, repository.findReturnPage(7L, null, null, 0, 10).totalElements)
+        assertEquals(0, repository.findReturnPage(7L, null, ReturnStatus.REQUESTED, 0, 10).totalElements)
+    }
+
+    @Test
+    fun findReturnIdsRequestedBefore는_REQUESTED만_id_keyset으로_준다() {
+        val ids = (1..3).map { i ->
+            val order = savedDeliveredOrder(10L * i, "K2026111012000${i}ABC123")
+            order.requestReturn(requireNotNull(order.allItems.first().id), ReturnReason.CHANGE_OF_MIND, null, Duration.ofDays(7), NOW.plusDays(1))
+            repository.save(order)
+        }
+        val returnIds = ids.map { requireNotNull(it.allItems.first().returnRequest?.id) }
+        // 두 번째는 철회해 REQUESTED 에서 빠진다.
+        val second = requireNotNull(repository.findById(requireNotNull(ids[1].id)))
+        second.withdrawReturn(returnIds[1])
+        repository.save(second)
+
+        val threshold = NOW.plusDays(2)
+        val all = repository.findReturnIdsRequestedBefore(threshold, 0, 10)
+        assertEquals(listOf(returnIds[0], returnIds[2]), all.map { it.second })
+        assertEquals(listOf(ids[0].id, ids[2].id), all.map { it.first })
+        assertEquals(listOf(returnIds[2]), repository.findReturnIdsRequestedBefore(threshold, returnIds[0], 10).map { it.second })
+        assertEquals(listOf(returnIds[0]), repository.findReturnIdsRequestedBefore(threshold, 0, 1).map { it.second })
+        assertTrue(repository.findReturnIdsRequestedBefore(NOW, 0, 10).isEmpty())
     }
 
     private companion object {

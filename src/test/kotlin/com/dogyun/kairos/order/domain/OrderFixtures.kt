@@ -33,7 +33,7 @@ internal fun withIds(o: Order): Order {
                     it.salePrice, it.extraPrice, it.quantity, it.status, it.cancelActor, it.cancelReason,
                     it.refundAmount, it.shippingFeeDeducted, it.shippingFeeReturned, it.canceledAt, it.productCouponId,
                     it.productCouponDiscount, it.productCouponIssuer, it.cartCouponAllocated, it.pointsAllocated, it.paidAmount,
-                    it.pointsRefunded,
+                    it.pointsRefunded, it.returnRequest,
                 )
             },
         )
@@ -84,3 +84,41 @@ internal fun specAllocation(): DiscountAllocation {
 
 internal fun paidSpecOrder(): Order =
     withIds(newOrderWith(specAllocation(), specB1(), specC1())).also { it.markPaid(NOW) }
+
+internal val RETURN_FEES = ReturnFeePolicy(returnFee = 3_000, outboundFee = 3_000)
+
+/** 결제(PAID) 상태인 판매자 주문을 모두 배송 완료(DELIVERED, deliveredAt = NOW)로 만든다. */
+internal fun Order.deliverAll(): Order = also { o ->
+    o.sellerOrders.filter { it.status == SellerOrderStatus.PAID }.forEach {
+        o.ship(it.id!!, "04", "T${it.id}", NOW)
+        o.deliver(it.id!!, NOW)
+    }
+}
+
+/** 모든 판매자 주문이 배송 완료된 주문. */
+internal fun deliveredOrder(vararg lines: OrderLine): Order = paidOrder(*lines).deliverAll()
+
+/** 반품 요청 id 는 항목 id + 5000. */
+internal fun returnIdOf(itemId: Long) = itemId + 5_000
+
+/**
+ * 항목 [itemId] 에 반품을 만들어 [status] 까지 진행한다(REQUESTED·APPROVED·REFUNDING·COMPLETED).
+ * REFUNDING·COMPLETED 는 [RETURN_FEES] 로 계산한 계획을 쓴다. COMPLETED 는 항목만 RETURNED 로 바꾼다(주문 누적 금액 반영은 하지 않음).
+ */
+internal fun Order.withReturn(itemId: Long, reason: ReturnReason, status: ReturnStatus = ReturnStatus.APPROVED): Order = also { o ->
+    val so = o.sellerOrders.first { s -> s.items.any { it.id == itemId } }
+    val item = o.findItem(itemId)
+    item.requestReturn(
+        ReturnRequest(
+            returnIdOf(itemId), o.id!!, so.id!!, itemId, o.memberId, so.sellerId, reason, null, ReturnStatus.REQUESTED,
+            0, 0, 0, 0, 0, 0, null, NOW, null, null, null, null,
+        ),
+    )
+    if (status == ReturnStatus.REQUESTED) return@also
+    o.approveReturn(returnIdOf(itemId), DecidedBy.SELLER, NOW)
+    if (status == ReturnStatus.APPROVED) return@also
+    o.startReturnRefund(returnIdOf(itemId), o.planReturnRefund(returnIdOf(itemId), RETURN_FEES), NOW)
+    if (status == ReturnStatus.REFUNDING) return@also
+    check(status == ReturnStatus.COMPLETED)
+    item.completeReturn(NOW, item.pointsAllocated)
+}

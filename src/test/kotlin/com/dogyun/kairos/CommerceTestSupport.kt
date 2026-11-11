@@ -17,6 +17,7 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import kotlin.test.BeforeTest
+import kotlin.test.assertEquals
 
 /** 판매자·카탈로그 API 통합 테스트 공통 도구. 이후 Task 가 cleanUp 대상 테이블을 늘린다. */
 abstract class CommerceTestSupport : IntegrationTestSupport() {
@@ -47,6 +48,11 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         jdbcTemplate.update("delete from member_point")
         jdbcTemplate.update("delete from coupon")
         jdbcTemplate.update("delete from coupon_policy")
+        jdbcTemplate.update("delete from settlement_adjustment")
+        jdbcTemplate.update("delete from settlement_line")
+        jdbcTemplate.update("delete from settlement")
+        jdbcTemplate.update("delete from settlement_run")
+        jdbcTemplate.update("delete from return_request")
         jdbcTemplate.update("delete from order_item")
         jdbcTemplate.update("delete from seller_order")
         jdbcTemplate.update("delete from orders")
@@ -430,6 +436,99 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
         return orderDetail(buyerToken, orderId)
     }
 
+    /** 결제 → 판매자 주문마다 배송 시작(`-D` 송장) → 배송 완료까지 마치고 내 주문 상세의 data 를 돌려준다. */
+    protected fun deliveredOrder(
+        buyerToken: String,
+        sellerToken: String,
+        items: List<Pair<Long, Int>>,
+        expectedTotal: Long,
+        productCoupons: List<Pair<Long, Long>> = emptyList(),
+        cartCouponId: Long? = null,
+        pointsToUse: Long = 0,
+    ): JsonNode {
+        val order = paidOrder(buyerToken, items, expectedTotal, productCoupons = productCoupons, cartCouponId = cartCouponId, pointsToUse = pointsToUse)
+        val orderId = order.get("orderId").asLong()
+        val sellerOrders = order.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val soId = sellerOrders.get(i).get("sellerOrderId").asLong()
+            patch("/api/v1/seller/orders/$soId/ship", sellerToken, mapOf("carrierCode" to "04", "trackingNumber" to "T-$soId-D"))
+                .andExpect { status { isOk() } }
+            patch("/api/v1/seller/orders/$soId/deliver", sellerToken).andExpect { status { isOk() } }
+        }
+        return orderDetail(buyerToken, orderId)
+    }
+
+    /** 반품을 요청하고(201) returnId 를 돌려준다. */
+    protected fun requestReturn(token: String, orderId: Long, itemId: Long, reason: String = "CHANGE_OF_MIND", detail: String? = null): Long =
+        json(
+            postIdem("/api/v1/orders/$orderId/items/$itemId/returns", token, mapOf("reason" to reason, "detail" to detail))
+                .andExpect { status { isCreated() } },
+        ).get("data").get("returnId").asLong()
+
+    /** 판매자 반품 승인(200)의 data. */
+    protected fun approveReturn(sellerToken: String, returnId: Long): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/approve", sellerToken).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 반품 거절(200)의 data. */
+    protected fun rejectReturn(sellerToken: String, returnId: Long, reason: String = "불량 아님"): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/reject", sellerToken, mapOf("rejectReason" to reason)).andExpect { status { isOk() } }).get("data")
+
+    /** 판매자 수거 확인(200)의 data. 환불까지 한다. */
+    protected fun receiveReturn(sellerToken: String, returnId: Long): JsonNode =
+        json(patch("/api/v1/seller/returns/$returnId/receive", sellerToken).andExpect { status { isOk() } }).get("data")
+
+    /** 반품 요청 → 판매자 승인 → 수거 확인까지 마친 반품 data. */
+    protected fun completedReturn(buyerToken: String, sellerToken: String, orderId: Long, itemId: Long, reason: String = "CHANGE_OF_MIND"): JsonNode {
+        val returnId = requestReturn(buyerToken, orderId, itemId, reason)
+        approveReturn(sellerToken, returnId)
+        return receiveReturn(sellerToken, returnId)
+    }
+
+    /**
+     * 돈 불변식(C4 스펙 5장): 총액 − 누적 환불 == 남은 결제 몫 + 남은 구매자 배송비 + 발송 구간 회수 + Σ 완료 반품의 회수 구간 반품비.
+     * [orderDetail] 은 내 주문 상세의 data 다.
+     */
+    protected fun assertMoneyInvariant(orderDetail: JsonNode, label: String = "") {
+        val returnFees = orderDetail.get("sellerOrders").sumOf { so ->
+            so.get("items").sumOf { item ->
+                val r = item.get("returnRequest")
+                if (r != null && !r.isNull && r.get("status").asString() == "COMPLETED") r.get("returnFee").asLong() else 0L
+            }
+        }
+        val left = orderDetail.get("totalAmount").asLong() - orderDetail.get("refundedAmount").asLong()
+        val remainingPaid = orderDetail.get("remainingPaidAmount").asLong()
+        val remainingFee = orderDetail.get("remainingBuyerShippingFee").asLong()
+        val recovered = orderDetail.get("shippingFeeRecovered").asLong()
+        assertEquals(
+            left, remainingPaid + remainingFee + recovered + returnFees,
+            "$label: total-refunded=$left, remainingPaid=$remainingPaid, remainingFee=$remainingFee, recovered=$recovered, returnFees=$returnFees",
+        )
+    }
+
+    /** 내 반품 상세의 data. */
+    protected fun returnDetail(token: String, returnId: Long): JsonNode =
+        json(get("/api/v1/returns/$returnId", token).andExpect { status { isOk() } }).get("data")
+
+    /** 주문 상세에서 항목이 속한 판매자 주문 ID. */
+    protected fun sellerOrderIdOf(orderDetail: JsonNode, itemId: Long): Long {
+        val sellerOrders = orderDetail.get("sellerOrders")
+        for (i in 0 until sellerOrders.size()) {
+            val so = sellerOrders.get(i)
+            val items = so.get("items")
+            if ((0 until items.size()).any { items.get(it).get("orderItemId").asLong() == itemId }) return so.get("sellerOrderId").asLong()
+        }
+        error("항목 $itemId 가 주문에 없다")
+    }
+
+    protected fun stockOf(skuId: Long): Long =
+        jdbcTemplate.queryForObject("select stock from sku where id = ?", Long::class.java, skuId)!!
+
+    protected fun salesCountOf(productId: Long): Long =
+        jdbcTemplate.queryForObject("select sales_count from product where id = ?", Long::class.java, productId)!!
+
+    protected fun paymentStatusOf(orderId: Long): String =
+        jdbcTemplate.queryForObject("select payment_status from payment where order_id = ?", String::class.java, orderId)!!
+
     /** 후기를 쓰고(201) reviewId 를 돌려준다. */
     protected fun writeReview(
         token: String,
@@ -462,6 +561,68 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
     protected fun unsuspendSeller(sellerId: Long) {
         post("/api/v1/admin/sellers/$sellerId/unsuspend", adminToken())
             .andExpect { status { isOk() } }
+    }
+
+    @Autowired
+    protected lateinit var settlementGenerationService: com.dogyun.kairos.settlement.application.SettlementGenerationService
+
+    @Autowired
+    protected lateinit var appClock: java.time.Clock
+
+    /** 지금(KST) 기준 이미 끝난 가장 최근 정산 기간의 시작 월요일. */
+    protected fun lastEndedPeriodStart(): java.time.LocalDate =
+        com.dogyun.kairos.settlement.domain.SettlementPeriod.lastEndedBefore(java.time.LocalDateTime.now(appClock)).start
+
+    protected fun setConfirmedAt(sellerOrderId: Long, at: java.time.LocalDateTime) {
+        jdbcTemplate.update("update seller_order set confirmed_at = ? where id = ?", at, sellerOrderId)
+    }
+
+    /** `POST /api/v1/admin/settlements/generate` 의 data(200). */
+    protected fun generateSettlement(adminToken: String, periodStart: java.time.LocalDate): JsonNode =
+        json(
+            postIdem("/api/v1/admin/settlements/generate", adminToken, mapOf("periodStart" to periodStart.toString()))
+                .andExpect { status { isOk() } },
+        ).get("data")
+
+    /** start-date 부터 [untilInclusive] 까지 미생성 기간을 오래된 순으로 만든다(스케줄 작업과 같은 경로). */
+    protected fun catchUpSettlements(untilInclusive: java.time.LocalDate = lastEndedPeriodStart()): Int =
+        settlementGenerationService.generateDue(untilInclusive)
+
+    /** settlement·settlement_line·settlement_adjustment 행을 표별 id 순으로(created_at·modified_at 제외) 덤프한다. */
+    protected fun settlementRows(): List<Map<String, Any?>> =
+        listOf("settlement", "settlement_line", "settlement_adjustment").flatMap { table ->
+            jdbcTemplate.queryForList("select * from $table order by id").map { row ->
+                mapOf("table" to table) + row.filterKeys { !it.equals("created_at", true) && !it.equals("modified_at", true) }
+            }
+        }
+
+    /**
+     * §8-8 불변식: 헤더 다섯 금액 == 라인 합(SQL sum), adjustment_amount == 붙은 조정 합,
+     * total == Σ line_amount + adjustment_amount, payable == max(total, 0), line_count == 라인 수.
+     */
+    protected fun assertSettlementInvariant(settlementId: Long) {
+        val h = jdbcTemplate.queryForMap("select * from settlement where id = ?", settlementId)
+        val l = jdbcTemplate.queryForMap(
+            "select coalesce(sum(sales_amount), 0) sales, coalesce(sum(seller_coupon_discount), 0) coupon, " +
+                "coalesce(sum(commission_amount), 0) commission, coalesce(sum(shipping_fee_owed), 0) shipping, " +
+                "coalesce(sum(return_fee_borne), 0) borne, coalesce(sum(line_amount), 0) amount, count(*) cnt " +
+                "from settlement_line where settlement_id = ?",
+            settlementId,
+        )
+        val adjustments = jdbcTemplate.queryForObject(
+            "select coalesce(sum(amount), 0) from settlement_adjustment where settlement_id = ?", Long::class.java, settlementId,
+        )!!
+        fun Map<String, Any?>.long(k: String) = (this[k] as Number).toLong()
+        val label = "settlementId=$settlementId"
+        assertEquals(l.long("sales"), h.long("sales_amount"), label)
+        assertEquals(l.long("coupon"), h.long("seller_coupon_discount"), label)
+        assertEquals(l.long("commission"), h.long("commission_amount"), label)
+        assertEquals(l.long("shipping"), h.long("shipping_fee_owed"), label)
+        assertEquals(l.long("borne"), h.long("return_fee_borne"), label)
+        assertEquals(adjustments, h.long("adjustment_amount"), label)
+        assertEquals(l.long("amount") + adjustments, h.long("total_amount"), label)
+        assertEquals(maxOf(h.long("total_amount"), 0L), h.long("payable_amount"), label)
+        assertEquals(l.long("cnt"), h.long("line_count"), label)
     }
 
     companion object {

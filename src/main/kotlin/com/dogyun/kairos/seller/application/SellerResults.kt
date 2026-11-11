@@ -30,4 +30,6 @@ data class SellerSettlementSnapshot(
     val companyName: String,
     val commissionRateBp: Int,
     val canManage: Boolean,
+    /** [com.dogyun.kairos.seller.domain.SellerStatus] 이름(정지·탈퇴 판매자도 정산에는 남는다). */
+    val sellerStatus: String,
 )

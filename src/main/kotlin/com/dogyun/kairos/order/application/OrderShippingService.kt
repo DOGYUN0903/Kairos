@@ -1,5 +1,6 @@
 package com.dogyun.kairos.order.application
 
+import com.dogyun.kairos.common.application.TransactionRunner
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.order.domain.Order
@@ -55,12 +56,14 @@ class OrderShippingService(
         save(order, sellerOrder)
     }
 
-    /** 배송 완료 후 정해진 기간이 지나 자동으로 확정할 때. 판매자 주문이 `DELIVERED` 가 아니면 아무것도 하지 않는다. */
+    /** 배송 완료 후 정해진 기간이 지나 자동으로 확정할 때. 판매자 주문이 `DELIVERED` 가 아니거나 열린 반품이 있으면 아무것도 하지 않는다. */
     fun autoConfirm(sellerOrderId: Long) {
         val orderId = orderRepository.findOrderIdBySellerOrderId(sellerOrderId) ?: return
         tx.run {
             val order = orderRepository.findByIdForUpdate(orderId) ?: return@run
-            if (order.findSellerOrder(sellerOrderId).status != SellerOrderStatus.DELIVERED) return@run
+            val sellerOrder = order.findSellerOrder(sellerOrderId)
+            // 열린 반품이 있으면 건너뛴다(쿼리로 거르지 않고 락 뒤 현재 상태로 판정). 반품이 끝나면 다음 실행이 확정한다.
+            if (sellerOrder.status != SellerOrderStatus.DELIVERED || sellerOrder.hasOpenReturn) return@run
             order.confirmPurchase(sellerOrderId, now())
             earn(order, order.findSellerOrder(sellerOrderId))
             orderRepository.save(order)

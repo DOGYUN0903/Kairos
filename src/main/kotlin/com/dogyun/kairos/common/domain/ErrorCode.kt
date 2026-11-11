@@ -88,6 +88,20 @@ enum class ErrorCode(val httpStatus: Int, val message: String) {
     REVIEW_ALREADY_WRITTEN(409, "이미 후기를 작성한 주문 항목입니다."),
     REVIEW_NOT_FOUND(404, "후기를 찾을 수 없습니다."),
 
+    RETURN_INVALID(400, "반품 요청 정보가 올바르지 않습니다."),
+    RETURN_NOT_FOUND(404, "반품 요청을 찾을 수 없습니다."),
+    RETURN_NOT_ELIGIBLE(409, "반품할 수 없는 주문 항목입니다."),
+    RETURN_WINDOW_EXPIRED(409, "반품 가능 기간이 지났습니다."),
+    RETURN_ALREADY_REQUESTED(409, "이미 반품을 요청한 주문 항목입니다."),
+    RETURN_INVALID_STATE_TRANSITION(409, "허용되지 않는 반품 상태 전이입니다."),
+    SELLER_ORDER_HAS_OPEN_RETURN(409, "처리 중인 반품이 있어 구매를 확정할 수 없습니다."),
+
+    SETTLEMENT_NOT_FOUND(404, "정산을 찾을 수 없습니다."),
+    SETTLEMENT_PERIOD_INVALID(400, "정산을 생성할 수 없는 기간입니다."),
+    SETTLEMENT_INVALID_STATE_TRANSITION(409, "허용되지 않는 정산 상태 전이입니다."),
+    SETTLEMENT_ADJUSTMENT_INVALID(400, "정산 조정 정보가 올바르지 않습니다."),
+    SETTLEMENT_ADJUSTMENT_APPLIED(409, "이미 정산에 반영된 조정은 바꿀 수 없습니다."),
+
     IDEMPOTENCY_KEY_REQUIRED(400, "Idempotency-Key 헤더가 필요합니다."),
     IDEMPOTENCY_KEY_REUSED(422, "같은 Idempotency-Key로 다른 요청을 보낼 수 없습니다."),
     IDEMPOTENCY_IN_PROGRESS(409, "같은 요청이 처리 중입니다."),

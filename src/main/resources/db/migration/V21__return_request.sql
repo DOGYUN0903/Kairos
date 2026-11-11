@@ -1,0 +1,33 @@
+-- 반품 요청. 주문 항목당 한 행(UNIQUE): 철회 뒤 재요청은 같은 행을 되살린다. 인덱스는 PK/UNIQUE 만 둔다. FK 없음.
+-- 금액 컬럼은 수거 확인(환불 시작) 때 계산해 저장하고, PG 실패로 되돌리면 0 으로 지운다.
+CREATE TABLE return_request (
+    id                     BIGINT       NOT NULL AUTO_INCREMENT,
+    order_id               BIGINT       NOT NULL,
+    seller_order_id        BIGINT       NOT NULL,
+    order_item_id          BIGINT       NOT NULL,
+    member_id              BIGINT       NOT NULL,
+    seller_id              BIGINT       NOT NULL,
+    return_reason          VARCHAR(20)  NOT NULL,
+    detail                 VARCHAR(500) NULL,
+    return_status          VARCHAR(20)  NOT NULL,
+    fee_bearer             VARCHAR(10)  NOT NULL,
+    return_fee             BIGINT       NOT NULL DEFAULT 0,
+    outbound_fee_recovered BIGINT       NOT NULL DEFAULT 0,
+    shipping_fee_refund    BIGINT       NOT NULL DEFAULT 0,
+    seller_borne_fee       BIGINT       NOT NULL DEFAULT 0,
+    refund_amount          BIGINT       NOT NULL DEFAULT 0,
+    points_refund          BIGINT       NOT NULL DEFAULT 0,
+    reject_reason          VARCHAR(500) NULL,
+    requested_at           DATETIME(6)  NOT NULL,
+    decided_at             DATETIME(6)  NULL,
+    decided_by             VARCHAR(10)  NULL,
+    received_at            DATETIME(6)  NULL,
+    completed_at           DATETIME(6)  NULL,
+    created_at             DATETIME(6)  NOT NULL,
+    created_by             BIGINT       NOT NULL,
+    modified_at            DATETIME(6)  NOT NULL,
+    modified_by            BIGINT       NOT NULL,
+    status                 VARCHAR(20)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_return_request_order_item UNIQUE (order_item_id)
+);

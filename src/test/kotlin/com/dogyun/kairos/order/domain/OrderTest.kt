@@ -358,4 +358,141 @@ class OrderTest {
         assertEquals(49_000, o.remainingPaidAmount)
         assertEquals(listOf(1L, 2L, 99L), o.usedCouponIds())
     }
+
+    // ---- 반품(C4) ----
+
+    private val window: Duration = Duration.ofDays(7)
+
+    /** 판매자 [sellerId] 주문을 배송 완료(NOW)까지 진행한 주문. */
+    private fun deliveredOrder(vararg lines: OrderLine): Order {
+        val o = paidOrder(*lines)
+        o.sellerOrders.forEach { o.ship(it.id!!, "CJ", "1", NOW); o.deliver(it.id!!, NOW) }
+        return o
+    }
+
+    private fun Order.requestReturn(itemId: Long, now: java.time.LocalDateTime = NOW.plusDays(1)) =
+        requestReturn(itemId, ReturnReason.CHANGE_OF_MIND, "사이즈", window, now)
+
+    @Test
+    fun 배송_완료_7일_1초_전_요청은_성공하고_7일_1초_뒤는_RETURN_WINDOW_EXPIRED() {
+        val ok = deliveredOrder(line(1, 30_000))
+        val r = ok.requestReturn(ok.itemIdOf(1), NOW.plusDays(7).minusSeconds(1))
+        assertEquals(ReturnStatus.REQUESTED, r.status)
+        assertEquals(OrderItemStatus.RETURN_REQUESTED, ok.findItem(ok.itemIdOf(1)).status)
+
+        val late = deliveredOrder(line(1, 30_000))
+        assertCode(ErrorCode.RETURN_WINDOW_EXPIRED) { late.requestReturn(late.itemIdOf(1), NOW.plusDays(7).plusSeconds(1)) }
+    }
+
+    @Test
+    fun DELIVERED가_아닌_판매자_주문은_RETURN_NOT_ELIGIBLE() {
+        val o = paidOrder(line(1, 30_000))
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { o.requestReturn(o.itemIdOf(1)) }
+        o.ship(soId(o, 1), "CJ", "1", NOW)
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { o.requestReturn(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 열린_반품_항목_재요청은_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        o.requestReturn(o.itemIdOf(1))
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.requestReturn(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 거절된_항목_재요청은_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.item(r).returnRequest!!.let { o.rejectReturnOf(it) }
+        assertEquals(OrderItemStatus.ORDERED, o.findItem(o.itemIdOf(1)).status)
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.requestReturn(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 철회_뒤_재요청은_같은_행이_REQUESTED로_돌아온다() {
+        val o2 = deliveredOrder(line(1, 30_000))
+        val itemId = o2.itemIdOf(1)
+        o2.requestReturn(itemId)
+        o2.findItem(itemId).returnRequest!!.let { o2.withdrawReturnOf(it) }
+        assertEquals(OrderItemStatus.ORDERED, o2.findItem(itemId).status)
+        val before = o2.findItem(itemId).returnRequest!!
+
+        val again = o2.requestReturn(itemId, ReturnReason.DEFECTIVE, "불량", window, NOW.plusDays(2))
+
+        assertTrue(before === again)
+        assertEquals(ReturnStatus.REQUESTED, again.status)
+        assertEquals(ReturnReason.DEFECTIVE, again.reason)
+        assertEquals(OrderItemStatus.RETURN_REQUESTED, o2.findItem(itemId).status)
+    }
+
+    @Test
+    fun 승인_뒤_철회는_RETURN_INVALID_STATE_TRANSITION() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.findItem(o.itemIdOf(1)).approveReturn(DecidedBy.SELLER, NOW)
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { o.findItem(o.itemIdOf(1)).withdrawReturn() }
+        assertEquals(ReturnStatus.APPROVED, r.status)
+    }
+
+    @Test
+    fun 관리자는_거절된_반품을_승인할_수_있고_CONFIRMED_뒤는_RETURN_NOT_ELIGIBLE() {
+        val o = deliveredOrder(line(1, 30_000))
+        val itemId = o.itemIdOf(1)
+        val r = o.requestReturn(itemId)
+        o.findItem(itemId).rejectReturn("상태 불량 아님", NOW)
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { r.approve(DecidedBy.SELLER, NOW) }
+
+        r.approve(DecidedBy.ADMIN, NOW)
+        assertEquals(ReturnStatus.APPROVED, r.status)
+
+        val withId = ReturnRequest(
+            5L, 1L, 101L, 1000L, 7L, 1L, ReturnReason.CHANGE_OF_MIND, null, ReturnStatus.REJECTED, 0, 0, 0, 0, 0, 0,
+            "거절", NOW, NOW, DecidedBy.SELLER, null, null,
+        )
+        val c2 = deliveredOrderWithReturn(withId)
+        c2.confirmPurchase(soId(c2, 1), NOW)
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { c2.approveReturn(5L, DecidedBy.ADMIN, NOW) }
+    }
+
+    @Test
+    fun 열린_반품이_있으면_confirm은_SELLER_ORDER_HAS_OPEN_RETURN() {
+        val o = deliveredOrder(line(1, 30_000))
+        o.requestReturn(o.itemIdOf(1))
+        assertCode(ErrorCode.SELLER_ORDER_HAS_OPEN_RETURN) { o.confirmPurchase(soId(o, 1), NOW) }
+        assertTrue(o.sellerOrders.first().hasOpenReturn)
+    }
+
+    @Test
+    fun remainingItemsAmount는_열린_반품_항목을_포함한다() {
+        val o = deliveredOrder(line(1, 30_000), line(2, 30_000))
+        assertEquals(60_000, o.remainingItemsAmount)
+        o.requestReturn(o.itemIdOf(1))
+        assertEquals(60_000, o.remainingItemsAmount)
+        assertEquals(60_000, o.remainingPaidAmount)
+        assertEquals(30_000, o.sellerOrders.first().remainingItemsAmount)
+    }
+
+    /** id 가 붙은 [request] 를 첫 항목에 달아 둔 배송 완료 주문. */
+    private fun deliveredOrderWithReturn(request: ReturnRequest): Order {
+        val o = deliveredOrder(line(1, 30_000))
+        val so = o.sellerOrders.first()
+        val old = so.items.first()
+        val item = OrderItem(
+            old.id, old.skuId, old.productId, old.productName, old.brandName, old.optionDisplayName, old.salePrice, old.extraPrice,
+            old.quantity, OrderItemStatus.ORDERED, null, null, 0, 0, 0, null, null, 0, null, 0, 0, old.paidAmount, 0, request,
+        )
+        val rebuilt = SellerOrder(
+            so.id, so.sellerId, so.sellerName, so.commissionRateBp, so.status, so.shippingFee, so.shippingFeePayer,
+            so.carrierCode, so.trackingNumber, so.shippedAt, so.deliveredAt, so.confirmedAt, listOf(item),
+        )
+        return Order(
+            o.id, o.orderNo, o.memberId, o.status, o.shippingAddress, o.itemsAmount, o.buyerShippingFee, o.totalAmount,
+            o.freeShippingApplied, o.shippingFeeRecovered, o.refundedAmount, o.productCouponDiscount, o.cartCouponId,
+            o.cartCouponDiscount, o.pointsUsed, o.pointsRefunded, o.expiresAt, o.paidAt, listOf(rebuilt), NOW,
+        )
+    }
+
+    private fun Order.item(r: ReturnRequest) = findItem(r.orderItemId)
+    private fun Order.rejectReturnOf(r: ReturnRequest) = item(r).rejectReturn("거절", NOW)
+    private fun Order.withdrawReturnOf(r: ReturnRequest) = item(r).withdrawReturn()
 }
