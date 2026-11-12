@@ -8,6 +8,7 @@ import { useAuth } from "@/auth/useAuth";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { ConsoleShell, type NavItem } from "@/components/layout/ConsoleShell";
+import { sellerTitleOf } from "@/components/layout/console-titles";
 import { ApplicationSummary } from "@/features/seller/apply/components/ApplicationSummary";
 import { ApplyForm } from "@/features/seller/apply/components/ApplyForm";
 import { useSellerOrderCount } from "@/features/seller/orders/api";
@@ -27,14 +28,6 @@ const fullNav = (shipBadge: number | undefined): NavItem[] => [
 ];
 // 미신청·심사 중·반려에서는 시안대로 "대시보드"만 보인다.
 const LIMITED_NAV: NavItem[] = [{ href: "/seller", label: "대시보드" }];
-
-function titleOf(pathname: string): string {
-  if (pathname.startsWith("/seller/apply")) return "입점 신청";
-  if (pathname.startsWith("/seller/products")) return "상품 관리";
-  if (pathname.startsWith("/seller/orders")) return "주문 관리";
-  if (pathname.startsWith("/seller/brands")) return "브랜드";
-  return "대시보드";
-}
 
 function Notice({ tone, children }: { tone: "info" | "warn"; children: ReactNode }) {
   return (
@@ -128,7 +121,7 @@ export function SellerGate({ children }: { children: ReactNode }) {
 
   return (
     <SellerBannerContext.Provider value={setBanner}>
-      <ConsoleShell role="판매자 센터" nav={full ? fullNav(shipCount.data) : LIMITED_NAV} userLabel={userLabel} title={titleOf(pathname)} banner={bannerNode}>
+      <ConsoleShell role="판매자 센터" nav={full ? fullNav(shipCount.data) : LIMITED_NAV} userLabel={userLabel} title={sellerTitleOf(pathname)} banner={bannerNode}>
         {body}
       </ConsoleShell>
     </SellerBannerContext.Provider>
