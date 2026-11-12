@@ -14,7 +14,7 @@
 - F4 스펙: `docs/superpowers/specs/2026-11-12-frontend-f4-returns-settlement-design.md`
 - 현재 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f4-returns-settlement.md` (이전: `docs/superpowers/plans/2026-11-12-frontend-f3-benefits.md`, `docs/superpowers/plans/2026-11-12-frontend-f2-purchase.md`, `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md`, `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`, `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: F1~F4(C1~C4 화면) 구현을 마쳤다. F4(C4 반품·정산 화면)는 `feature/frontend-f4-returns-settlement` 브랜치에서 PR을 기다리는 중이다. 다음은 **C5 운영 데이터**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1~C4, F1~F3는 완료
+- 현재 단계: Phase 0~2, C1~C4, F1~F4(C1~C4 화면)는 완료. 다음은 **C5 운영 데이터**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`)
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
