@@ -9,11 +9,11 @@ const TH = "whitespace-nowrap bg-surface px-3 py-2.5 text-right text-xs font-med
 const TD = "whitespace-nowrap border-b border-border px-3 py-2.5 text-right tabular-nums";
 
 /** 정산에 포함된 주문 줄(판매자·관리자 공용). 주문 링크는 orderHref 로 받고 없으면 글자만 보인다. 수수료율은 줄마다 다를 수 있다. */
-export function SettlementLinesTable({ lines, orderHref }: { lines: Line[]; orderHref?: (line: Line) => string | undefined }) {
+export function SettlementLinesTable({ lines, orderHref, lineCount }: { lines: Line[]; orderHref?: (line: Line) => string | undefined; lineCount?: number }) {
   return (
     <section className="card" aria-label="포함된 주문">
       <div className="border-b border-border px-5 py-4 text-[15px] font-bold">
-        포함된 주문 <span className="ml-1.5 text-xs font-normal text-text-2">구매 확정 주문 {lines.length}건</span>
+        포함된 주문 <span className="ml-1.5 text-xs font-normal text-text-2">구매 확정 주문 {lineCount ?? lines.length}건</span>
       </div>
       {lines.length === 0 ? (
         <p className="px-5 py-8 text-center text-sm text-text-2">포함된 주문이 없습니다</p>

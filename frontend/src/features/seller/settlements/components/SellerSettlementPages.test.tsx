@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { notFound } from "next/navigation";
+import { ApiError } from "@/api/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SellerSettlementDetailPage } from "@/features/seller/settlements/components/SellerSettlementDetailPage";
 import { SellerSettlementListPage } from "@/features/seller/settlements/components/SellerSettlementListPage";
@@ -23,6 +25,21 @@ describe("판매자 정산 화면", () => {
     expect(screen.getByText("2건")).toBeInTheDocument();
   });
 
+  it("캐시가_있어도_재조회가_실패하면_오류를_보인다", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(["sellerSettlements", "list", { page: 0, size: 20 }], { content: [summary], page: 0, size: 20, totalElements: 1, totalPages: 1 });
+    h.GET.mockRejectedValue(new ApiError(500, "INTERNAL_ERROR", "서버 오류", null));
+    render(<QueryClientProvider client={qc}><SellerSettlementListPage /></QueryClientProvider>);
+    expect(await screen.findByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
+    expect(screen.getByText("−3,000원")).toBeInTheDocument();
+  });
+
+  it("404_SETTLEMENT_NOT_FOUND_는_notFound", async () => {
+    h.GET.mockRejectedValue(new ApiError(404, "SETTLEMENT_NOT_FOUND", "없음", null));
+    wrap(<SellerSettlementDetailPage settlementId={7} />);
+    await waitFor(() => expect(notFound).toHaveBeenCalled());
+  });
+
   it("목록이_비면_안내", async () => {
     h.GET.mockResolvedValue({ data: { data: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 } } });
     wrap(<SellerSettlementListPage />);
@@ -31,11 +48,14 @@ describe("판매자 정산 화면", () => {
 
   it("상세는_라인_0개_조정만_있는_정산과_지급_메모", async () => {
     h.GET.mockResolvedValue({
-      data: { data: { ...summary, salesAmount: 0, sellerCouponDiscount: 0, commissionAmount: 0, shippingFeeOwed: 0, returnFeeBorne: 0, adjustmentAmount: -3000, paidAt: "2026-10-21T10:00:00", paidMemo: "이체 완료", lines: [], adjustments: [{ adjustmentId: 1, sellerId: 1, type: "CARRY_OVER", amount: -3000, reason: "이월" }] } },
+      data: { data: { ...summary, salesAmount: 0, sellerCouponDiscount: 0, commissionAmount: 0, shippingFeeOwed: 0, returnFeeBorne: 0, adjustmentAmount: -3000, paidAt: "2026-10-22T10:00:00", paidMemo: "이체 완료", lines: [], adjustments: [{ adjustmentId: 1, sellerId: 1, type: "CARRY_OVER", amount: -3000, reason: "이월" }] } },
     });
     wrap(<SellerSettlementDetailPage settlementId={7} />);
     expect(await screen.findByText("포함된 주문이 없습니다")).toBeInTheDocument();
     expect(screen.getByText(/다음 정산으로 넘어갑니다/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2026-10-12 ~ 2026-10-18/).length).toBeGreaterThan(0);
+    expect(screen.getByText("2026-10-22", { selector: "dd" })).toBeInTheDocument();
+    expect(screen.getByText("지급액").closest("li")!.textContent).toBe("지급액0원");
     expect(screen.getByText("이체 완료")).toBeInTheDocument();
     expect(screen.getByText("플랫폼이 부담한 쿠폰·포인트·무료배송은 정산에서 차감되지 않습니다")).toBeInTheDocument();
   });

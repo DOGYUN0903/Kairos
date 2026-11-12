@@ -19,6 +19,16 @@ describe("SettlementBreakdown", () => {
     expect(screen.getByText("합계가 0원보다 적어 이번 지급액은 0원입니다. 부족한 금액은 다음 정산으로 넘어갑니다")).toBeInTheDocument();
     expect(screen.getByText("−3,000원")).toBeInTheDocument();
   });
+  it("음수_합계에서_지급액은_0원이고_조정_기호는_±_유지", () => {
+    render(<SettlementBreakdown detail={{ ...base, adjustmentAmount: -10000, totalAmount: -3000, payableAmount: 0 } as never} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items[7]!.textContent).toBe("지급액0원");
+    expect(items[5]!.textContent).toBe("±조정−10,000원");
+  });
+  it("기호는_aria-hidden", () => {
+    const { container } = render(<SettlementBreakdown detail={base as never} />);
+    expect(container.querySelectorAll("span.w-5:not([aria-hidden=true])")).toHaveLength(0);
+  });
   it("정상_합계에는_안내가_없다", () => {
     render(<SettlementBreakdown detail={base as never} />);
     expect(screen.queryByText(/다음 정산으로 넘어갑니다/)).toBeNull();
@@ -33,6 +43,15 @@ describe("SettlementLinesTable", () => {
     expect(within(rows[2]!).getByText("8%")).toBeInTheDocument();
     expect(within(rows[2]!).getByText("−3,000원", { selector: "td:last-child" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "K1" })).toHaveAttribute("href", "/seller/orders/11");
+  });
+  it("0원_줄은_0원이고_-0원이_아니다", () => {
+    render(<SettlementLinesTable lines={[line({ salesAmount: 0, sellerCouponDiscount: 0, commissionBase: 0, commissionAmount: 0, shippingFeeOwed: 0, returnFeeBorne: 0, lineAmount: 0 })]} />);
+    const cells = within(screen.getAllByRole("row")[1]!).getAllByRole("cell");
+    expect(cells.slice(2).map((c) => c.textContent)).toEqual(["0원", "0원", "0원", "10%", "0원", "0원", "0원", "0원"]);
+  });
+  it("건수는_lineCount_우선", () => {
+    render(<SettlementLinesTable lines={[line()]} lineCount={5} />);
+    expect(screen.getByText("구매 확정 주문 5건")).toBeInTheDocument();
   });
   it("링크가_없으면_글자만", () => {
     render(<SettlementLinesTable lines={[line()]} />);

@@ -6,8 +6,9 @@ type Detail = components["schemas"]["SettlementDetail"];
 /** 정산 계산 내역(판매자·관리자 공용). 8줄은 0원이어도 고정이고 값은 서버 필드 그대로다. 합계가 음수면 이월 안내를 보인다. */
 export function SettlementBreakdown({ detail }: { detail: Detail }) {
   const rows = settlementRows(detail);
-  const total = rows[6]!;
-  const payable = rows[7]!;
+  const total = rows.find((r) => r.key === "total")!;
+  const payable = rows.find((r) => r.key === "payable")!;
+  const body = rows.filter((r) => r.key !== "total" && r.key !== "payable");
   return (
     <section className="card" aria-label="계산 내역">
       <div className="border-b border-border px-5 py-4 text-[15px] font-bold">계산 내역</div>
@@ -18,10 +19,10 @@ export function SettlementBreakdown({ detail }: { detail: Detail }) {
           </div>
         )}
         <ul className="flex flex-col gap-2 text-sm">
-          {rows.slice(0, 6).map((r) => (
+          {body.map((r) => (
             <li key={r.label} className="flex justify-between gap-3">
               <span className="text-text-2">
-                <span className="inline-block w-5" aria-hidden={r.sign ? undefined : true}>{r.sign}</span>
+                <span className="inline-block w-5" aria-hidden="true">{r.sign}</span>
                 {r.label}
               </span>
               <span className="tabular-nums">{r.text}</span>
@@ -29,7 +30,7 @@ export function SettlementBreakdown({ detail }: { detail: Detail }) {
           ))}
           <li className="flex justify-between gap-3 border-t border-border pt-3 font-bold">
             <span>
-              <span className="inline-block w-5">{total.sign}</span>
+              <span className="inline-block w-5" aria-hidden="true">{total.sign}</span>
               {total.label}
             </span>
             <span className="tabular-nums">{total.text}</span>

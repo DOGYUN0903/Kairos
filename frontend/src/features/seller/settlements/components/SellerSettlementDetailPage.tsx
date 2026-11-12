@@ -70,7 +70,7 @@ export function SellerSettlementDetailPage({ settlementId }: { settlementId: num
               </p>
             </aside>
           </div>
-          <SettlementLinesTable lines={d.lines} orderHref={(l) => `/seller/orders/${l.sellerOrderId}`} />
+          <SettlementLinesTable lines={d.lines} lineCount={d.lineCount} orderHref={(l) => `/seller/orders/${l.sellerOrderId}`} />
           <SettlementAdjustmentsTable adjustments={d.adjustments} />
         </>
       )}

@@ -26,6 +26,7 @@ export function SellerSettlementListPage() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] text-text-2">정산은 매주 월요일에 지난주(월~일) 구매 확정 주문으로 만들어집니다. 최신 기간 순입니다.</p>
+      {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
       <div className="card">
         {q.isError && !data ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
