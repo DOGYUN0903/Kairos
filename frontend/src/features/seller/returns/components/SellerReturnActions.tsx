@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -19,7 +19,8 @@ import { joinDot } from "@/lib/join-dot";
 import { formatKrw } from "@/lib/money";
 import { queryKeys } from "@/lib/query-keys";
 
-export type ReturnNotice = { tone: "info" | "warn"; text: string };
+/** whileStatus: 상세가 이 상태인 동안만 보인다(상태가 바뀌면 낡은 안내이므로 사라진다). */
+export type ReturnNotice = { tone: "info" | "warn"; text: string; whileStatus: string };
 
 export const SUSPENDED_NOTICE = "정지 상태에서는 반품을 처리할 수 없습니다. 관리자가 대신 처리합니다";
 export const RECEIVE_REJECTED = "환불이 거절되었습니다. 반품은 승인 상태로 돌아갔습니다. 잠시 후 다시 시도해 주세요";
@@ -38,12 +39,22 @@ export function SellerReturnActions({ data: r, onNotice }: { data: ReturnRequest
   const { approve, reject, receive } = useSellerReturnActions(r.returnId);
   const [dialog, setDialog] = useState<"approve" | "reject" | "receive" | null>(null);
   const [busy, setBusy] = useState(false);
-  // 환불이 접수(완료·확인 중)된 뒤에는 상세가 새 상태를 읽어 올 때까지 다시 보내지 않는다.
-  const [receiveLocked, setReceiveLocked] = useState(false);
+  // 환불이 접수(완료·확인 중)된 뒤에는 서버 상태를 따른다: sent(접수, 아직 APPROVED 가 아닌 상태를 못 봄) →
+  // moved(APPROVED 가 아닌 상태를 봄) → 다시 APPROVED 가 보이면(PG 거절을 대사가 되돌림) 잠금을 풀고 거절 안내를 보인다.
+  const [lock, setLock] = useState<"none" | "sent" | "moved">("none");
   const inFlight = useRef(false);
 
+  useEffect(() => {
+    if (lock === "sent" && r.status !== "APPROVED") setLock("moved");
+    else if (lock === "moved" && r.status === "APPROVED") {
+      setLock("none");
+      onNotice({ tone: "warn", text: RECEIVE_REJECTED, whileStatus: "APPROVED" });
+    }
+  }, [lock, r.status, onNotice]);
+
   const actionable = r.status === "REQUESTED" || r.status === "APPROVED";
-  if (!actionable) return <p className="text-sm text-text-2">처리할 수 있는 작업이 없습니다.</p>;
+  // 환불 확인 중에는 상세 쪽 안내가 있으므로 빈 안내를 따로 보이지 않는다.
+  if (!actionable) return r.status === "REFUNDING" ? null : <p className="text-sm text-text-2">처리할 수 있는 작업이 없습니다.</p>;
   if (!canProcessReturns(sellerStatus)) {
     return (
       <div className="notice notice-warn" role="alert">
@@ -87,16 +98,17 @@ export function SellerReturnActions({ data: r, onNotice }: { data: ReturnRequest
       setDialog(null);
     });
 
+  // 실패하면 창을 열어 둔다(입력한 사유를 잃지 않는다). 닫는 것은 성공했을 때뿐.
   const confirmReject = (reason: string) =>
     guarded(async () => {
       onNotice(null);
       try {
         await reject(reason);
         toast({ title: "반품을 거절했습니다" });
+        setDialog(null);
       } catch (e) {
         onFailure(e);
       }
-      setDialog(null);
     });
 
   const confirmReceive = () =>
@@ -112,20 +124,20 @@ export function SellerReturnActions({ data: r, onNotice }: { data: ReturnRequest
       }
       switch (outcome.kind) {
         case "completed":
-          setReceiveLocked(true);
+          setLock("sent");
           toast({ title: `환불을 완료했습니다. 환불 금액 ${formatKrw(outcome.refundAmount)}` });
           break;
         case "refunding":
-          setReceiveLocked(true);
+          setLock("sent");
           toast({ title: "환불을 확인하고 있습니다" });
           break;
         case "rejected":
           toast({ title: RECEIVE_REJECTED, variant: "destructive" });
-          onNotice({ tone: "warn", text: RECEIVE_REJECTED });
+          onNotice({ tone: "warn", text: RECEIVE_REJECTED, whileStatus: "APPROVED" });
           break;
         case "unknown":
           toast({ title: RECEIVE_UNKNOWN, variant: "destructive" });
-          onNotice({ tone: "warn", text: RECEIVE_UNKNOWN_NOTICE });
+          onNotice({ tone: "warn", text: RECEIVE_UNKNOWN_NOTICE, whileStatus: "APPROVED" });
           break;
         case "error":
           break;
@@ -149,7 +161,7 @@ export function SellerReturnActions({ data: r, onNotice }: { data: ReturnRequest
         </>
       ) : (
         <>
-          <button type="button" className="btn btn-primary" disabled={receiveLocked || busy} onClick={() => setDialog("receive")}>
+          <button type="button" className="btn btn-primary" disabled={lock !== "none" || busy} onClick={() => setDialog("receive")}>
             수거 확인
           </button>
           <p className="hint mt-2">상품을 받은 뒤 확인하면 구매자에게 환불이 실행됩니다.</p>
@@ -177,7 +189,8 @@ export function SellerReturnActions({ data: r, onNotice }: { data: ReturnRequest
               <div className="min-w-0">
                 <div className="truncate font-medium">{r.productName}</div>
                 <div className="text-[13px] text-text-2">{joinDot(r.optionDisplayName, `${r.quantity}개`)}</div>
-                {r.sellerBorneFee > 0 && <div className="mt-1 text-[13px] font-medium">판매자 부담 반품비 {formatKrw(r.sellerBorneFee)} — 정산에서 차감됩니다</div>}
+                {/* 반품비 금액은 수거 확인 때 서버가 정하므로(승인 상태에서는 0) 금액 없이 안내한다. */}
+                {r.feeBearer === "SELLER" && <div className="mt-1 text-[13px] font-medium">판매자 부담 반품입니다. 반품 배송비는 정산에서 차감됩니다.</div>}
               </div>
             </div>
           }

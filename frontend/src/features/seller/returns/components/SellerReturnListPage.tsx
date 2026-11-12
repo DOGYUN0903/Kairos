@@ -57,7 +57,7 @@ export function SellerReturnListPage() {
               onClick={() => go(t.status, 0)}
             >
               {t.label}
-              {t.status === "REQUESTED" && pending.data !== undefined && pending.data > 0 && (
+              {t.status === "REQUESTED" && !pending.isError && pending.data !== undefined && pending.data > 0 && (
                 <span className="rounded-full bg-danger px-1.5 text-[11px] font-bold leading-5 text-white" aria-label={`${pending.data}건`}>
                   {pending.data}
                 </span>
@@ -68,9 +68,9 @@ export function SellerReturnListPage() {
       </div>
 
       <div className="card" role="tabpanel" aria-label="반품 목록">
-        {q.isError && !data ? (
+        {q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-        ) : !data ? (
+        ) : !data || q.isPlaceholderData ? (
           <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3 p-5">
             {[0, 1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-14 w-full" />

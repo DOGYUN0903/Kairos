@@ -18,6 +18,7 @@ export function stockNotice(reason: ReturnRequestResponse["reason"]): string {
  * 수거 확인 창(판매자·관리자 공용). 확인하면 환불이 실행되므로 요청은 한 번만 나간다:
  * 처리 중(busy)에는 버튼을 막고, 같은 틱의 연타는 ref 로 막는다. 마운트되어 있는 동안 열려 있다(호출 쪽이 닫는다).
  * onConfirm 은 결과 처리와 창 닫기까지 호출 쪽이 한다. 실패해도 이 창은 다시 보내지 않는다.
+ * onClose 는 필수다(취소 버튼·바깥 클릭·Esc 가 부른다. 관리자 화면도 반드시 넘긴다). summary 는 상품 줄 등 호출 쪽이 정하는 안내 자리다.
  */
 export function ReceiveDialog({ reason, onConfirm, busy, onClose, summary }: { reason: ReturnRequestResponse["reason"]; onConfirm: () => Promise<void>; busy: boolean; onClose: () => void; summary?: ReactNode }) {
   const sending = useRef(false);

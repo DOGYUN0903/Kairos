@@ -125,7 +125,7 @@ export function SellerGate({ children }: { children: ReactNode }) {
 
   return (
     <SellerBannerContext.Provider value={setBanner}>
-      <ConsoleShell role="판매자 센터" nav={full ? fullNav(shipCount.data, returnCount.data) : LIMITED_NAV} userLabel={userLabel} title={sellerTitleOf(pathname)} banner={bannerNode}>
+      <ConsoleShell role="판매자 센터" nav={full ? fullNav(shipCount.data, returnCount.isError ? undefined : returnCount.data) : LIMITED_NAV} userLabel={userLabel} title={sellerTitleOf(pathname)} banner={bannerNode}>
         {body}
       </ConsoleShell>
     </SellerBannerContext.Provider>

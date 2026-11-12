@@ -31,7 +31,7 @@ export function SellerReturnDetailPage({ returnId }: { returnId: number }) {
         <ChevronLeft className="h-4 w-4" aria-hidden />
         반품 목록으로
       </Link>
-      {notice && (
+      {notice && r?.status === notice.whileStatus && (
         <div className={notice.tone === "warn" ? "notice notice-warn" : "notice"} role="alert">
           <span>{notice.text}</span>
         </div>

@@ -75,7 +75,12 @@ export function ReturnDetailView({ data: r, orderHref, actions, showSeller = fal
               <dd>{returnReasonLabel(r.reason)}</dd>
               <dt className="text-text-2">부담 주체</dt>
               <dd>{r.feeBearer === "BUYER" ? "구매자" : "판매자"}</dd>
-              {/* 구매자가 적은 상세 내용 자리: 응답에 `detail` 이 추가되면 여기에 "상세 내용" 줄을 더한다. */}
+              {r.detail && (
+                <>
+                  <dt className="text-text-2">상세 내용</dt>
+                  <dd className="whitespace-pre-wrap break-words">{r.detail}</dd>
+                </>
+              )}
             </dl>
             {r.status === "REJECTED" && r.rejectReason && (
               <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
