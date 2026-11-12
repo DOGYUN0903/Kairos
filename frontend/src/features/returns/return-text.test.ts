@@ -27,10 +27,15 @@ describe("return-text", () => {
   });
 
   it("환불_요약은_완료일_때만_금액", () => {
-    const all = ["REQUESTED", "APPROVED", "REFUNDING", "COMPLETED", "REJECTED", "WITHDRAWN", "CANCELED_BY_ADMIN"] as const;
-    for (const status of all) {
-      const text = refundSummaryText({ status, refundAmount: 25000 });
-      expect(text).toBe(status === "COMPLETED" ? "25,000원" : "수거 확인 뒤 확정");
+    expect(refundSummaryText({ status: "COMPLETED", refundAmount: 25000 })).toBe("25,000원");
+    for (const status of ["REQUESTED", "APPROVED", "REFUNDING"] as const) {
+      expect(refundSummaryText({ status, refundAmount: 25000 })).toBe("수거 확인 뒤 확정");
+    }
+  });
+  it("환불_없이_끝난_반품은_환불_없음", () => {
+    for (const status of ["REJECTED", "WITHDRAWN", "CANCELED_BY_ADMIN"] as const) {
+      expect(refundSummaryText({ status, refundAmount: 0 })).toBe("환불 없음");
+      expect(refundSummaryText({ status, refundAmount: 25000 })).toBe("환불 없음");
     }
   });
   it("재조회는_환불_확인_중일_때만", () => {
