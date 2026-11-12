@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 후기 (작성·수정·내 후기)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-mypage.html"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요</a>
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 3개">3</span>장바구니</a>
+      <a href="user-mypage.html"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <div class="board-nav__row"><strong>창</strong><button type="button" data-go="r-write" aria-pressed="false">① 작성 창 (빈 · 사진 올리는 중)</button><button type="button" data-go="r-write2" aria-pressed="false">② 작성 창 (등록 가능 · 오류) · 성공 토스트</button><button type="button" data-go="r-edit" aria-pressed="false">③ 수정 창 · 삭제 확인 창</button></div>
+    <div class="board-nav__row"><strong>화면</strong><button type="button" data-go="r-list" aria-pressed="false">④ 내 후기 목록</button><button type="button" data-go="r-empty" aria-pressed="false">⑤ 내 후기 빈 상태</button><button type="button" data-go="r-order" aria-pressed="false">⑥ 주문 상세 항목 줄 (후기 상태 4가지)</button><button type="button" data-go="r-confirm" aria-pressed="false">⑦ 구매 확정 창 · 토스트</button></div>
+    
+  </nav>
+
+  <section id="r-write" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">① 후기 작성 창 — 주문 상세의 "후기 작성"을 누르면 열립니다</h2>
+    <p class="board__note">왼쪽은 처음 열었을 때(별점 미선택, 등록 막힘), 오른쪽은 작성 중 사진을 올리는 동안입니다. 올리는 동안은 등록할 수 없고, 올린 사진은 미리보기와 삭제가 됩니다. 별점은 키보드(←→)로도 고를 수 있습니다.</p>
+    <div class="dialog-stage">
+      <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="rw1-h--r-write">
+        <div class="dialog__head"><h3 id="rw1-h--r-write">후기 작성</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 B]</div><div style="font-weight:500">와이드 데님 팬츠</div><div class="small muted">인디고 / 32 · 수량 1개</div></div>
+          </div>
+          <div class="field">
+            <span class="label" id="rw1-rl--r-write">별점<span class="req" aria-hidden="true">*</span></span>
+            <div class="row" style="gap:0">
+              <div class="star-input" role="radiogroup" aria-labelledby="rw1-rl--r-write"><button type="button" role="radio" aria-checked="false" aria-label="1점" class="">★</button><button type="button" role="radio" aria-checked="false" aria-label="2점" class="">★</button><button type="button" role="radio" aria-checked="false" aria-label="3점" class="">★</button><button type="button" role="radio" aria-checked="false" aria-label="4점" class="">★</button><button type="button" role="radio" aria-checked="false" aria-label="5점" class="">★</button></div>
+              <span class="star-label">별점을 선택해 주세요</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rw1-t--r-write">후기 내용<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rw1-t--r-write" class="textarea" maxlength="1000" placeholder="상품은 어땠나요? 10자 이상 적어 주세요." style="min-height:110px"></textarea>
+            <div class="row-between"><span class="hint">앞뒤 공백을 뺀 10~1,000자</span><span class="counter">0 / 1,000</span></div>
+          </div>
+          <div class="field">
+            <span class="label">사진 <span class="muted" style="font-weight:400">(선택, 최대 3장)</span></span>
+            <div class="photo-grid"><button type="button" class="photo-slot is-add" aria-label="사진 추가"><svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>사진 추가</span></button></div>
+            
+            <span class="hint">jpg, png, webp · 5MB 이하</span>
+          </div>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다.</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary" disabled>후기 등록</button></div>
+      </div>
+      <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="rw2-h--r-write">
+        <div class="dialog__head"><h3 id="rw2-h--r-write">후기 작성</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 B]</div><div style="font-weight:500">와이드 데님 팬츠</div><div class="small muted">인디고 / 32 · 수량 1개</div></div>
+          </div>
+          <div class="field">
+            <span class="label" id="rw2-rl--r-write">별점<span class="req" aria-hidden="true">*</span></span>
+            <div class="row" style="gap:0">
+              <div class="star-input" role="radiogroup" aria-labelledby="rw2-rl--r-write"><button type="button" role="radio" aria-checked="false" aria-label="1점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="2점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="3점" class="is-on">★</button><button type="button" role="radio" aria-checked="true" aria-label="4점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="5점" class="">★</button></div>
+              <span class="star-label">4점 · 좋아요</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rw2-t--r-write">후기 내용<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rw2-t--r-write" class="textarea" maxlength="1000" placeholder="상품은 어땠나요? 10자 이상 적어 주세요." style="min-height:110px">생각보다 두께감이 있어서 가을에 입기 좋아요. 핏도 넉넉해서 만족합니다.</textarea>
+            <div class="row-between"><span class="hint">앞뒤 공백을 뺀 10~1,000자</span><span class="counter">40 / 1,000</span></div>
+          </div>
+          <div class="field">
+            <span class="label">사진 <span class="muted" style="font-weight:400">(선택, 최대 3장)</span></span>
+            <div class="photo-grid"><div class="photo-slot is-filled"><span>[사진 1]</span><button type="button" class="x" aria-label="사진 1 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div class="photo-slot is-uploading" role="status" aria-label="사진 올리는 중 60%"><span class="upload-label">올리는 중 60%</span><div class="progress"><span style="width:60%"></span></div></div><button type="button" class="photo-slot is-add" aria-label="사진 추가"><svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>사진 추가</span></button></div>
+            
+            <span class="hint">사진을 올리는 동안에는 등록할 수 없습니다</span>
+          </div>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다.</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary" disabled>사진을 올리는 중…</button></div>
+      </div>
+    </div>
+</section>
+  <section id="r-write2" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">② 후기 작성 창 — 등록 가능 · 서버 입력 오류, 등록 성공 토스트</h2>
+    <p class="board__note">왼쪽은 별점·본문·사진 3장이 갖춰져 등록 버튼이 켜진 상태입니다. 오른쪽은 화면에서 먼저 걸러진 입력(본문 10자 미만, 형식·용량이 맞지 않는 사진)과 서버가 거절했을 때 폼 위쪽에 놓이는 안내입니다.</p>
+    <div class="dialog-stage">
+      <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="rw3-h--r-write2">
+        <div class="dialog__head"><h3 id="rw3-h--r-write2">후기 작성</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 B]</div><div style="font-weight:500">와이드 데님 팬츠</div><div class="small muted">인디고 / 32 · 수량 1개</div></div>
+          </div>
+          <div class="field">
+            <span class="label" id="rw3-rl--r-write2">별점<span class="req" aria-hidden="true">*</span></span>
+            <div class="row" style="gap:0">
+              <div class="star-input" role="radiogroup" aria-labelledby="rw3-rl--r-write2"><button type="button" role="radio" aria-checked="false" aria-label="1점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="2점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="3점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="4점" class="is-on">★</button><button type="button" role="radio" aria-checked="true" aria-label="5점" class="is-on">★</button></div>
+              <span class="star-label">5점 · 아주 좋아요</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rw3-t--r-write2">후기 내용<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rw3-t--r-write2" class="textarea" maxlength="1000" placeholder="상품은 어땠나요? 10자 이상 적어 주세요." style="min-height:110px">허리 밴딩이 없는데도 편하게 맞아요. 워싱이 사진보다 약간 진하지만 오히려 더 마음에 듭니다. 길이는 170cm 기준 발목 위로 올라와서 운동화랑 입기 좋고, 세탁 후에도 늘어나지 않았습니다. 다음에는 다른 색상도 사려고요.</textarea>
+            <div class="row-between"><span class="hint">앞뒤 공백을 뺀 10~1,000자</span><span class="counter">125 / 1,000</span></div>
+          </div>
+          <div class="field">
+            <span class="label">사진 <span class="muted" style="font-weight:400">(선택, 최대 3장)</span></span>
+            <div class="photo-grid"><div class="photo-slot is-filled"><span>[사진 1]</span><button type="button" class="x" aria-label="사진 1 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div class="photo-slot is-filled"><span>[사진 2]</span><button type="button" class="x" aria-label="사진 2 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div class="photo-slot is-filled"><span>[사진 3]</span><button type="button" class="x" aria-label="사진 3 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></div>
+            
+            <span class="hint">jpg, png, webp · 5MB 이하</span>
+          </div>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다.</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">후기 등록</button></div>
+      </div>
+      <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="rw4-h--r-write2">
+        <div class="dialog__head"><h3 id="rw4-h--r-write2">후기 작성</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          <div class="notice notice-error" role="alert"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>입력한 내용을 확인해 주세요.</span></div>
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 B]</div><div style="font-weight:500">와이드 데님 팬츠</div><div class="small muted">인디고 / 32 · 수량 1개</div></div>
+          </div>
+          <div class="field">
+            <span class="label" id="rw4-rl--r-write2">별점<span class="req" aria-hidden="true">*</span></span>
+            <div class="row" style="gap:0">
+              <div class="star-input" role="radiogroup" aria-labelledby="rw4-rl--r-write2"><button type="button" role="radio" aria-checked="false" aria-label="1점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="2점" class="is-on">★</button><button type="button" role="radio" aria-checked="true" aria-label="3점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="4점" class="">★</button><button type="button" role="radio" aria-checked="false" aria-label="5점" class="">★</button></div>
+              <span class="star-label">3점 · 보통이에요</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rw4-t--r-write2">후기 내용<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="rw4-t--r-write2" class="textarea is-error" maxlength="1000" placeholder="상품은 어땠나요? 10자 이상 적어 주세요." style="min-height:110px" aria-invalid="true">좋아요</textarea>
+            <div class="row-between"><span class="error-text" role="alert">후기는 10자 이상 입력해 주세요</span><span class="counter">3 / 1,000</span></div>
+          </div>
+          <div class="field">
+            <span class="label">사진 <span class="muted" style="font-weight:400">(선택, 최대 3장)</span></span>
+            <div class="photo-grid"><div class="photo-slot is-filled"><span>[사진 1]</span><button type="button" class="x" aria-label="사진 1 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></div>
+            <span class="error-text" role="alert">coat.heic — jpg, png, webp 형식만 올릴 수 있습니다</span><span class="error-text" role="alert">large.png — 5MB 이하 파일만 올릴 수 있습니다</span>
+            <span class="hint">jpg, png, webp · 5MB 이하</span>
+          </div>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다.</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">후기 등록</button></div>
+      </div>
+    </div>
+    <div class="mt-24"><div class="small muted mb-8">등록 성공 토스트 (창이 닫히고 화면 아래에 잠시 보입니다)</div>
+      <div class="toast-stack"><div class="toast" role="status"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg><span>후기를 등록했습니다. 500P가 적립되었습니다</span></div></div></div>
+</section>
+  <section id="r-edit" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">③ 후기 수정 창 · 후기 삭제 확인 창 — 내 후기 목록의 "수정"·"삭제"</h2>
+    <p class="board__note">수정 창은 작성 창과 같은 폼에 기존 별점·본문·사진이 채워져 있고, 적립 안내 대신 "수정해도 추가 적립은 없습니다"가 보입니다.</p>
+    <div class="dialog-stage">
+      <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="re1-h--r-edit">
+        <div class="dialog__head"><h3 id="re1-h--r-edit">후기 수정</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 A]</div><div style="font-weight:500">오버핏 헤비웨이트 코튼 티셔츠</div><div class="small muted">블랙 / L · 수량 1개</div></div>
+          </div>
+          <div class="field">
+            <span class="label" id="re1-rl--r-edit">별점<span class="req" aria-hidden="true">*</span></span>
+            <div class="row" style="gap:0">
+              <div class="star-input" role="radiogroup" aria-labelledby="re1-rl--r-edit"><button type="button" role="radio" aria-checked="false" aria-label="1점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="2점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="3점" class="is-on">★</button><button type="button" role="radio" aria-checked="true" aria-label="4점" class="is-on">★</button><button type="button" role="radio" aria-checked="false" aria-label="5점" class="">★</button></div>
+              <span class="star-label">4점 · 좋아요</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="re1-t--r-edit">후기 내용<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="re1-t--r-edit" class="textarea" maxlength="1000" placeholder="상품은 어땠나요? 10자 이상 적어 주세요." style="min-height:110px">생각보다 두께감이 있어서 가을에 입기 좋아요. 핏도 넉넉해서 만족합니다.</textarea>
+            <div class="row-between"><span class="hint">앞뒤 공백을 뺀 10~1,000자</span><span class="counter">40 / 1,000</span></div>
+          </div>
+          <div class="field">
+            <span class="label">사진 <span class="muted" style="font-weight:400">(선택, 최대 3장)</span></span>
+            <div class="photo-grid"><div class="photo-slot is-filled"><span>[사진 1]</span><button type="button" class="x" aria-label="사진 1 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div class="photo-slot is-filled"><span>[사진 2]</span><button type="button" class="x" aria-label="사진 2 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><button type="button" class="photo-slot is-add" aria-label="사진 추가"><svg class="icon" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>사진 추가</span></button></div>
+            
+            <span class="hint">jpg, png, webp · 5MB 이하</span>
+          </div>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>수정해도 추가 적립은 없습니다.</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">수정 완료</button></div>
+      </div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="del-h--r-edit">
+        <div class="dialog__head"><h3 id="del-h--r-edit">후기 삭제</h3></div>
+        <div class="dialog__body">
+          <p>삭제하면 이 상품에 후기를 다시 쓸 수 없고, 적립된 포인트는 회수되지 않습니다.</p>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-danger">삭제</button></div>
+      </div>
+    </div>
+</section>
+  <section id="r-list" class="state-panel" data-group="main" data-menu="reviews" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="user-mypage.html#m-claim"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="user-mypage.html#m-points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html" aria-current="page"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="user-mypage.html#m-likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div>
+      <div class="my-head"><h1>내 후기<span class="count">2</span></h1></div>
+      <article class="review-card">
+        <div class="review-card__head">
+          <div class="ph ph-sm">[이미지]</div>
+          <div style="min-width:0"><div class="line-item__brand">[브랜드 A]</div><a class="name" href="user-product-detail.html">오버핏 헤비웨이트 코튼 티셔츠</a></div>
+          <span class="small muted" style="margin-left:auto">2026-09-15 · <b style="font-weight:700;color:var(--text)">수정됨</b></span>
+        </div>
+        <div class="review-card__body">
+          <span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span>
+          <p class="review__body">생각보다 두께감이 있어서 가을에 입기 딱 좋아요. 핏도 넉넉해서 만족합니다.</p>
+          <div class="review__photos"><button type="button" aria-label="사진 1 크게 보기"><div class="ph ">[사진 1]</div></button><button type="button" aria-label="사진 2 크게 보기"><div class="ph ">[사진 2]</div></button></div>
+          <div class="review__reply"><div class="review__reply-head"><span class="badge badge-seller">판매자</span>[판매자 A 주식회사]<span class="review__meta">2026-09-16</span></div><p>소중한 후기 감사합니다. 사이즈 교환이 필요하시면 언제든 문의해 주세요.</p></div>
+        </div>
+        <div class="review-card__foot">
+          <span class="reward-tag"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>500P 적립</span>
+          <span class="row" style="gap:8px"><button type="button" class="btn btn-ghost btn-sm">수정</button><button type="button" class="btn btn-ghost btn-sm">삭제</button></span>
+        </div>
+      </article>
+      <article class="review-card">
+        <div class="review-card__head">
+          <div class="ph ph-sm">[이미지]</div>
+          <div style="min-width:0"><div class="line-item__brand">[브랜드 C]</div><a class="name" href="user-product-detail.html">코튼 립 삭스</a></div>
+          <span class="small muted" style="margin-left:auto">2026-10-28</span>
+        </div>
+        <div class="review-card__body">
+          <span class="stars" role="img" aria-label="별점 4점">★★★★<span class="off">★</span></span>
+          <p class="review__body">발목 밴드가 단단하게 잡아줘서 신고 벗기 편해요. 세탁해도 보풀이 거의 없습니다.</p>
+          
+          <div class="small muted" style="margin-top:14px">아직 판매자 답글이 없습니다</div>
+        </div>
+        <div class="review-card__foot">
+          <span class="reward-tag"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>100P 적립</span>
+          <span class="row" style="gap:8px"><button type="button" class="btn btn-ghost btn-sm">수정</button><button type="button" class="btn btn-ghost btn-sm">삭제</button></span>
+        </div>
+      </article>
+      <nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a></nav>
+    </div></div>
+</section>
+  <section id="r-empty" class="state-panel" data-group="main" data-menu="reviews" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="user-mypage.html#m-claim"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="user-mypage.html#m-points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html" aria-current="page"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="user-mypage.html#m-likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div>
+      <div class="my-head"><h1>내 후기</h1></div>
+      <div class="empty" style="border-top:0"><div class="empty__icon"><svg class="icon " viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg></div><h2>작성한 후기가 없습니다</h2><p>구매를 확정한 상품에 후기를 남기면 포인트를 받을 수 있습니다.</p><a class="btn btn-primary" href="user-order-list.html">주문 내역 보기</a></div>
+    </div></div>
+</section>
+  <section id="r-order" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">⑥ 주문 상세의 항목 줄 — 구매 확정된 판매자 주문에서 후기 상태 4가지 (+ 아무것도 안 보이는 경우)</h2>
+    <p class="board__note">F2 주문 상세의 판매자 주문 카드입니다. 항목 줄 오른쪽 끝에 후기 상태에 따라 버튼과 안내가 놓입니다. 회색 작은 글씨(review.status)는 시안 설명용이며 화면에는 나오지 않습니다.</p>
+    <section class="so-card" aria-label="[판매자 B 상사] 주문" style="max-width:960px">
+      <div class="so-card__head">
+        <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span>
+        <span class="chip chip-onsale">구매 확정</span>
+      </div>
+      <div class="line-item line-item--review">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 B]</div>
+              <a class="line-item__name" href="user-product-detail.html">와이드 데님 팬츠</a>
+              <div class="line-item__opt">인디고 / 32 · 수량 1개</div>
+              <span class="anno">review.status = WRITABLE</span>
+            </div>
+            <div class="line-item__state"><span class="chip chip-onsale">구매 확정</span><span class="review-state"><b>12월 9일 14:30</b>까지 작성 가능</span></div>
+            <div class="line-item__amount">30,000원</div>
+            <div class="line-item__action"><button type="button" class="btn btn-primary btn-sm" data-go="r-write">후기 작성</button></div>
+          </div>
+      <div class="line-item line-item--review">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 B]</div>
+              <a class="line-item__name" href="user-product-detail.html">코튼 립 삭스</a>
+              <div class="line-item__opt">차콜 / FREE · 수량 3개</div>
+              <span class="anno">review.status = WRITTEN</span>
+            </div>
+            <div class="line-item__state"><span class="chip chip-onsale">구매 확정</span><span class="review-state">후기를 작성했습니다</span></div>
+            <div class="line-item__amount">14,700원</div>
+            <div class="line-item__action"><a class="btn btn-ghost btn-sm" href="user-review.html#r-list">내 후기 보기</a></div>
+          </div>
+      <div class="line-item line-item--review">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 B]</div>
+              <a class="line-item__name" href="user-product-detail.html">로고 자수 볼캡</a>
+              <div class="line-item__opt">블랙 / FREE · 수량 2개</div>
+              <span class="anno">review.status = EXPIRED</span>
+            </div>
+            <div class="line-item__state"><span class="chip chip-onsale">구매 확정</span><span class="review-state">후기 작성 기한이 지났습니다</span></div>
+            <div class="line-item__amount">40,000원</div>
+            <div class="line-item__action"></div>
+          </div>
+      <div class="line-item line-item--review">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 B]</div>
+              <a class="line-item__name" href="user-product-detail.html">램스울 크루넥 니트</a>
+              <div class="line-item__opt">오트밀 / M · 수량 1개</div>
+              <span class="anno">review.status = DELETED</span>
+            </div>
+            <div class="line-item__state"><span class="chip chip-onsale">구매 확정</span><span class="review-state">삭제한 후기는 다시 작성할 수 없습니다</span></div>
+            <div class="line-item__amount">30,000원</div>
+            <div class="line-item__action"></div>
+          </div>
+      <div class="line-item line-item--review is-canceled">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 C]</div>
+              <a class="line-item__name" href="user-product-detail.html">캔버스 토트백</a>
+              <div class="line-item__opt">네이비 / FREE · 수량 1개</div>
+              <span class="anno">review.status = NOT_ELIGIBLE</span>
+            </div>
+            <div class="line-item__state"><span class="chip chip-ended">취소</span></div>
+            <div class="line-item__amount">25,000원</div>
+            <div class="line-item__action"></div>
+          </div>
+    </section>
+</section>
+  <section id="r-confirm" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">⑦ 구매 확정 확인 창에 적립 안내 · 확정 성공 토스트에 "포인트 내역 보기"</h2>
+    <p class="board__note">주문 상세의 "구매 확정"을 누르면 열립니다. 적립 숫자는 보여 주지 않고 비율(1%)만 안내합니다.</p>
+    <div class="dialog-stage">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="cf-h--r-confirm">
+        <div class="dialog__head"><h3 id="cf-h--r-confirm">구매 확정</h3></div>
+        <div class="dialog__body">
+          <p>구매를 확정하시겠습니까? 확정하면 되돌릴 수 없습니다.</p>
+          <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg><span>구매 확정 시 결제 금액의 1%가 포인트로 적립됩니다</span></div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">구매 확정</button></div>
+      </div>
+    </div>
+    <div class="mt-24"><div class="small muted mb-8">확정 성공 토스트</div>
+      <div class="toast-stack"><div class="toast" role="status"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg><span>구매를 확정했습니다.</span><a href="user-mypage.html#m-points">포인트 내역 보기</a></div></div></div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+<script>
+/* 시안 상태 전환: data-go="패널 id" 를 누르면 같은 data-group 의 패널만 보인다. 주소 뒤 #패널id 로 바로 열 수도 있다. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.state-panel'));
+  var gos = [].slice.call(document.querySelectorAll('[data-go]'));
+  function byId(id) { return document.getElementById(id); }
+  function go(id) {
+    var p = byId(id); if (!p) return;
+    var g = p.getAttribute('data-group');
+    panels.forEach(function (q) { if (q.getAttribute('data-group') === g) q.hidden = (q !== p); });
+    gos.forEach(function (b) {
+      var t = byId(b.getAttribute('data-go'));
+      if (!t || t.getAttribute('data-group') !== g) return;
+      var on = b.getAttribute('data-go') === id;
+      var attr = b.hasAttribute('aria-selected') ? 'aria-selected' : (b.hasAttribute('aria-pressed') ? 'aria-pressed' : null);
+      if (attr) b.setAttribute(attr, on ? 'true' : 'false');
+    });
+    var m = p.getAttribute('data-menu');
+    if (m) [].forEach.call(document.querySelectorAll('[data-menu-item]'), function (a) {
+      if (a.getAttribute('data-menu-item') === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (!b) return;
+    e.preventDefault();
+    go(b.getAttribute('data-go'));
+  });
+  var seen = {};
+  panels.forEach(function (p) { var g = p.getAttribute('data-group'); if (!seen[g]) { seen[g] = 1; go(p.id); } });
+  var h = location.hash.slice(1);
+  if (h && byId(h) && byId(h).classList.contains('state-panel')) go(h);
+})();
+</script>
+</body>
+</html>

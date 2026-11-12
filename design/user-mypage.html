@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 마이페이지 (쿠폰·포인트·좋아요)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-mypage.html"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요</a>
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 3개">3</span>장바구니</a>
+      <a href="user-mypage.html"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <div class="board-nav__row"><strong>쿠폰</strong><button type="button" data-go="m-claim" aria-pressed="false">① 받을 수 있는 쿠폰</button><button type="button" data-go="m-mine" aria-pressed="false">② 내 쿠폰 · 사용 가능</button><button type="button" data-go="m-used" aria-pressed="false">③ 내 쿠폰 · 사용 완료</button><button type="button" data-go="m-expired" aria-pressed="false">④ 내 쿠폰 · 기간 만료</button></div>
+    <div class="board-nav__row"><strong>그 밖에</strong><button type="button" data-go="m-points" aria-pressed="false">⑤ 포인트</button><button type="button" data-go="m-likes" aria-pressed="false">⑥ 좋아요 (판매 종료 카드 포함)</button><button type="button" data-go="m-empty" aria-pressed="false">⑦ 빈 상태 3가지</button></div>
+    
+  </nav>
+
+  <section id="m-claim" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>쿠폰</h1></div>
+      <div class="tabs mt-24" role="tablist" aria-label="쿠폰 구분">
+        <button type="button" role="tab" aria-selected="true" data-go="m-claim">받을 수 있는 쿠폰<span class="count">6</span></button>
+        <button type="button" role="tab" aria-selected="false" data-go="m-mine">내 쿠폰<span class="count">5</span></button>
+      </div>
+      <p class="my-note"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>전 상품에 쓸 수 있는 쿠폰과 장바구니 쿠폰입니다. 특정 상품·판매자 쿠폰은 상품 상세에서 받을 수 있습니다.</p>
+      <div class="coupon-grid">
+        <div class="coupon">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">신규 회원 2,000원 쿠폰</div>
+    <div class="coupon__meta">30,000원 이상 구매 시 · 2026-12-31까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>20%</strong><small>최대 10,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">주말 20% 특가 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-12-31까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>5,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">주말 특가 5,000원 장바구니 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-12-31까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>10%</strong><small>최대 8,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">VIP 10% 장바구니 쿠폰</div>
+    <div class="coupon__meta">80,000원 이상 구매 시 · 2026-12-31까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>3,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">겨울 맞이 3,000원 쿠폰</div>
+    <div class="coupon__meta">40,000원 이상 구매 시 · 2026-12-31까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>7%</strong><small>최대 6,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">11월 한정 7% 장바구니 쿠폰</div>
+    <div class="coupon__meta">60,000원 이상 구매 시 · 2026-11-30까지 받을 수 있음</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+      </div></div></div>
+</section>
+  <section id="m-mine" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>쿠폰</h1></div>
+      <div class="tabs mt-24" role="tablist" aria-label="쿠폰 구분">
+        <button type="button" role="tab" aria-selected="false" data-go="m-claim">받을 수 있는 쿠폰<span class="count">6</span></button>
+        <button type="button" role="tab" aria-selected="true" data-go="m-mine">내 쿠폰<span class="count">5</span></button>
+      </div>
+      <div class="filter-chips" role="group" aria-label="쿠폰 상태">
+        <button type="button" aria-pressed="true" data-go="m-mine">사용 가능 (5)</button>
+        <button type="button" aria-pressed="false" data-go="m-used">사용 완료</button>
+        <button type="button" aria-pressed="false" data-go="m-expired">기간 만료</button>
+      </div>
+      <p class="my-note"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>주문서에서 쓸 수 있는 쿠폰이 자동으로 보입니다. 쿠폰 카드에는 적용 대상을 따로 적지 않습니다.</p>
+      <div class="coupon-grid" style="margin-top:16px"><div class="coupon">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><span class="badge badge-soon">곧 만료</span></div>
+    <div class="coupon__name">신규 회원 2,000원 쿠폰</div>
+    <div class="coupon__meta">30,000원 이상 구매 시 · <span class="soon">2026-11-18까지</span></div>
+    
+  </div>
+  
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 C] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">최소 주문 금액 없음 · 2026-12-31까지</div>
+    
+  </div>
+  
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>20%</strong><small>최대 10,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">주말 20% 특가 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-11-30까지</div>
+    
+  </div>
+  
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>5,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">주말 특가 5,000원 장바구니 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-12-15까지</div>
+    
+  </div>
+  
+</div>
+        <div class="coupon">
+  <div class="coupon__value"><strong>10%</strong><small>최대 8,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">VIP 10% 장바구니 쿠폰</div>
+    <div class="coupon__meta">80,000원 이상 구매 시 · 2026-11-30까지</div>
+    
+  </div>
+  
+</div></div></div></div>
+</section>
+  <section id="m-used" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>쿠폰</h1></div>
+      <div class="tabs mt-24" role="tablist" aria-label="쿠폰 구분">
+        <button type="button" role="tab" aria-selected="false" data-go="m-claim">받을 수 있는 쿠폰<span class="count">6</span></button>
+        <button type="button" role="tab" aria-selected="true" data-go="m-mine">내 쿠폰<span class="count">5</span></button>
+      </div>
+      <div class="filter-chips" role="group" aria-label="쿠폰 상태">
+        <button type="button" aria-pressed="false" data-go="m-mine">사용 가능 (5)</button>
+        <button type="button" aria-pressed="true" data-go="m-used">사용 완료</button>
+        <button type="button" aria-pressed="false" data-go="m-expired">기간 만료</button>
+      </div>
+      <div class="coupon-grid">
+        <div class="coupon is-done">
+  <div class="coupon__value"><strong>3,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">추석 맞이 3,000원 쿠폰</div>
+    <div class="coupon__meta">사용일 2026-10-03</div>
+    
+  </div>
+  <div class="coupon__act"><a class="btn btn-ghost btn-sm" href="user-order-detail.html">주문 보기</a></div>
+</div>
+        <div class="coupon is-done">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 B] 가을맞이 10% 쿠폰</div>
+    <div class="coupon__meta">사용일 2026-09-02</div>
+    
+  </div>
+  <div class="coupon__act"><a class="btn btn-ghost btn-sm" href="user-order-detail.html">주문 보기</a></div>
+</div>
+        <div class="coupon is-done">
+  <div class="coupon__value"><strong>5,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">개강 맞이 5,000원 장바구니 쿠폰</div>
+    <div class="coupon__meta">사용일 2026-08-29</div>
+    
+  </div>
+  <div class="coupon__act"><a class="btn btn-ghost btn-sm" href="user-order-detail.html">주문 보기</a></div>
+</div>
+      </div></div></div>
+</section>
+  <section id="m-expired" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>쿠폰</h1></div>
+      <div class="tabs mt-24" role="tablist" aria-label="쿠폰 구분">
+        <button type="button" role="tab" aria-selected="false" data-go="m-claim">받을 수 있는 쿠폰<span class="count">6</span></button>
+        <button type="button" role="tab" aria-selected="true" data-go="m-mine">내 쿠폰<span class="count">5</span></button>
+      </div>
+      <div class="filter-chips" role="group" aria-label="쿠폰 상태">
+        <button type="button" aria-pressed="false" data-go="m-mine">사용 가능 (5)</button>
+        <button type="button" aria-pressed="false" data-go="m-used">사용 완료</button>
+        <button type="button" aria-pressed="true" data-go="m-expired">기간 만료</button>
+      </div>
+      <div class="coupon-grid">
+        <div class="coupon is-done">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">여름 맞이 2,000원 쿠폰</div>
+    <div class="coupon__meta">2026-08-31 만료</div>
+    
+  </div>
+  <div class="coupon__act"><span class="chip chip-ended">기간 만료</span></div>
+</div>
+        <div class="coupon is-done">
+  <div class="coupon__value"><strong>15%</strong><small>최대 7,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 A] 시즌오프 15% 쿠폰</div>
+    <div class="coupon__meta">2026-10-31 만료</div>
+    
+  </div>
+  <div class="coupon__act"><span class="chip chip-ended">기간 만료</span></div>
+</div>
+      </div></div></div>
+</section>
+  <section id="m-points" class="state-panel" data-group="main" data-menu="points" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>포인트</h1></div>
+      <div class="balance-hero">
+        <div>
+          <div class="balance-hero__label">보유 포인트</div>
+          <strong>20,000P</strong>
+        </div>
+        <div class="balance-hero__side">
+          <span class="chip chip-pending">30일 안에 1,500P 만료 예정</span>
+          <div class="small muted">1,000P 이상 보유 시 10P 단위로, 상품 금액의 30%까지 사용</div>
+        </div>
+      </div>
+      <h2 class="section-title mt-32">포인트 내역</h2>
+      <div class="card mt-16">
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th scope="col">일시</th><th scope="col">내용</th><th scope="col" class="num">변동</th><th scope="col" class="num">잔액</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="muted mono">2026-11-09 14:20</td>
+                <td><span class="tx-desc">구매 확정 적립<a class="tx-link" href="user-order-detail.html">주문 보기</a></span></td>
+                <td class="num"><span class="amt-plus">+500P</span></td>
+                <td class="num mono">20,000P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-11-02 00:00</td>
+                <td><span class="tx-desc">기간 만료</span></td>
+                <td class="num"><span class="amt-minus">−400P</span></td>
+                <td class="num mono">19,500P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-10-28 16:05</td>
+                <td><span class="tx-desc">후기 작성 적립</span></td>
+                <td class="num"><span class="amt-plus">+100P</span></td>
+                <td class="num mono">19,900P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-10-20 11:42</td>
+                <td><span class="tx-desc">구매 확정 적립<a class="tx-link" href="user-order-detail.html">주문 보기</a></span></td>
+                <td class="num"><span class="amt-plus">+9,500P</span></td>
+                <td class="num mono">19,800P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-10-05 09:12</td>
+                <td><span class="tx-desc">주문 취소 환급<a class="tx-link" href="user-order-detail.html">주문 보기</a></span></td>
+                <td class="num"><span class="amt-plus">+8,000P</span></td>
+                <td class="num mono">10,300P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-10-03 21:30</td>
+                <td><span class="tx-desc">주문 사용<a class="tx-link" href="user-order-detail.html">주문 보기</a></span></td>
+                <td class="num"><span class="amt-minus">−8,000P</span></td>
+                <td class="num mono">2,300P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-09-15 13:08</td>
+                <td><span class="tx-desc">후기 작성 적립</span></td>
+                <td class="num"><span class="amt-plus">+500P</span></td>
+                <td class="num mono">10,300P</td>
+              </tr>
+              <tr>
+                <td class="muted mono">2026-09-02 10:25</td>
+                <td><span class="tx-desc">구매 확정 적립<a class="tx-link" href="user-order-detail.html">주문 보기</a></span></td>
+                <td class="num"><span class="amt-plus">+9,800P</span></td>
+                <td class="num mono">9,800P</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <nav class="pager" aria-label="페이지"><a href="#" aria-label="이전" style="pointer-events:none;opacity:.4">‹</a><a href="#" aria-current="page">1</a><a href="#">2</a><a href="#" aria-label="다음">›</a></nav></div></div>
+</section>
+  <section id="m-likes" class="state-panel" data-group="main" data-menu="likes" hidden>
+<div class="my-layout"><aside class="my-menu" aria-label="마이페이지 메뉴">
+      <h2>마이페이지</h2>
+      <nav>
+        <a href="user-order-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 내역</a>
+        <a href="#" data-go="m-claim" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰<span class="meta">5장</span></a>
+        <a href="#" data-go="m-points" data-menu-item="points"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg>포인트<span class="meta">20,000P</span></a>
+        <a href="user-review.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>내 후기</a>
+        <a href="#" data-go="m-likes" data-menu-item="likes"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요<span class="meta">8</span></a>
+      </nav>
+    </aside><div><div class="my-head"><h1>좋아요</h1><span class="small muted">판매가만 보입니다</span></div>
+      <div class="pgrid">
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 A]</div><a class="name" href="user-product-detail.html">오버핏 헤비웨이트 코튼 티셔츠</a><span class="price">27,300원</span></div>
+      </article>
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 B]</div><a class="name" href="user-product-detail.html">와이드 데님 팬츠</a><span class="price">30,000원</span></div>
+      </article>
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 C]</div><a class="name" href="user-product-detail.html">로고 자수 볼캡</a><span class="price">20,000원</span></div>
+      </article>
+        <article class="pcard is-ended">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><div class="end-tag">판매 종료</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 A]</div><a class="name" href="user-product-detail.html">램스울 크루넥 니트</a><span class="price">30,000원</span></div>
+      </article>
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 C]</div><a class="name" href="user-product-detail.html">코튼 립 삭스</a><span class="price">4,900원</span></div>
+      </article>
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 B]</div><a class="name" href="user-product-detail.html">라이트 윈드 브레이커</a><span class="price">59,000원</span></div>
+      </article>
+        <article class="pcard is-ended">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><div class="end-tag">판매 종료</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 A]</div><a class="name" href="user-product-detail.html">워싱 피그먼트 포켓 티셔츠</a><span class="price">33,200원</span></div>
+      </article>
+        <article class="pcard">
+        <div class="thumb"><div class="ph ">[상품 이미지]</div><button type="button" class="like" aria-label="좋아요 취소"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></button></div>
+        <div class="info"><div class="brand">[브랜드 C]</div><a class="name" href="user-product-detail.html">캔버스 토트백</a><span class="price">25,000원</span></div>
+      </article>
+      </div>
+      <nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a></nav></div></div>
+</section>
+  <section id="m-empty" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<h2 class="board__label">빈 상태 3가지 — 내 쿠폰(사용 가능) · 포인트 내역 · 좋아요</h2>
+    <p class="board__note">각각 해당 메뉴 화면에서 목록이 비었을 때 목록 자리에 놓입니다.</p>
+    <div class="grid-2" style="grid-template-columns:repeat(3,1fr);gap:24px">
+      <div><div class="small muted mb-8">내 쿠폰 · 사용 가능</div><div class="empty" style="padding:48px 24px"><div class="empty__icon"><svg class="icon" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg></div><h2>사용 가능한 쿠폰이 없습니다</h2><p>받을 수 있는 쿠폰을 확인해 보세요.</p><button type="button" class="btn btn-primary" style="min-width:0" data-go="m-claim">받을 수 있는 쿠폰 보기</button></div></div>
+      <div><div class="small muted mb-8">포인트 내역</div><div class="empty" style="padding:48px 24px"><div class="empty__icon"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5m0 0h3.6a1.9 1.9 0 0 1 0 3.8H9.5M9.5 8v8"/></svg></div><h2>포인트 내역이 없습니다</h2><p>구매를 확정하거나 후기를 쓰면 포인트가 쌓입니다.</p><a class="btn btn-primary" style="min-width:0" href="user-order-list.html">주문 내역 보기</a></div></div>
+      <div><div class="small muted mb-8">좋아요</div><div class="empty" style="padding:48px 24px"><div class="empty__icon"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg></div><h2>좋아요한 상품이 없습니다</h2><p>마음에 드는 상품의 하트를 눌러 보세요.</p><a class="btn btn-primary" style="min-width:0" href="user-product-list.html">상품 둘러보기</a></div></div>
+    </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+<script>
+/* 시안 상태 전환: data-go="패널 id" 를 누르면 같은 data-group 의 패널만 보인다. 주소 뒤 #패널id 로 바로 열 수도 있다. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.state-panel'));
+  var gos = [].slice.call(document.querySelectorAll('[data-go]'));
+  function byId(id) { return document.getElementById(id); }
+  function go(id) {
+    var p = byId(id); if (!p) return;
+    var g = p.getAttribute('data-group');
+    panels.forEach(function (q) { if (q.getAttribute('data-group') === g) q.hidden = (q !== p); });
+    gos.forEach(function (b) {
+      var t = byId(b.getAttribute('data-go'));
+      if (!t || t.getAttribute('data-group') !== g) return;
+      var on = b.getAttribute('data-go') === id;
+      b.setAttribute(b.hasAttribute('aria-selected') ? 'aria-selected' : 'aria-pressed', on ? 'true' : 'false');
+    });
+    var m = p.getAttribute('data-menu');
+    if (m) [].forEach.call(document.querySelectorAll('[data-menu-item]'), function (a) {
+      if (a.getAttribute('data-menu-item') === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (!b) return;
+    e.preventDefault();
+    go(b.getAttribute('data-go'));
+  });
+  var seen = {};
+  panels.forEach(function (p) { var g = p.getAttribute('data-group'); if (!seen[g]) { seen[g] = 1; go(p.id); } });
+  var h = location.hash.slice(1);
+  if (h && byId(h) && byId(h).classList.contains('state-panel')) go(h);
+})();
+</script>
+</body>
+</html>
