@@ -67,7 +67,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
       ) : !data ? (
         <PageSkeleton />
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-8">
+        <div className="grid gap-6">
           <div>
             <OrderStatusHeader
               order={data}
@@ -98,7 +98,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
               항목 취소는 판매자가 발송하기 전(배송 준비 중)에만 할 수 있습니다. 구매 확정은 배송 완료 후에 할 수 있으며, 확정하면 되돌릴 수 없습니다.
             </p>
           </div>
-          <aside className="flex flex-col gap-4">
+          <aside className="grid grid-cols-2 items-start gap-4">
             <PaymentSummaryCard order={data} />
             <ShippingAddressCard address={data.shippingAddress} />
           </aside>
