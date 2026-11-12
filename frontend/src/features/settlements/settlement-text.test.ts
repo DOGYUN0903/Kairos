@@ -29,6 +29,12 @@ describe("settlementRows", () => {
   });
 });
 
+describe("settlementRows sign", () => {
+  it("줄마다_기호가_붙는다", () => {
+    expect(settlementRows(d()).map((r) => r.sign)).toEqual(["", "−", "−", "+", "−", "±", "=", ""]);
+  });
+});
+
 describe("라벨", () => {
   it("정산 상태", () => {
     expect(settlementStatusLabel("GENERATED")).toBe("정산 생성");
