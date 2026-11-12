@@ -15,6 +15,15 @@ data class PlaceOrderResult(
 
 data class QuoteLine(
     val skuId: Long,
+    val productId: Long,
+    val productName: String,
+    val brandName: String,
+    val optionDisplayName: String,
+    /** 이미지가 없으면 빈 문자열 */
+    val thumbnailUrl: String,
+    /** 판매가 + 옵션 추가금 */
+    val unitPrice: Long,
+    val sellerId: Long,
     val quantity: Int,
     val lineAmount: Long,
     val productCouponDiscount: Long,
@@ -23,9 +32,21 @@ data class QuoteLine(
     val paidAmount: Long,
 )
 
+data class SellerQuote(
+    val sellerId: Long,
+    val sellerName: String,
+    val itemsAmount: Long,
+    val shippingFee: Long,
+    /** BUYER | PLATFORM */
+    val shippingFeePayer: String,
+)
+
 /** 주문 금액 미리보기. place 와 같은 계산이며 아무것도 저장하지 않는다. */
 data class OrderQuote(
     val items: List<QuoteLine>,
+    val sellerQuotes: List<SellerQuote>,
+    val freeShippingThreshold: Long,
+    val baseShippingFee: Long,
     val itemsAmount: Long,
     val productCouponDiscount: Long,
     val cartCouponDiscount: Long,
@@ -48,6 +69,8 @@ data class OrderItemResult(
     val skuId: Long,
     val productId: Long,
     val productName: String,
+    /** 조회 시점 상품의 대표 이미지. 상품이 삭제됐거나 이미지가 없으면 null. */
+    val thumbnailUrl: String?,
     val brandName: String,
     val optionDisplayName: String,
     val salePrice: Long,
@@ -113,6 +136,8 @@ data class OrderDetail(
     val freeShippingApplied: Boolean,
     val shippingFeeRecovered: Long,
     val refundedAmount: Long,
+    /** 결제 금액에서 누적 환불액을 뺀 값. 화면은 이 값을 그대로 보여준다. */
+    val remainingAmount: Long,
     /** 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합 */
     val remainingPaidAmount: Long,
     /** 아직 환불되지 않은 구매자 부담 배송비 */
@@ -137,6 +162,12 @@ data class OrderSummary(
     val totalAmount: Long,
     val itemCount: Int,
     val firstProductName: String,
+    /** 첫 항목의 대표 이미지. 없으면 null. */
+    val thumbnailUrl: String?,
+    /** 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용. */
+    val sellerOrderStatuses: List<String>,
+    /** 결제 만료 시각. 상세의 expiresAt 과 같은 값. */
+    val expiresAt: LocalDateTime,
     val createdAt: LocalDateTime,
 )
 
@@ -167,7 +198,19 @@ data class SellerOrderSummary(
     val itemsAmount: Long,
     val itemCount: Int,
     val firstProductName: String,
+    val thumbnailUrl: String?,
     val orderedAt: LocalDateTime,
+)
+
+/** 환불 미리보기. 실제 취소와 같은 계산([com.dogyun.kairos.order.domain.RefundCalculator])의 결과이며 아무것도 바꾸지 않는다. */
+data class CancelPreviewResult(
+    val orderItemId: Long,
+    val paidAmount: Long,
+    val shippingFeeRefund: Long,
+    val shippingFeeDeducted: Long,
+    val shippingFeeReturned: Long,
+    val refundAmount: Long,
+    val pointsRefund: Long,
 )
 
 data class CancelItemResult(

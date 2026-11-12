@@ -1027,7 +1027,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999) */
+        /**
+         * 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999)
+         * @description 수량을 더하는 요청이라 `Idempotency-Key` 필수다. 같은 키로 다시 보내면 저장된 응답을 돌려주고 수량은 한 번만 더해진다. 정지된 판매자의 상품도 담을 수 있다(장바구니 조회에서 `PAUSED` 로 보인다).
+         */
         post: operations["addCartItem"];
         delete?: never;
         options?: never;
@@ -1217,6 +1220,30 @@ export interface paths {
          *     구매자 취소로 남은 상품 금액이 무료배송 기준 아래로 처음 떨어지면 기본 배송비 1회분을 환불에서 차감한다(`shippingFeeDeducted`).
          */
         post: operations["cancelMyOrderItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{orderId}/items/{orderItemId}/cancel-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 주문 항목 환불 미리보기 (구매자)
+         * @description 실제 취소와 같은 계산(`RefundCalculator`)으로 지금 이 항목을 취소하면 얼마가 환불되는지 보여준다. 아무것도 바꾸지 않는다(주문·결제·재고 불변, 주문 행 락 없음).
+         *     미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다. `Idempotency-Key` 는 없다.
+         */
+        get: operations["previewCancelMyOrderItem"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2998,6 +3025,13 @@ export interface components {
             skuId: number;
             /** Format: int64 */
             productId: number;
+            /**
+             * Format: int64
+             * @description 판매자 ID. SKU 가 사라진(DISCONTINUED) 항목만 null. 정지된 판매자여도 채운다.
+             */
+            sellerId: number | null;
+            /** @description 판매자 회사명. SKU 가 사라진 항목만 null. */
+            sellerName: string | null;
             productName: string;
             brandName: string;
             thumbnailUrl: string;
@@ -3011,7 +3045,10 @@ export interface components {
             quantity: number;
             /** Format: int64 */
             lineAmount: number;
-            /** @enum {string} */
+            /**
+             * @description 판매자가 주문 가능한 상태(활성)가 아니면 AVAILABLE 대신 PAUSED 로 내려준다(견적·주문과 같은 기준).
+             * @enum {string}
+             */
             availability: "AVAILABLE" | "SOLD_OUT" | "PAUSED" | "DISCONTINUED" | "ENDED";
         };
         CartResult: {
@@ -3083,6 +3120,20 @@ export interface components {
         QuoteLine: {
             /** Format: int64 */
             skuId: number;
+            /** Format: int64 */
+            productId: number;
+            productName: string;
+            brandName: string;
+            optionDisplayName: string;
+            /** @description 상품 대표 이미지 URL. 이미지가 없으면 빈 문자열 */
+            thumbnailUrl: string;
+            /**
+             * Format: int64
+             * @description 판매가 + 옵션 추가금
+             */
+            unitPrice: number;
+            /** Format: int64 */
+            sellerId: number;
             /** Format: int32 */
             quantity: number;
             /** Format: int64 */
@@ -3096,8 +3147,33 @@ export interface components {
             /** Format: int64 */
             paidAmount: number;
         };
+        SellerQuote: {
+            /** Format: int64 */
+            sellerId: number;
+            sellerName: string;
+            /**
+             * Format: int64
+             * @description 이 판매자 항목의 상품 금액 합(쿠폰·포인트 차감 전)
+             */
+            itemsAmount: number;
+            /** Format: int64 */
+            shippingFee: number;
+            /** @enum {string} */
+            shippingFeePayer: "BUYER" | "PLATFORM";
+        };
         OrderQuote: {
             items: components["schemas"]["QuoteLine"][];
+            sellerQuotes: components["schemas"]["SellerQuote"][];
+            /**
+             * Format: int64
+             * @description 상품 합계가 이 금액 이상이면 배송비는 플랫폼 부담
+             */
+            freeShippingThreshold: number;
+            /**
+             * Format: int64
+             * @description 판매자별 기본 배송비
+             */
+            baseShippingFee: number;
             /** Format: int64 */
             itemsAmount: number;
             /** Format: int64 */
@@ -3144,6 +3220,37 @@ export interface components {
              * Format: int64
              * @description 되돌려진 포인트
              */
+            pointsRefund: number;
+        };
+        CancelPreview: {
+            /** Format: int64 */
+            orderItemId: number;
+            /**
+             * Format: int64
+             * @description 항목의 현금 결제 몫
+             */
+            paidAmount: number;
+            /**
+             * Format: int64
+             * @description 판매자 주문이 통째로 비어 돌려받는 배송비
+             */
+            shippingFeeRefund: number;
+            /**
+             * Format: int64
+             * @description 무료배송 기준이 깨져 차감되는 배송비
+             */
+            shippingFeeDeducted: number;
+            /**
+             * Format: int64
+             * @description 마지막 취소라 되돌려받는 앞선 차감액
+             */
+            shippingFeeReturned: number;
+            /**
+             * Format: int64
+             * @description 최종 환불액(`paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`)
+             */
+            refundAmount: number;
+            /** Format: int64 */
             pointsRefund: number;
         };
         ConfirmPaymentRequest: {
@@ -3194,6 +3301,8 @@ export interface components {
             productId: number;
             /** @description 주문 시점 스냅샷 */
             productName: string;
+            /** @description 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null */
+            thumbnailUrl: string | null;
             brandName: string;
             optionDisplayName: string;
             /** Format: int64 */
@@ -3397,6 +3506,11 @@ export interface components {
             refundedAmount: number;
             /**
              * Format: int64
+             * @description 결제 금액에서 누적 환불액을 뺀 남은 결제 금액. 화면은 이 값을 그대로 보여준다
+             */
+            remainingAmount: number;
+            /**
+             * Format: int64
              * @description 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합
              */
             remainingPaidAmount: number;
@@ -3435,6 +3549,15 @@ export interface components {
             /** Format: int32 */
             itemCount: number;
             firstProductName: string;
+            /** @description 첫 항목의 대표 이미지 URL. 없으면 null */
+            thumbnailUrl: string | null;
+            /** @description 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용 */
+            sellerOrderStatuses: components["schemas"]["SellerOrderStatus"][];
+            /**
+             * Format: date-time
+             * @description 결제 만료 시각(오프셋 없는 KST). 상세의 `expiresAt` 과 같은 값
+             */
+            expiresAt: string;
             /** Format: date-time */
             createdAt: string;
         };
@@ -3481,6 +3604,8 @@ export interface components {
             /** Format: int32 */
             itemCount: number;
             firstProductName: string;
+            /** @description 첫 항목의 대표 이미지 URL. 없으면 null */
+            thumbnailUrl: string | null;
             /** Format: date-time */
             orderedAt: string;
         };
@@ -6124,7 +6249,10 @@ export interface operations {
     addCartItem: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 같은 요청의 재시도를 식별하는 키(1~100자). 같은 회원·같은 키·같은 본문이면 저장된 응답을 다시 돌려준다. 저장되는 응답에는 409 같은 오류도 포함되므로, 같은 키로 재시도하면 그 409 가 그대로 재생된다. 상태가 바뀐 뒤(재고 보충 등) 다시 시도하려면 새 키를 쓴다. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -6145,7 +6273,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description `CART_INVALID`(합산 수량 범위 초과) 또는 `INVALID_REQUEST` */
+            /** @description `CART_INVALID`(합산 수량 범위 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST` */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6164,7 +6292,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `SKU_NOT_ORDERABLE` AVAILABLE 이 아닌 SKU */
+            /** @description `SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU) 또는 `IDEMPOTENCY_IN_PROGRESS` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6173,6 +6301,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            422: components["responses"]["IdempotencyKeyReused"];
         };
     };
     removeCartItem: {
@@ -6619,6 +6748,51 @@ export interface operations {
                 };
             };
             422: components["responses"]["IdempotencyKeyReused"];
+        };
+    };
+    previewCancelMyOrderItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 지금 취소하면 받을 환불 내역 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["CancelPreview"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description `ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `ORDER_ITEM_NOT_CANCELABLE`(배송 시작·다른 항목 취소 확인 중) 또는 `ORDER_INVALID_STATE_TRANSITION`(결제 전 등) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     cancelSellerOrderItem: {

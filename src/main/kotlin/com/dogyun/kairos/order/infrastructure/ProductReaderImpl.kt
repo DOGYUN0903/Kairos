@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component
 @Component("orderProductReader")
 class ProductReaderImpl(private val skuQueryService: SkuQueryService) : ProductReader {
 
+    override fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String> =
+        skuQueryService.findThumbnailUrls(productIds)
+
     override fun findOrderableSkus(skuIds: Collection<Long>): Map<Long, OrderableSkuInfo> =
         skuQueryService.findOrderableSkus(skuIds).mapValues { (_, sku) ->
             OrderableSkuInfo(
@@ -22,6 +25,7 @@ class ProductReaderImpl(private val skuQueryService: SkuQueryService) : ProductR
                 salePrice = sku.salePrice,
                 extraPrice = sku.extraPrice,
                 sellerId = sku.sellerId,
+                thumbnailUrl = sku.thumbnailUrl,
                 available = sku.availability == SkuAvailability.AVAILABLE,
             )
         }

@@ -71,6 +71,16 @@ class OrderController(
         CancelItemResponse.from(orderCancelService.cancelByBuyer(loginMember.id, orderId, orderItemId, request.reason)),
     )
 
+    /** 상태를 바꾸지 않는 읽기라 `Idempotency-Key` 가 없다. */
+    @GetMapping("/{orderId}/items/{orderItemId}/cancel-preview")
+    fun previewCancel(
+        @AuthenticationPrincipal loginMember: LoginMember,
+        @PathVariable orderId: Long,
+        @PathVariable orderItemId: Long,
+    ): ResponseEntity<ApiResponse<CancelPreviewResponse>> = ApiResponse.ok(
+        CancelPreviewResponse.from(orderQueryService.previewCancel(loginMember.id, orderId, orderItemId)),
+    )
+
     @PatchMapping("/{orderId}/seller-orders/{sellerOrderId}/confirm")
     fun confirmPurchase(
         @AuthenticationPrincipal loginMember: LoginMember,

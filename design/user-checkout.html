@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 주문서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 3개">3</span>장바구니</a>
+      <a href="user-order-list.html"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <strong>상태별 보기</strong>
+    <a href="#state-default">① 주문서</a><a href="#state-changed">② 금액 변경 안내</a><a href="#state-pay">③ 모의 결제창 (일반 · 데모)</a>
+  </nav>
+
+  <!-- ① 주문서 -->
+  <section id="state-default" aria-labelledby="co-h">
+    <div class="page-head">
+      <h1 id="co-h">주문서</h1>
+      <ol class="steps" aria-label="구매 단계">
+        <li>장바구니</li><li aria-current="step">주문서</li><li>주문 완료</li>
+      </ol>
+    </div>
+
+    <div class="buy-layout">
+      <div class="stack" style="gap:24px">
+
+        <!-- 배송지 -->
+        <section class="card" aria-labelledby="addr-h">
+          <div class="card__head">
+            <h2 id="addr-h">배송지</h2>
+            <button type="button" class="btn btn-ghost btn-sm">최근 배송지 불러오기</button>
+          </div>
+          <div class="card__body">
+            <form class="form-grid" action="#" onsubmit="return false">
+              <div class="field">
+                <label for="receiver">수령인<span class="req" aria-hidden="true">*</span></label>
+                <input id="receiver" class="input" type="text" maxlength="50" value="김민지" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="phone">연락처<span class="req" aria-hidden="true">*</span></label>
+                <input id="phone" class="input" type="tel" maxlength="20" value="010-1234-5678" placeholder="010-0000-0000" autocomplete="tel">
+              </div>
+              <div class="field span-2">
+                <label for="zip">우편번호<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-group" style="max-width:320px">
+                  <input id="zip" class="input" type="text" maxlength="10" value="04524" autocomplete="postal-code">
+                  <button type="button" class="btn">주소 검색</button>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label for="addr1">주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr1" class="input" type="text" maxlength="200" value="서울특별시 중구 세종대로 110" autocomplete="address-line1">
+              </div>
+              <div class="field span-2">
+                <label for="addr2">상세 주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr2" class="input" type="text" maxlength="200" value="302호" autocomplete="address-line2">
+                <span class="hint">주소 검색을 쓸 수 없을 때는 우편번호와 주소를 직접 입력할 수 있습니다.</span>
+              </div>
+              <div class="field span-2">
+                <label for="memo">배송 메모 <span class="muted" style="font-weight:400">(선택)</span></label>
+                <input id="memo" class="input" type="text" maxlength="200" value="부재 시 문 앞에 놓아 주세요">
+                <span class="counter">17 / 200</span>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- 주문 상품 -->
+        <section aria-labelledby="items-h">
+          <div class="row-between">
+            <h2 id="items-h" class="section-title">주문 상품 <span class="muted" style="font-weight:500">2</span></h2>
+            <span class="small muted">판매자별로 따로 배송됩니다</span>
+          </div>
+
+          <div class="seller-group">
+            <div class="seller-group__head">
+              <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 A 주식회사]</span>
+            </div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 A]</div>
+                <span class="line-item__name">오버핏 헤비웨이트 코튼 티셔츠</span>
+                <div class="line-item__opt">블랙 / L · 27,300원</div>
+              </div>
+              <div class="line-item__qty">수량 1개</div>
+              <div class="line-item__amount">27,300원</div>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>27,300원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>3,000원</b></span>
+            </div>
+          </div>
+
+          <div class="seller-group">
+            <div class="seller-group__head">
+              <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span>
+            </div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 C]</div>
+                <span class="line-item__name">코튼 립 삭스</span>
+                <div class="line-item__opt">차콜 / FREE · 4,900원</div>
+              </div>
+              <div class="line-item__qty">수량 3개</div>
+              <div class="line-item__amount">14,700원</div>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>14,700원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>3,000원</b></span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="buy-layout__side" aria-label="결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>42,000원</dd>
+            <dt>배송비</dt><dd>6,000원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>3,000원 × 2</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>48,000원</strong></div>
+          <button type="button" class="btn btn-primary btn-lg btn-block">48,000원 결제하기</button>
+          <span class="hint">결제하기를 누르면 주문이 만들어지고 결제창이 열립니다</span>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ② 금액 변경 -->
+  <section id="state-changed" class="board">
+    <h2 class="board__label">② 금액이 변경되었을 때 — 결제하기를 눌렀는데 그 사이 가격이 바뀐 경우</h2>
+    <p class="board__note">견적을 다시 불러 바뀐 금액으로 화면을 갱신하고 안내를 띄웁니다. 자동으로 다시 제출하지 않으며, 사용자가 새 금액을 확인하고 다시 눌러야 주문됩니다. 안내는 주문서 맨 위(제목 아래)에 놓입니다.</p>
+
+    <div class="buy-layout">
+      <div class="stack">
+        <div class="notice notice-warn" role="alert">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span><strong>금액이 변경되었습니다.</strong> 확인 후 다시 결제해 주세요.</span>
+        </div>
+        <div class="seller-group" style="margin-top:0">
+          <div class="seller-group__head">
+            <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 A 주식회사]</span>
+          </div>
+          <div class="line-item line-item--plain">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 A]</div>
+              <span class="line-item__name">오버핏 헤비웨이트 코튼 티셔츠</span>
+              <div class="line-item__opt">블랙 / L · 29,300원</div>
+            </div>
+            <div class="line-item__qty">수량 1개</div>
+            <div class="line-item__amount">29,300원</div>
+          </div>
+          <div class="seller-group__foot">
+            <span>상품 금액<b>29,300원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>3,000원</b></span>
+          </div>
+        </div>
+      </div>
+      <aside aria-label="변경된 결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>44,000원</dd>
+            <dt>배송비</dt><dd>6,000원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>3,000원 × 2</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>50,000원</strong></div>
+          <button type="button" class="btn btn-primary btn-lg btn-block">50,000원 결제하기</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ③ 모의 결제창 -->
+  <section id="state-pay" class="board">
+    <h2 class="board__label">③ 모의 결제창 — 주문이 만들어진 뒤 결제 페이지에서 열리는 다이얼로그</h2>
+    <p class="board__note">왼쪽은 일반 빌드, 오른쪽은 데모 빌드입니다. 결과 선택은 데모 빌드에서만 보이고 "시연용" 표시가 붙습니다. "닫기"는 아무것도 호출하지 않으며 주문은 결제 대기로 남습니다.</p>
+
+    <div class="dialog-stage">
+      <!-- 일반 -->
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="pay-h1">
+        <div class="dialog__head">
+          <h3 id="pay-h1">결제</h3>
+          <span class="badge badge-outline">모의 결제</span>
+        </div>
+        <div class="dialog__body">
+          <div class="pay-amount">
+            <span class="label">결제 금액</span>
+            <strong>48,000원</strong>
+            <div class="name">오버핏 헤비웨이트 코튼 티셔츠 외 1건</div>
+          </div>
+          <dl class="kv">
+            <dt>주문명</dt><dd>오버핏 헤비웨이트 코튼 티셔츠 외 1건</dd>
+            <dt>주문번호</dt><dd class="mono">K20261112142110Q3ZT8B</dd>
+          </dl>
+        </div>
+        <div class="dialog__foot">
+          <button type="button" class="btn btn-ghost">닫기</button>
+          <button type="button" class="btn btn-primary">결제</button>
+        </div>
+      </div>
+
+      <!-- 데모 -->
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="pay-h2">
+        <div class="dialog__head">
+          <h3 id="pay-h2">결제</h3>
+          <span class="badge badge-outline">모의 결제</span>
+        </div>
+        <div class="dialog__body">
+          <div class="pay-amount">
+            <span class="label">결제 금액</span>
+            <strong>48,000원</strong>
+            <div class="name">오버핏 헤비웨이트 코튼 티셔츠 외 1건</div>
+          </div>
+          <dl class="kv">
+            <dt>주문명</dt><dd>오버핏 헤비웨이트 코튼 티셔츠 외 1건</dd>
+            <dt>주문번호</dt><dd class="mono">K20261112142110Q3ZT8B</dd>
+          </dl>
+          <fieldset class="demo-box" style="margin:0">
+            <legend class="sr-only">결제 결과 선택 (시연용)</legend>
+            <div class="demo-box__title"><span class="badge badge-demo">시연용</span>결제 결과 선택</div>
+            <label class="radio"><input type="radio" name="demo-result" checked><span><b>정상 승인</b><span>결제가 승인되고 주문이 완료됩니다</span></span></label>
+            <label class="radio"><input type="radio" name="demo-result"><span><b>카드사 거절</b><span>결제가 거절되고 주문이 취소됩니다</span></span></label>
+            <label class="radio"><input type="radio" name="demo-result"><span><b>응답 없음 — 실제로는 승인됨</b><span>"결제 확인 중"을 거쳐 결제 완료로 바뀝니다</span></span></label>
+            <label class="radio"><input type="radio" name="demo-result"><span><b>응답 없음 — 승인도 안 됨</b><span>"결제 확인 중"을 거쳐 주문이 취소됩니다</span></span></label>
+          </fieldset>
+        </div>
+        <div class="dialog__foot">
+          <button type="button" class="btn btn-ghost">닫기</button>
+          <button type="button" class="btn btn-primary">결제</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+</body>
+</html>

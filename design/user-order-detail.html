@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 주문 상세</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>장바구니</a>
+      <a href="user-order-list.html" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <strong>상태별 보기</strong>
+    <a href="#state-default">① 결제 완료 (기본)</a><a href="#state-headers">② 상태 헤더 변형 3종</a><a href="#state-cancel">③ 항목 취소 창</a>
+  </nav>
+
+  <!-- ① 결제 완료 -->
+  <section id="state-default" aria-labelledby="od-h">
+    <nav class="crumb" aria-label="현재 위치" style="margin-bottom:0">
+      <a href="user-order-list.html">주문 내역</a><span aria-hidden="true">/</span><span>주문 상세</span>
+    </nav>
+    <div class="page-head" style="margin-top:12px">
+      <h1 id="od-h">주문 상세</h1>
+    </div>
+
+    <div class="buy-layout">
+      <div>
+        <!-- 상태 헤더 -->
+        <div class="status-hero">
+          <div>
+            <div class="status-hero__title">결제 완료</div>
+            <p class="status-hero__desc">판매자가 상품을 준비하고 있습니다. 배송 상태는 판매자별로 아래에서 확인할 수 있습니다.</p>
+            <div class="status-hero__meta">
+              <span>주문번호<b class="mono">K20261110193042M4XA7C</b></span>
+              <span>주문 일시<b class="mono">2026-11-10 19:30</b></span>
+              <span>결제 일시<b class="mono">2026-11-10 19:31</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 판매자 주문 1: 배송 준비 중 -->
+        <section class="so-card" aria-label="[판매자 A 주식회사] 주문">
+          <div class="so-card__head">
+            <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 A 주식회사]</span>
+            <span class="chip chip-pending">배송 준비 중</span>
+          </div>
+
+          <div class="line-item line-item--order">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 C]</div>
+              <a class="line-item__name" href="user-product-detail.html">코튼 립 삭스</a>
+              <div class="line-item__opt">차콜 / FREE · 수량 3개</div>
+            </div>
+            <div class="line-item__state"><span class="chip chip-info">주문 완료</span></div>
+            <div class="line-item__amount">14,700원</div>
+            <div class="line-item__action"><button type="button" class="btn btn-ghost btn-sm">취소</button></div>
+          </div>
+
+          <div class="line-item line-item--order">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 C]</div>
+              <a class="line-item__name" href="user-product-detail.html">코튼 립 삭스</a>
+              <div class="line-item__opt">아이보리 / FREE · 수량 1개</div>
+            </div>
+            <div class="line-item__state"><span class="chip chip-pending">취소 확인 중</span><span class="small muted">취소를 확인하고 있습니다</span></div>
+            <div class="line-item__amount">4,900원</div>
+            <div class="line-item__action"></div>
+          </div>
+
+          <div class="line-item line-item--order is-canceled">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 A]</div>
+              <a class="line-item__name" href="user-product-detail.html">램스울 크루넥 니트</a>
+              <div class="line-item__opt">오트밀 / M · 수량 1개</div>
+            </div>
+            <div class="line-item__state"><span class="chip chip-ended">취소</span><span class="small">환불 27,000원</span></div>
+            <div class="line-item__amount">30,000원</div>
+            <div class="line-item__action"></div>
+          </div>
+
+          <div class="seller-group__foot">
+            <span>배송비<b>3,000원</b></span><span class="sep" aria-hidden="true"></span><span>무료배송 · KAIROS 부담</span>
+          </div>
+        </section>
+
+        <!-- 판매자 주문 2: 배송 완료 -->
+        <section class="so-card" aria-label="[판매자 B 상사] 주문">
+          <div class="so-card__head">
+            <span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span>
+            <span class="chip chip-onsale">배송 완료</span>
+          </div>
+          <div class="so-card__ship">
+            <div class="kv-inline">
+              <span>택배사<b>CJ대한통운</b></span>
+              <span>송장번호<b class="mono">6812 3345 9021</b></span>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm">구매 확정</button>
+          </div>
+
+          <div class="line-item line-item--order">
+            <div class="ph ph-72">[이미지]</div>
+            <div class="line-item__info">
+              <div class="line-item__brand">[브랜드 A]</div>
+              <a class="line-item__name" href="user-product-detail.html">오버핏 헤비웨이트 코튼 티셔츠</a>
+              <div class="line-item__opt">블랙 / L · 수량 1개</div>
+            </div>
+            <div class="line-item__state"><span class="chip chip-info">주문 완료</span></div>
+            <div class="line-item__amount">27,300원</div>
+            <div class="line-item__action"></div>
+          </div>
+
+          <div class="seller-group__foot">
+            <span>배송비<b>3,000원</b></span><span class="sep" aria-hidden="true"></span><span>무료배송 · KAIROS 부담</span>
+          </div>
+        </section>
+
+        <p class="hint mt-16">항목 취소는 판매자가 발송하기 전(배송 준비 중)에만 할 수 있습니다. 구매 확정은 배송 완료 후에 할 수 있으며, 확정하면 되돌릴 수 없습니다.</p>
+      </div>
+
+      <aside class="buy-layout__side">
+        <section class="summary-panel" aria-labelledby="pay-sum-h">
+          <h2 id="pay-sum-h">결제 요약</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>76,900원</dd>
+            <dt>배송비</dt><dd>0원</dd>
+            <dt style="font-weight:700;color:var(--text)">결제 금액</dt><dd style="font-weight:700">76,900원</dd>
+            <div class="sum-divider" aria-hidden="true"></div>
+            <dt>환불 금액</dt><dd class="minus">−27,000원</dd>
+            <div class="sub"><span>무료배송 기준 미달로 차감된 배송비</span><span>3,000원</span></div>
+          </dl>
+          <div class="sum-total"><span>남은 결제 금액</span><strong>49,900원</strong></div>
+        </section>
+
+        <section class="summary-panel" aria-labelledby="addr-h">
+          <h2 id="addr-h">배송지</h2>
+          <dl class="kv">
+            <dt>수령인</dt><dd>김민지</dd>
+            <dt>연락처</dt><dd class="mono">010-1234-5678</dd>
+            <dt>주소</dt><dd>(04524) 서울특별시 중구 세종대로 110, 302호</dd>
+            <dt>배송 메모</dt><dd>부재 시 문 앞에 놓아 주세요</dd>
+          </dl>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ② 상태 헤더 변형 -->
+  <section id="state-headers" class="board">
+    <h2 class="board__label">② 상태 헤더 변형 — 헤더 자리만 바뀝니다</h2>
+    <p class="board__note">아래 세 가지는 ①의 "결제 완료" 헤더 자리에 주문·결제 상태에 따라 대신 놓입니다. 구매 확정 상태는 결제 완료와 같은 모양에 제목과 설명만 다릅니다.</p>
+
+    <div class="stack" style="max-width:832px; gap:12px">
+      <h3 class="board__label">②-1 결제 대기 — 남은 시간과 결제하기</h3>
+      <div class="status-hero status-hero--wait">
+        <div>
+          <div class="status-hero__title">결제 대기</div>
+          <p class="status-hero__desc">남은 시간 안에 결제하지 않으면 주문이 자동으로 취소됩니다.</p>
+          <div class="status-hero__meta">
+            <span>주문번호<b class="mono">K20261112142110Q3ZT8B</b></span>
+            <span>주문 일시<b class="mono">2026-11-12 14:21</b></span>
+          </div>
+        </div>
+        <div class="status-hero__side">
+          <div class="countdown" role="timer" aria-label="결제까지 남은 시간 12분 34초">
+            <span class="label">남은 시간</span>
+            <strong>12:34</strong>
+          </div>
+          <a class="btn btn-primary btn-lg" href="#">결제하기</a>
+        </div>
+      </div>
+
+      <h3 class="board__label mt-16">②-2 결제 확인 중 — 완료도 실패도 단정하지 않습니다</h3>
+      <div class="status-hero">
+        <div>
+          <div class="status-hero__title"><span class="spinner" aria-hidden="true"></span>결제 확인 중</div>
+          <p class="status-hero__desc">결제 결과를 확인하고 있습니다. 잠시 후 자동으로 바뀌니 다시 결제하지 말고 기다려 주세요.</p>
+          <div class="status-hero__meta">
+            <span>주문번호<b class="mono">K20261112142110Q3ZT8B</b></span>
+            <span>주문 일시<b class="mono">2026-11-12 14:21</b></span>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="board__label mt-16">②-3 취소 — 결제 기한 만료·결제 거절·전체 취소</h3>
+      <div class="status-hero status-hero--muted">
+        <div>
+          <div class="status-hero__title">취소</div>
+          <p class="status-hero__desc">취소된 주문입니다. 결제된 금액이 있었다면 아래 결제 요약의 환불 금액에서 확인할 수 있습니다.</p>
+          <div class="status-hero__meta">
+            <span>주문번호<b class="mono">K20261103101502H8PD3W</b></span>
+            <span>주문 일시<b class="mono">2026-11-03 10:15</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 항목 취소 창 -->
+  <section id="state-cancel" class="board">
+    <h2 class="board__label">③ 항목 취소 창 — 항목의 "취소"를 누르면 열립니다</h2>
+    <p class="board__note">환불 예정 내역은 서버의 환불 미리보기 값입니다. 0원인 줄은 숨깁니다. 예시는 ①의 "램스울 크루넥 니트"를 취소하기 직전(상품 금액 76,900원 → 남는 금액 46,900원)의 창이고, 오른쪽은 미리보기가 취소 불가로 돌아온 경우입니다.</p>
+
+    <div class="dialog-stage">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-h">
+        <div class="dialog__head"><h3 id="cancel-h">주문 항목 취소</h3></div>
+        <div class="dialog__body">
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div class="line-item__info" style="min-width:0">
+              <div class="line-item__brand">[브랜드 A]</div>
+              <span class="line-item__name">램스울 크루넥 니트</span>
+              <div class="line-item__opt">오트밀 / M · 수량 1개</div>
+            </div>
+          </div>
+
+          <div class="dialog__box">
+            <div class="small" style="font-weight:700;margin-bottom:10px">환불 예정 내역</div>
+            <dl class="sum-rows">
+              <dt>항목 금액</dt><dd>30,000원</dd>
+              <dt>배송비 차감</dt><dd class="minus">−3,000원</dd>
+            </dl>
+            <div class="sum-total"><span>환불 예정 금액</span><strong>27,000원</strong></div>
+          </div>
+          <p class="small muted" style="margin-top:-6px">남은 상품 금액이 무료배송 기준보다 적어져 배송비가 차감됩니다.</p>
+
+          <div class="field">
+            <label for="cancel-reason">취소 사유<span class="req" aria-hidden="true">*</span></label>
+            <textarea id="cancel-reason" class="textarea" maxlength="500" style="min-height:88px" placeholder="취소 사유를 입력해 주세요">사이즈를 잘못 골랐어요</textarea>
+            <span class="counter">12 / 500</span>
+          </div>
+        </div>
+        <div class="dialog__foot">
+          <button type="button" class="btn btn-ghost">닫기</button>
+          <button type="button" class="btn btn-primary">취소하기</button>
+        </div>
+      </div>
+
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-h2">
+        <div class="dialog__head"><h3 id="cancel-h2">주문 항목 취소</h3></div>
+        <div class="dialog__body">
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div class="line-item__info" style="min-width:0">
+              <div class="line-item__brand">[브랜드 C]</div>
+              <span class="line-item__name">코튼 립 삭스</span>
+              <div class="line-item__opt">차콜 / FREE · 수량 3개</div>
+            </div>
+          </div>
+          <div class="notice notice-warn" role="alert">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+            <span>이미 발송된 상품은 취소할 수 없습니다.</span>
+          </div>
+        </div>
+        <div class="dialog__foot">
+          <button type="button" class="btn btn-ghost">닫기</button>
+          <button type="button" class="btn btn-primary" disabled>취소하기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+</body>
+</html>

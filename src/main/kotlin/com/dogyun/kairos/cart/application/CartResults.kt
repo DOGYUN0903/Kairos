@@ -4,6 +4,9 @@ data class CartItemResult(
     val cartItemId: Long,
     val skuId: Long,
     val productId: Long,
+    /** SKU 가 사라진 항목만 null */
+    val sellerId: Long?,
+    val sellerName: String?,
     val productName: String,
     val brandName: String,
     val thumbnailUrl: String,

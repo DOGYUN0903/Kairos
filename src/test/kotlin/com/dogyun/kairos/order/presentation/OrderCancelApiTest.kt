@@ -444,4 +444,49 @@ class OrderCancelApiTest : CommerceTestSupport() {
     }
 
     private fun json(body: String): JsonNode = objectMapper.readTree(body)
+
+    @Test
+    fun 결제_직후_남은_결제_금액은_결제_금액과_같다() {
+        val b = shop(30_000)
+        val c = shop(30_000)
+        val user = newUserToken()
+
+        val order = pay(user, listOf(b to 1, c to 1), 60_000)
+
+        assertEquals(0L, order.get("refundedAmount").asLong())
+        assertEquals(60_000L, order.get("remainingAmount").asLong())
+    }
+
+    @Test
+    fun 부분_취소_뒤_남은_결제_금액은_결제_금액에서_환불액을_뺀_값이다() {
+        val b = shop(30_000)
+        val c = shop(30_000)
+        val user = newUserToken()
+        val order = pay(user, listOf(b to 1, c to 1), 60_000)
+        val orderId = order.get("orderId").asLong()
+
+        dataOf(cancel(user, orderId, sellerOrderAndItem(order, 1).second))
+
+        val detail = orderDetail(user, orderId)
+        assertEquals(27_000L, detail.get("refundedAmount").asLong())
+        assertEquals(33_000L, detail.get("remainingAmount").asLong())
+    }
+
+    @Test
+    fun 전부_취소하면_남은_결제_금액은_0이다() {
+        val b = shop(30_000)
+        val c = shop(30_000)
+        val user = newUserToken()
+        val order = pay(user, listOf(b to 1, c to 1), 60_000)
+        val orderId = order.get("orderId").asLong()
+
+        dataOf(cancel(user, orderId, sellerOrderAndItem(order, 1).second))
+        dataOf(cancel(user, orderId, sellerOrderAndItem(order, 0).second))
+
+        val detail = orderDetail(user, orderId)
+        assertEquals(60_000L, detail.get("refundedAmount").asLong())
+        assertEquals(0L, detail.get("remainingAmount").asLong())
+        val admin = json(get("/api/v1/admin/orders/$orderId", adminToken()).andExpect { status { isOk() } }).get("data")
+        assertEquals(0L, admin.get("remainingAmount").asLong())
+    }
 }

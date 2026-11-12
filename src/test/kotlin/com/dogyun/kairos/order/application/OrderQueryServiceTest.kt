@@ -38,7 +38,7 @@ class OrderQueryServiceTest {
     private val returnService = OrderReturnService(
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, OrderProperties(), tx, clock,
     )
-    private val service = OrderQueryService(orderRepository, paymentGateway, OrderProperties())
+    private val service = OrderQueryService(orderRepository, paymentGateway, productReader, OrderProperties())
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L
@@ -150,6 +150,16 @@ class OrderQueryServiceTest {
     }
 
     @Test
+    fun 남은_결제_금액은_총액에서_환불액을_뺀_값이고_목록_만료_시각은_상세와_같다() {
+        val order = place(10L, 20L)
+
+        val before = service.getMine(memberId, order.orderId)
+        assertEquals(before.totalAmount, before.remainingAmount)
+        assertEquals(before.expiresAt, service.listMine(memberId, 0, 20).content.single().expiresAt)
+        assertEquals(before.expiresAt, service.listForAdmin(null, null, null, 0, 20).content.single().expiresAt)
+    }
+
+    @Test
     fun 결제_정보가_없으면_payment는_null이다() {
         val order = place(10L)
         paymentGateway.payments.clear()
@@ -252,5 +262,39 @@ class OrderQueryServiceTest {
         // 반열린 구간: to 는 포함하지 않고 from 은 포함한다
         assertEquals(emptyList(), service.findConfirmedForSettlement(now.minusDays(1), now, 0, 10))
         assertEquals(2, service.findConfirmedForSettlement(now, now.plusDays(1), 0, 10).size)
+    }
+
+    @Test
+    fun 삭제된_상품의_주문_이미지는_null이다() {
+        productReader.thumbnails[110L] = "http://files/110.png" // SKU 10 의 상품. SKU 20 의 상품(120)은 삭제돼 빠졌다
+        val order = place(10L, 20L)
+        pay(order)
+
+        val detail = service.getMine(memberId, order.orderId)
+
+        val byProduct = detail.sellerOrders.flatMap { it.items }.associate { it.productId to it.thumbnailUrl }
+        assertEquals("http://files/110.png", byProduct[110L])
+        assertNull(byProduct[120L])
+        val summary = service.listMine(memberId, 0, 20).content.single()
+        assertEquals("http://files/110.png", summary.thumbnailUrl)
+
+        val deletedFirst = place(20L)
+        assertNull(service.listMine(memberId, 0, 20).content.first { it.orderId == deletedFirst.orderId }.thumbnailUrl)
+    }
+
+    @Test
+    fun 주문_목록_한_페이지의_이미지는_한_번에_조회한다() {
+        productReader.thumbnails[110L] = "http://files/110.png"
+        productReader.thumbnails[120L] = "http://files/120.png"
+        pay(place(10L))
+        pay(place(20L))
+        pay(place(10L, 20L))
+
+        productReader.thumbnailCalls = 0
+        val page = service.listMine(memberId, 0, 20)
+
+        assertEquals(3, page.content.size)
+        assertEquals(1, productReader.thumbnailCalls)
+        assertEquals(0, run { productReader.thumbnailCalls = 0; service.listMine(memberId + 1, 0, 20); productReader.thumbnailCalls })
     }
 }

@@ -1,6 +1,7 @@
 package com.dogyun.kairos.order.presentation
 
 import com.dogyun.kairos.order.application.CancelItemResult
+import com.dogyun.kairos.order.application.CancelPreviewResult
 import com.dogyun.kairos.order.application.ConfirmPaymentCommand
 import com.dogyun.kairos.order.application.ConfirmPaymentResult
 import com.dogyun.kairos.order.application.OrderItemCommand
@@ -123,6 +124,23 @@ data class CancelItemResponse(
     companion object {
         fun from(result: CancelItemResult) =
             CancelItemResponse(result.orderItemId, result.itemStatus, result.refundAmount, result.shippingFeeDeducted, result.pointsRefund)
+    }
+}
+
+data class CancelPreviewResponse(
+    val orderItemId: Long,
+    val paidAmount: Long,
+    val shippingFeeRefund: Long,
+    val shippingFeeDeducted: Long,
+    val shippingFeeReturned: Long,
+    val refundAmount: Long,
+    val pointsRefund: Long,
+) {
+    companion object {
+        fun from(result: CancelPreviewResult) = CancelPreviewResponse(
+            result.orderItemId, result.paidAmount, result.shippingFeeRefund, result.shippingFeeDeducted,
+            result.shippingFeeReturned, result.refundAmount, result.pointsRefund,
+        )
     }
 }
 

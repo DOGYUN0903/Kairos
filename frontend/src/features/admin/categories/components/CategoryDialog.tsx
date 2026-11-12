@@ -33,23 +33,26 @@ function CategoryForm({ state, onClose }: { state: CategoryDialogState; onClose:
   const form = useForm<CategoryValues>({ resolver: zodResolver(categorySchema), defaultValues: state.initial });
   const { register, formState } = form;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
-    try {
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values, key) => {
       if (state.mode === "create") await create.mutateAsync({ parentId: state.parentId, values, key });
       else await update.mutateAsync({ id: state.id, values });
       toast({ title: state.mode === "create" ? "카테고리를 추가했습니다." : "카테고리를 수정했습니다." });
       form.reset();
       onClose();
-    } catch (e) {
-      const r = resolveError(e);
-      if (e instanceof ApiError && e.status === 400) {
-        // INVALID_REQUEST 의 서버 메시지는 "필드: 사유" 형태라 필드 이름이 있으면 그 필드에, 없으면 이름에 붙인다.
-        const field = e.message.includes("displayOrder") ? "displayOrder" : "name";
-        form.setError(field, { message: field === "displayOrder" ? "표시 순서는 0 이상의 정수여야 합니다." : r.message });
-      }
-      else toast({ variant: "destructive", title: r.message, ...(r.traceId ? { description: `문의 시 전달: ${r.traceId}` } : {}) });
-    }
-  });
+    },
+    {
+      onError: (e) => {
+        const r = resolveError(e);
+        if (e instanceof ApiError && e.status === 400) {
+          // INVALID_REQUEST 의 서버 메시지는 "필드: 사유" 형태라 필드 이름이 있으면 그 필드에, 없으면 이름에 붙인다.
+          const field = e.message.includes("displayOrder") ? "displayOrder" : "name";
+          form.setError(field, { message: field === "displayOrder" ? "표시 순서는 0 이상의 정수여야 합니다." : r.message });
+        } else toast({ variant: "destructive", title: r.message, ...(r.traceId ? { description: `문의 시 전달: ${r.traceId}` } : {}) });
+      },
+    },
+  );
 
   return (
     <>

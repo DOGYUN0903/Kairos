@@ -3,7 +3,7 @@
 # dev 모드와 달리 실행 중 타입 생성이 없고, 빌드가 고쳐 쓰는 next-env.d.ts 는 원래대로 돌려놓는다(커밋된 파일을 더럽히지 않게).
 set -e
 PORT="${1:-3100}"
-export NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_DEMO_MODE=false
+export NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_DEMO_MODE=false NEXT_PUBLIC_PG_PROVIDER=mock
 backup=$(mktemp)
 cp next-env.d.ts "$backup"
 trap 'cp "$backup" next-env.d.ts; rm -f "$backup"' EXIT

@@ -2149,6 +2149,9 @@ paths:
       tags: [Cart]
       operationId: addCartItem
       summary: 장바구니 담기 (같은 SKU 는 수량 합산, 합계 최대 999)
+      description: 수량을 더하는 요청이라 `Idempotency-Key` 필수다. 같은 키로 다시 보내면 저장된 응답을 돌려주고 수량은 한 번만 더해진다. 정지된 판매자의 상품도 담을 수 있다(장바구니 조회에서 `PAUSED` 로 보인다).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2168,7 +2171,7 @@ paths:
                       data:
                         $ref: '#/components/schemas/AddCartItemResponse'
         '400':
-          description: "`CART_INVALID`(합산 수량 범위 초과) 또는 `INVALID_REQUEST`"
+          description: "`CART_INVALID`(합산 수량 범위 초과), `IDEMPOTENCY_KEY_REQUIRED` 또는 `INVALID_REQUEST`"
           content:
             application/json:
               schema:
@@ -2182,11 +2185,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: "`SKU_NOT_ORDERABLE` AVAILABLE 이 아닌 SKU"
+          description: "`SKU_NOT_ORDERABLE`(AVAILABLE 이 아닌 SKU) 또는 `IDEMPOTENCY_IN_PROGRESS`"
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
   /api/v1/cart/items/{cartItemId}:
     patch:
       tags: [Cart]
@@ -2598,6 +2603,45 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+  /api/v1/orders/{orderId}/items/{orderItemId}/cancel-preview:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - $ref: '#/components/parameters/OrderItemId'
+    get:
+      tags: [Order]
+      operationId: previewCancelMyOrderItem
+      summary: 주문 항목 환불 미리보기 (구매자)
+      description: |
+        실제 취소와 같은 계산(`RefundCalculator`)으로 지금 이 항목을 취소하면 얼마가 환불되는지 보여준다. 아무것도 바꾸지 않는다(주문·결제·재고 불변, 주문 행 락 없음).
+        미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다. `Idempotency-Key` 는 없다.
+      responses:
+        '200':
+          description: 지금 취소하면 받을 환불 내역
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CancelPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: "`ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: "`ORDER_ITEM_NOT_CANCELABLE`(배송 시작·다른 항목 취소 확인 중) 또는 `ORDER_INVALID_STATE_TRANSITION`(결제 전 등)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/seller/orders/{sellerOrderId}/items/{orderItemId}/cancel:
     parameters:
       - $ref: '#/components/parameters/SellerOrderId'
@@ -6101,7 +6145,7 @@ components:
           maximum: 999
     CartItemResult:
       type: object
-      required: [cartItemId, skuId, productId, productName, brandName, thumbnailUrl, optionDisplayName, unitPrice, quantity, lineAmount, availability]
+      required: [cartItemId, skuId, productId, sellerId, sellerName, productName, brandName, thumbnailUrl, optionDisplayName, unitPrice, quantity, lineAmount, availability]
       properties:
         cartItemId:
           type: integer
@@ -6112,6 +6156,15 @@ components:
         productId:
           type: integer
           format: int64
+        sellerId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 판매자 ID. SKU 가 사라진(DISCONTINUED) 항목만 null. 정지된 판매자여도 채운다.
+        sellerName:
+          type: string
+          nullable: true
+          description: 판매자 회사명. SKU 가 사라진 항목만 null.
         productName:
           type: string
         brandName:
@@ -6133,6 +6186,7 @@ components:
         availability:
           type: string
           enum: [AVAILABLE, SOLD_OUT, PAUSED, DISCONTINUED, ENDED]
+          description: 판매자가 주문 가능한 상태(활성)가 아니면 AVAILABLE 대신 PAUSED 로 내려준다(견적·주문과 같은 기준).
     CartResult:
       type: object
       required: [items, availableAmount]
@@ -6252,9 +6306,28 @@ components:
           default: 0
     QuoteLine:
       type: object
-      required: [skuId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
+      required: [skuId, productId, productName, brandName, optionDisplayName, thumbnailUrl, unitPrice, sellerId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
       properties:
         skuId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        productName:
+          type: string
+        brandName:
+          type: string
+        optionDisplayName:
+          type: string
+        thumbnailUrl:
+          type: string
+          description: 상품 대표 이미지 URL. 이미지가 없으면 빈 문자열
+        unitPrice:
+          type: integer
+          format: int64
+          description: 판매가 + 옵션 추가금
+        sellerId:
           type: integer
           format: int64
         quantity:
@@ -6275,14 +6348,45 @@ components:
         paidAmount:
           type: integer
           format: int64
+    SellerQuote:
+      type: object
+      required: [sellerId, sellerName, itemsAmount, shippingFee, shippingFeePayer]
+      properties:
+        sellerId:
+          type: integer
+          format: int64
+        sellerName:
+          type: string
+        itemsAmount:
+          type: integer
+          format: int64
+          description: 이 판매자 항목의 상품 금액 합(쿠폰·포인트 차감 전)
+        shippingFee:
+          type: integer
+          format: int64
+        shippingFeePayer:
+          type: string
+          enum: [BUYER, PLATFORM]
     OrderQuote:
       type: object
-      required: [items, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
+      required: [items, sellerQuotes, freeShippingThreshold, baseShippingFee, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/QuoteLine'
+        sellerQuotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SellerQuote'
+        freeShippingThreshold:
+          type: integer
+          format: int64
+          description: 상품 합계가 이 금액 이상이면 배송비는 플랫폼 부담
+        baseShippingFee:
+          type: integer
+          format: int64
+          description: 판매자별 기본 배송비
         itemsAmount:
           type: integer
           format: int64
@@ -6358,6 +6462,36 @@ components:
           type: integer
           format: int64
           description: 되돌려진 포인트
+    CancelPreview:
+      type: object
+      required: [orderItemId, paidAmount, shippingFeeRefund, shippingFeeDeducted, shippingFeeReturned, refundAmount, pointsRefund]
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+        paidAmount:
+          type: integer
+          format: int64
+          description: 항목의 현금 결제 몫
+        shippingFeeRefund:
+          type: integer
+          format: int64
+          description: 판매자 주문이 통째로 비어 돌려받는 배송비
+        shippingFeeDeducted:
+          type: integer
+          format: int64
+          description: 무료배송 기준이 깨져 차감되는 배송비
+        shippingFeeReturned:
+          type: integer
+          format: int64
+          description: 마지막 취소라 되돌려받는 앞선 차감액
+        refundAmount:
+          type: integer
+          format: int64
+          description: 최종 환불액(`paidAmount + shippingFeeRefund - shippingFeeDeducted + shippingFeeReturned`)
+        pointsRefund:
+          type: integer
+          format: int64
     ConfirmPaymentRequest:
       type: object
       required: [orderNo, paymentKey, amount]
@@ -6417,7 +6551,7 @@ components:
       enum: [PENDING_PAYMENT, PAID, SHIPPING, DELIVERED, CONFIRMED, CANCELED]
     OrderItemResult:
       type: object
-      required: [orderItemId, skuId, productId, productName, brandName, optionDisplayName, salePrice, extraPrice, quantity, lineAmount, status, refundAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount, pointsRefunded]
+      required: [orderItemId, skuId, productId, productName, thumbnailUrl, brandName, optionDisplayName, salePrice, extraPrice, quantity, lineAmount, status, refundAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount, pointsRefunded]
       properties:
         orderItemId:
           type: integer
@@ -6431,6 +6565,10 @@ components:
         productName:
           type: string
           description: 주문 시점 스냅샷
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null
         brandName:
           type: string
         optionDisplayName:
@@ -6705,7 +6843,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     OrderDetail:
       type: object
-      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
       properties:
         orderId:
           type: integer
@@ -6731,6 +6869,10 @@ components:
         refundedAmount:
           type: integer
           format: int64
+        remainingAmount:
+          type: integer
+          format: int64
+          description: 결제 금액에서 누적 환불액을 뺀 남은 결제 금액. 화면은 이 값을 그대로 보여준다
         remainingPaidAmount:
           type: integer
           format: int64
@@ -6777,7 +6919,7 @@ components:
           nullable: true
     OrderSummary:
       type: object
-      required: [orderId, orderNo, status, totalAmount, itemCount, firstProductName, createdAt]
+      required: [orderId, orderNo, status, totalAmount, itemCount, firstProductName, thumbnailUrl, sellerOrderStatuses, expiresAt, createdAt]
       properties:
         orderId:
           type: integer
@@ -6794,6 +6936,19 @@ components:
           format: int32
         firstProductName:
           type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: 첫 항목의 대표 이미지 URL. 없으면 null
+        sellerOrderStatuses:
+          type: array
+          description: 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용
+          items:
+            $ref: '#/components/schemas/SellerOrderStatus'
+        expiresAt:
+          type: string
+          format: date-time
+          description: 결제 만료 시각(오프셋 없는 KST). 상세의 `expiresAt` 과 같은 값
         createdAt:
           type: string
           format: date-time
@@ -6857,7 +7012,7 @@ components:
           format: date-time
     SellerOrderSummary:
       type: object
-      required: [sellerOrderId, orderNo, status, itemsAmount, itemCount, firstProductName, orderedAt]
+      required: [sellerOrderId, orderNo, status, itemsAmount, itemCount, firstProductName, thumbnailUrl, orderedAt]
       properties:
         sellerOrderId:
           type: integer
@@ -6874,6 +7029,10 @@ components:
           format: int32
         firstProductName:
           type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: 첫 항목의 대표 이미지 URL. 없으면 null
         orderedAt:
           type: string
           format: date-time

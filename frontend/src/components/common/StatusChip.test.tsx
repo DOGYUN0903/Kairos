@@ -17,4 +17,14 @@ describe("StatusChip", () => {
     render(<StatusChip kind="brand" status="WHATEVER" />);
     expect(screen.getByText("WHATEVER")).toHaveClass("chip-paused");
   });
+
+  it("주문_항목_RETURN_REFUNDING은_반품_환불_중", () => {
+    render(<StatusChip kind="orderItem" status="RETURN_REFUNDING" />);
+    expect(screen.getByText("반품 환불 중")).toBeInTheDocument();
+  });
+
+  it("주문_계열_kind의_모르는_값은_원문", () => {
+    render(<StatusChip kind="payment" status="WHATEVER" />);
+    expect(screen.getByText("WHATEVER")).toHaveClass("chip-paused");
+  });
 });

@@ -106,13 +106,25 @@ class OrderService(
             now = now,
             paymentTtl = properties.paymentTtl,
         )
+        // 표시용 필드는 도메인 OrderLine 에 넣지 않고 SKU 조회 결과를 skuId 로 다시 매핑한다.
+        val skuInfos = productReader.findOrderableSkus(quantities.keys)
+        val policy = properties.shippingPolicy()
         val afterCoupon = order.itemsAmount - allocation.productCouponDiscount - allocation.cartCouponDiscount
         OrderQuote(
             items = order.allItems.sortedBy { it.skuId }.map {
                 QuoteLine(
-                    it.skuId, it.quantity, it.lineAmount, it.productCouponDiscount, it.cartCouponAllocated, it.pointsAllocated, it.paidAmount,
+                    skuId = it.skuId, productId = it.productId, productName = it.productName, brandName = it.brandName,
+                    optionDisplayName = it.optionDisplayName, thumbnailUrl = skuInfos.getValue(it.skuId).thumbnailUrl,
+                    unitPrice = it.salePrice + it.extraPrice, sellerId = skuInfos.getValue(it.skuId).sellerId,
+                    quantity = it.quantity, lineAmount = it.lineAmount, productCouponDiscount = it.productCouponDiscount,
+                    cartCouponAllocated = it.cartCouponAllocated, pointsAllocated = it.pointsAllocated, paidAmount = it.paidAmount,
                 )
             },
+            sellerQuotes = order.sellerOrders.map {
+                SellerQuote(it.sellerId, it.sellerName, it.itemsAmount, it.shippingFee, it.shippingFeePayer.name)
+            },
+            freeShippingThreshold = policy.freeShippingThreshold,
+            baseShippingFee = policy.baseShippingFee,
             itemsAmount = order.itemsAmount,
             productCouponDiscount = allocation.productCouponDiscount,
             cartCouponDiscount = allocation.cartCouponDiscount,

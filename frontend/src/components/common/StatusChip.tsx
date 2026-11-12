@@ -1,4 +1,4 @@
-type Kind = "seller" | "brand" | "product" | "changeRequest";
+type Kind = "seller" | "brand" | "product" | "changeRequest" | "order" | "sellerOrder" | "orderItem" | "payment";
 type Tone = "pending" | "onsale" | "rejected" | "paused" | "ended" | "info";
 
 // 스펙 §9-4 표 그대로.
@@ -26,6 +26,38 @@ const table: Record<Kind, Record<string, [string, Tone]>> = {
     APPROVED: ["승인", "onsale"],
     REJECTED: ["반려", "rejected"],
     WITHDRAWN: ["철회", "ended"],
+  },
+  order: {
+    PENDING_PAYMENT: ["결제 대기", "pending"],
+    PAID: ["결제 완료", "info"],
+    COMPLETED: ["구매 확정", "onsale"],
+    CANCELED: ["취소", "ended"],
+  },
+  sellerOrder: {
+    PENDING_PAYMENT: ["결제 대기", "pending"],
+    PAID: ["배송 준비 중", "info"],
+    SHIPPING: ["배송 중", "info"],
+    DELIVERED: ["배송 완료", "onsale"],
+    CONFIRMED: ["구매 확정", "onsale"],
+    CANCELED: ["취소", "ended"],
+  },
+  orderItem: {
+    ORDERED: ["주문 완료", "info"],
+    CANCEL_REQUESTED: ["취소 확인 중", "pending"],
+    CANCELED: ["취소", "ended"],
+    RETURN_REQUESTED: ["반품 요청", "pending"],
+    RETURN_APPROVED: ["반품 승인", "info"],
+    RETURN_REFUNDING: ["반품 환불 중", "pending"],
+    RETURNED: ["반품 완료", "ended"],
+  },
+  payment: {
+    READY: ["결제 대기", "pending"],
+    IN_PROGRESS: ["확인 중", "pending"],
+    UNKNOWN: ["확인 중", "pending"],
+    APPROVED: ["승인", "onsale"],
+    PARTIAL_CANCELED: ["부분 환불", "paused"],
+    CANCELED: ["전액 환불", "ended"],
+    FAILED: ["실패", "rejected"],
   },
 };
 

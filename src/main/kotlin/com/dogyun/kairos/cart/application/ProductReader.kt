@@ -9,6 +9,7 @@ interface ProductReader {
 data class CartSkuInfo(
     val skuId: Long,
     val productId: Long,
+    val sellerId: Long,
     val productName: String,
     val brandName: String,
     val thumbnailUrl: String,

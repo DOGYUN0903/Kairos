@@ -25,23 +25,22 @@ export function SignupForm({ next }: { next: string | null }) {
   const { register, formState } = form;
   const { errors } = formState;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
-    try {
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values, key) => {
       await signup.mutateAsync({ values, key });
-    } catch (e) {
-      applyFormError(form, e);
-      return;
-    }
-    // 같은 값으로 다시 가입을 시도하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
-    form.reset();
-    toast({ title: "가입했습니다." });
-    try {
-      const me = await login(values.email, values.password);
-      router.replace(afterLoginPath(me, next));
-    } catch {
-      router.replace(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
-    }
-  });
+      // 입력(비밀번호 포함)이 화면에 남지 않게 성공 뒤 폼을 비운다. Idempotency-Key 와는 무관하다(키는 성공하면 훅이 버린다).
+      form.reset();
+      toast({ title: "가입했습니다." });
+      try {
+        const me = await login(values.email, values.password);
+        router.replace(afterLoginPath(me, next));
+      } catch {
+        router.replace(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
+      }
+    },
+    { onError: (e) => applyFormError(form, e) },
+  );
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 p-7">

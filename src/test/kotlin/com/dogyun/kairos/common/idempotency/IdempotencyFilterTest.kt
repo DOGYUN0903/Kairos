@@ -118,7 +118,7 @@ class IdempotencyFilterTest {
         val getChain = RecordingChain(200, "{}")
         filter.doFilter(get, MockHttpServletResponse(), getChain)
         val otherChain = RecordingChain(200, "{}")
-        filter.doFilter(post(path = "/api/v1/cart/items", key = null), MockHttpServletResponse(), otherChain)
+        filter.doFilter(post(path = "/api/v1/seller/brands", key = null), MockHttpServletResponse(), otherChain)
 
         assertEquals(1, getChain.calls)
         assertEquals(1, otherChain.calls)

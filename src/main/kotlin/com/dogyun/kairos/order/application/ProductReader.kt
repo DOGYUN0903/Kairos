@@ -4,6 +4,9 @@ package com.dogyun.kairos.order.application
 interface ProductReader {
     /** 없는 SKU ID 는 결과에서 빠진다. */
     fun findOrderableSkus(skuIds: Collection<Long>): Map<Long, OrderableSkuInfo>
+
+    /** 상품 ID 목록 → 대표 이미지 URL, 한 번의 조회. 없는·삭제된 상품과 이미지 없는 상품은 결과에서 빠진다. */
+    fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String>
 }
 
 data class OrderableSkuInfo(
@@ -15,6 +18,8 @@ data class OrderableSkuInfo(
     val salePrice: Long,
     val extraPrice: Long,
     val sellerId: Long,
+    /** 상품 대표 이미지. 이미지가 없으면 빈 문자열. */
+    val thumbnailUrl: String,
     /** 지금 주문할 수 있는 상태(AVAILABLE)인가. */
     val available: Boolean,
 )

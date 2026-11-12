@@ -150,14 +150,24 @@ class FakeProductReader : ProductReader {
         salePrice: Long = 9_000,
         extraPrice: Long = 0,
         available: Boolean = true,
+        thumbnailUrl: String = "https://img.test/sku$skuId.jpg",
     ) {
         skus[skuId] = OrderableSkuInfo(
-            skuId, 100L + skuId, "티셔츠$skuId", "브랜드", "블랙 / M", salePrice, extraPrice, sellerId, available,
+            skuId, 100L + skuId, "티셔츠$skuId", "브랜드", "블랙 / M", salePrice, extraPrice, sellerId, thumbnailUrl, available,
         )
     }
 
     override fun findOrderableSkus(skuIds: Collection<Long>): Map<Long, OrderableSkuInfo> =
         skuIds.mapNotNull { skus[it] }.associateBy { it.skuId }
+
+    /** 상품 ID → 대표 이미지. 여기 없는 상품(삭제 등)은 결과에서 빠진다. */
+    val thumbnails = mutableMapOf<Long, String>()
+    var thumbnailCalls = 0
+
+    override fun findThumbnailUrls(productIds: Collection<Long>): Map<Long, String> {
+        thumbnailCalls++
+        return productIds.mapNotNull { id -> thumbnails[id]?.let { id to it } }.toMap()
+    }
 }
 
 class FakeSellerReader : SellerReader {

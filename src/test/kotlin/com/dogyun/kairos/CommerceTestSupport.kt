@@ -251,7 +251,7 @@ abstract class CommerceTestSupport : IntegrationTestSupport() {
 
     /** 장바구니에 담고 cartItemId 를 돌려준다. */
     protected fun addToCart(token: String, skuId: Long, quantity: Int): Long {
-        val result = post("/api/v1/cart/items", token, mapOf("skuId" to skuId, "quantity" to quantity))
+        val result = postIdem("/api/v1/cart/items", token, mapOf("skuId" to skuId, "quantity" to quantity))
             .andExpect { status { isOk() } }
         return json(result).get("data").get("cartItemId").asLong()
     }

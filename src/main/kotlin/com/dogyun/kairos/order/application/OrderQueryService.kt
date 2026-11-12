@@ -3,6 +3,7 @@ package com.dogyun.kairos.order.application
 import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.common.domain.PageResult
+import com.dogyun.kairos.order.domain.CancelActor
 import com.dogyun.kairos.order.domain.Order
 import com.dogyun.kairos.order.domain.OrderItem
 import com.dogyun.kairos.order.domain.OrderItemStatus
@@ -22,8 +23,29 @@ import java.time.LocalDateTime
 class OrderQueryService(
     private val orderRepository: OrderRepository,
     private val paymentGateway: PaymentGateway,
+    private val productReader: ProductReader,
     private val properties: OrderProperties,
 ) {
+
+    /**
+     * 환불 미리보기. 주문 행 락 없이 읽는다(쓰기를 결정하는 읽기가 아니다). 계산은 실제 취소와 같은 [Order.planCancel] 이다.
+     * 미리보기 뒤 상태가 바뀔 수 있으며 진실은 취소 응답이다.
+     */
+    fun previewCancel(memberId: Long, orderId: Long, orderItemId: Long): CancelPreviewResult {
+        val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
+            ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
+        order.findItem(orderItemId)
+        val plan = order.planCancel(orderItemId, CancelActor.BUYER, properties.shippingPolicy())
+        return CancelPreviewResult(
+            orderItemId = orderItemId,
+            paidAmount = plan.paidAmount,
+            shippingFeeRefund = plan.shippingFeeRefund,
+            shippingFeeDeducted = plan.shippingFeeDeducted,
+            shippingFeeReturned = plan.shippingFeeReturned,
+            refundAmount = plan.refundAmount,
+            pointsRefund = plan.pointsRefund,
+        )
+    }
 
     fun getMine(memberId: Long, orderId: Long): OrderDetail {
         val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
@@ -84,7 +106,7 @@ class OrderQueryService(
 
     fun listMine(memberId: Long, page: Int, size: Int): PageResult<OrderSummary> {
         validate(page, size)
-        return orderRepository.findPageByMemberId(memberId, page, size).map(::toSummary)
+        return toSummaries(orderRepository.findPageByMemberId(memberId, page, size))
     }
 
     /** 결제 전(PENDING_PAYMENT) 판매자 주문은 판매자에게 없는 것으로 친다. */
@@ -94,6 +116,7 @@ class OrderQueryService(
         if (sellerOrder.sellerId != sellerId || sellerOrder.status == SellerOrderStatus.PENDING_PAYMENT) {
             throw DomainException(ErrorCode.SELLER_ORDER_NOT_FOUND)
         }
+        val thumbnails = thumbnailsOf(sellerOrder.items)
         return SellerOrderDetail(
             sellerOrderId = sellerOrderId,
             orderId = requireNotNull(order.id),
@@ -110,14 +133,16 @@ class OrderQueryService(
             allItemsReturned = sellerOrder.allItemsReturned,
             hasOpenReturn = sellerOrder.hasOpenReturn,
             shippingAddress = order.shippingAddress.toResult(),
-            items = sellerOrder.items.map { it.toResult() },
+            items = sellerOrder.items.map { it.toResult(thumbnails) },
             orderedAt = requireNotNull(order.createdAt),
         )
     }
 
     fun listForSeller(sellerId: Long, status: SellerOrderStatus?, page: Int, size: Int): PageResult<SellerOrderSummary> {
         validate(page, size)
-        return orderRepository.findPageBySellerId(sellerId, status, page, size).map { order ->
+        val orders = orderRepository.findPageBySellerId(sellerId, status, page, size)
+        val thumbnails = thumbnailsOf(orders.content.flatMap { o -> o.sellerOrders.first { it.sellerId == sellerId }.items.take(1) })
+        return orders.map { order ->
             val sellerOrder = order.sellerOrders.first { it.sellerId == sellerId }
             SellerOrderSummary(
                 sellerOrderId = requireNotNull(sellerOrder.id),
@@ -126,6 +151,7 @@ class OrderQueryService(
                 itemsAmount = sellerOrder.itemsAmount,
                 itemCount = sellerOrder.items.size,
                 firstProductName = sellerOrder.items.first().productName,
+                thumbnailUrl = thumbnails[sellerOrder.items.first().productId],
                 orderedAt = requireNotNull(order.createdAt),
             )
         }
@@ -136,7 +162,7 @@ class OrderQueryService(
 
     fun listForAdmin(status: OrderStatus?, memberId: Long?, orderNo: String?, page: Int, size: Int): PageResult<OrderSummary> {
         validate(page, size)
-        return orderRepository.findPageForAdmin(status, memberId, orderNo, page, size).map(::toSummary)
+        return toSummaries(orderRepository.findPageForAdmin(status, memberId, orderNo, page, size))
     }
 
     private fun validate(page: Int, size: Int) {
@@ -145,6 +171,7 @@ class OrderQueryService(
 
     private fun toDetail(order: Order): OrderDetail {
         val orderId = requireNotNull(order.id)
+        val thumbnails = thumbnailsOf(order.allItems)
         return OrderDetail(
             orderId = orderId,
             orderNo = order.orderNo,
@@ -155,6 +182,7 @@ class OrderQueryService(
             freeShippingApplied = order.freeShippingApplied,
             shippingFeeRecovered = order.shippingFeeRecovered,
             refundedAmount = order.refundedAmount,
+            remainingAmount = order.totalAmount - order.refundedAmount,
             remainingPaidAmount = order.remainingPaidAmount,
             remainingBuyerShippingFee = order.remainingBuyerShippingFee,
             productCouponDiscount = order.productCouponDiscount,
@@ -166,7 +194,7 @@ class OrderQueryService(
             paidAt = order.paidAt,
             createdAt = requireNotNull(order.createdAt),
             shippingAddress = order.shippingAddress.toResult(),
-            sellerOrders = order.sellerOrders.map { it.toResult() },
+            sellerOrders = order.sellerOrders.map { it.toResult(thumbnails) },
             payment = findPayment(orderId),
         )
     }
@@ -177,17 +205,32 @@ class OrderQueryService(
         if (e.errorCode == ErrorCode.PAYMENT_NOT_FOUND) null else throw e
     }
 
-    private fun toSummary(order: Order) = OrderSummary(
+    /** 한 페이지의 첫 항목 이미지를 한 번에 조회한다(N+1 금지). 판매자 주문 상태는 이미 읽은 애그리거트에서 만든다. */
+    private fun toSummaries(page: PageResult<Order>): PageResult<OrderSummary> {
+        val thumbnails = thumbnailsOf(page.content.map { it.allItems.first() })
+        return page.map { toSummary(it, thumbnails) }
+    }
+
+    /** 상품 ID → 대표 이미지 URL. 항목이 없으면 조회하지 않고, 상품이 사라졌으면 맵에 없다(호출부가 null 로 쓴다). */
+    private fun thumbnailsOf(items: Collection<OrderItem>): Map<Long, String> {
+        val productIds = items.map { it.productId }.toSet()
+        return if (productIds.isEmpty()) emptyMap() else productReader.findThumbnailUrls(productIds)
+    }
+
+    private fun toSummary(order: Order, thumbnails: Map<Long, String>) = OrderSummary(
         orderId = requireNotNull(order.id),
         orderNo = order.orderNo,
         status = order.status.name,
         totalAmount = order.totalAmount,
         itemCount = order.allItems.size,
         firstProductName = order.allItems.first().productName,
+        thumbnailUrl = thumbnails[order.allItems.first().productId],
+        sellerOrderStatuses = order.sellerOrders.map { it.status.name },
+        expiresAt = order.expiresAt,
         createdAt = requireNotNull(order.createdAt),
     )
 
-    private fun SellerOrder.toResult() = SellerOrderResult(
+    private fun SellerOrder.toResult(thumbnails: Map<Long, String>) = SellerOrderResult(
         sellerOrderId = requireNotNull(id),
         sellerId = sellerId,
         sellerName = sellerName,
@@ -202,14 +245,15 @@ class OrderQueryService(
         returnableUntil = returnableUntil(properties.returnWindow),
         allItemsReturned = allItemsReturned,
         hasOpenReturn = hasOpenReturn,
-        items = items.map { it.toResult() },
+        items = items.map { it.toResult(thumbnails) },
     )
 
-    private fun OrderItem.toResult() = OrderItemResult(
+    private fun OrderItem.toResult(thumbnails: Map<Long, String>) = OrderItemResult(
         orderItemId = requireNotNull(id),
         skuId = skuId,
         productId = productId,
         productName = productName,
+        thumbnailUrl = thumbnails[productId],
         brandName = brandName,
         optionDisplayName = optionDisplayName,
         salePrice = salePrice,

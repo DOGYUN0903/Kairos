@@ -5,13 +5,15 @@ import com.dogyun.kairos.common.domain.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class CartServiceTest {
 
     private val repository = FakeCartRepository()
     private val reader = FakeProductReader()
+    private val sellerReader = FakeSellerReader().apply { put(1L) }
     private val service = CartService(repository, reader)
-    private val queryService = CartQueryService(repository, reader)
+    private val queryService = CartQueryService(repository, reader, sellerReader)
 
     private fun assertCode(code: ErrorCode, block: () -> Unit) {
         assertEquals(code, assertFailsWith<DomainException> { block() }.errorCode)
@@ -83,5 +85,53 @@ class CartServiceTest {
         assertEquals(listOf(2L), queryService.get(7L).items.map { it.skuId })
         service.removeBySkuIds(7L, listOf(2L))
         assertEquals(0, queryService.get(7L).items.size)
+    }
+
+    @Test
+    fun SKU가_사라진_항목은_판매자_정보가_null이다() {
+        reader.put(1L)
+        service.add(7L, 1L, 1)
+        reader.skus.remove(1L)
+
+        val item = queryService.get(7L).items.single()
+
+        assertEquals("DISCONTINUED", item.availability)
+        assertNull(item.sellerId)
+        assertNull(item.sellerName)
+    }
+
+    @Test
+    fun 판매자가_조회_결과에_없으면_PAUSED다() {
+        reader.put(1L, sellerId = 5L)
+        reader.put(2L, sellerId = 1L, unitPrice = 1000)
+        service.add(7L, 1L, 1)
+        service.add(7L, 2L, 1)
+
+        val result = queryService.get(7L)
+
+        val bySku = result.items.associateBy { it.skuId }
+        assertEquals("PAUSED", bySku.getValue(1L).availability)
+        assertEquals(5L, bySku.getValue(1L).sellerId)
+        assertNull(bySku.getValue(1L).sellerName)
+        assertEquals("AVAILABLE", bySku.getValue(2L).availability)
+        assertEquals(1000L, result.availableAmount)
+    }
+
+    @Test
+    fun 주문할_수_없는_판매자의_AVAILABLE_항목만_PAUSED로_바뀌고_다른_사유는_그대로다() {
+        sellerReader.put(2L, "정지상사", orderable = false)
+        reader.put(1L, sellerId = 2L)
+        reader.put(2L, sellerId = 2L)
+        service.add(7L, 1L, 1)
+        service.add(7L, 2L, 1)
+        reader.put(2L, sellerId = 2L, availability = "SOLD_OUT")
+
+        val result = queryService.get(7L)
+
+        val bySku = result.items.associateBy { it.skuId }
+        assertEquals("PAUSED", bySku.getValue(1L).availability)
+        assertEquals("정지상사", bySku.getValue(1L).sellerName)
+        assertEquals("SOLD_OUT", bySku.getValue(2L).availability)
+        assertEquals(0L, result.availableAmount)
     }
 }

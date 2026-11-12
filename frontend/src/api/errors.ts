@@ -13,10 +13,13 @@ export const errorTable: Partial<Record<ErrorCode, { kind: ErrorKind; field?: st
   FILE_NOT_OWNED: { kind: "field", field: "images", message: "직접 올린 이미지만 사용할 수 있습니다. 다시 올려 주세요." },
   PRODUCT_INVALID: { kind: "form" },
   SELLER_NOT_ACTIVE: { kind: "banner" },
+  ORDER_INVALID: { kind: "form" },
   UNAUTHORIZED: { kind: "page" },
   FORBIDDEN: { kind: "page" },
   PRODUCT_NOT_FOUND: { kind: "page" },
   BRAND_NOT_FOUND: { kind: "page" },
+  ORDER_NOT_FOUND: { kind: "page" },
+  SELLER_ORDER_NOT_FOUND: { kind: "page" },
   CATEGORY_HAS_PRODUCTS: { kind: "toast", message: "이 카테고리에 상품이 있어 삭제할 수 없습니다. 상품을 다른 카테고리로 옮긴 뒤 다시 시도하세요." },
   CATEGORY_HAS_CHILDREN: { kind: "toast", message: "소분류가 있는 대분류는 삭제할 수 없습니다. 소분류를 먼저 삭제하세요." },
   CHANGE_REQUEST_ALREADY_PENDING: {

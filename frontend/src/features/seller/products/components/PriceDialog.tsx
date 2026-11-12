@@ -50,17 +50,20 @@ function PriceForm({ productId, originalPrice, salePrice, onClose }: { productId
   const typed = parseWon(form.watch("salePrice") ?? "");
   const rate = typed !== null && typed >= 1 && typed <= originalPrice ? discountRate(originalPrice, typed) : null;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values) => {
-    try {
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values) => {
       await change.mutateAsync({ salePrice: values.salePrice });
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "PRODUCT_INVALID_PRICE") {
-        form.setError("salePrice", { type: "server", message: "판매가는 1원 이상, 정가 이하여야 합니다." }, { shouldFocus: true });
-      }
-      return;
-    }
-    onClose();
-  });
+      onClose();
+    },
+    {
+      onError: (e) => {
+        if (e instanceof ApiError && e.code === "PRODUCT_INVALID_PRICE") {
+          form.setError("salePrice", { type: "server", message: "판매가는 1원 이상, 정가 이하여야 합니다." }, { shouldFocus: true });
+        }
+      },
+    },
+  );
 
   return (
     <form onSubmit={onSubmit} noValidate>

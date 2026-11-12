@@ -9,9 +9,10 @@
 - C3 스펙: `docs/superpowers/specs/2026-11-10-c3-benefits-reviews-design.md`
 - C4 스펙: `docs/superpowers/specs/2026-11-10-c4-returns-settlement-design.md`
 - F1 스펙: `docs/superpowers/specs/2026-11-11-frontend-f1-foundation-design.md`
-- 현재 구현 계획: `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md` (이전: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`, `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
+- F2 스펙: `docs/superpowers/specs/2026-11-12-frontend-f2-purchase-design.md`
+- 현재 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f2-purchase.md` (이전: `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md`, `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`, `docs/superpowers/plans/2026-11-10-c3-benefits-reviews.md`, `docs/superpowers/plans/2026-11-09-c2-purchase.md`, `docs/superpowers/plans/2026-11-09-c1-seller-catalog.md`)
 - API 계약: `docs/api/openapi.yaml`
-- 현재 단계: **F1 프론트엔드 기반·C1 화면**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1~C4는 완료
+- 현재 단계: **F2 구매 화면**(커머스 로드맵, `docs/superpowers/specs/2026-11-09-commerce-roadmap-design.md`). Phase 0~2, C1~C4, F1은 완료
 
 ## 스택
 Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Flyway, QueryDSL 7.7 (OpenFeign fork, KSP), JUnit5, Testcontainers, ArchUnit.
@@ -62,6 +63,7 @@ com.dogyun.kairos.{module}/
 - 성공 응답은 `ApiResponse(message, data, timestamp)`, 에러는 `ErrorResponse(code, message, timestamp)`, 목록은 `?page&size` + `PageResponse`.
 - API 일시는 오프셋 없는 LocalDateTime(KST 기준, 예: 2026-12-09T10:00:00). 서버 기본 시간대는 Asia/Seoul로 고정한다.
 - application 계층은 Spring `Page`가 아니라 `PageResult`를 반환한다.
+- 장바구니 `availability`는 판매자 상태도 반영한다: 판매자가 주문을 받을 수 없으면 `PAUSED`(견적·주문과 같은 기준). 항목 취소 미리보기(`GET /orders/{orderId}/items/{orderItemId}/cancel-preview`)는 `RefundCalculator`를 읽기 전용으로 호출한다.
 - 인증: 액세스 토큰 Bearer(30분), 리프레시 토큰은 본문과 httpOnly 쿠키 `kairos_refresh`(Path=/api/v1/auth, SameSite=Strict) 둘 다. 쿠키 기반 reissue·logout은 `X-Requested-With: kairos-web` 헤더를 요구한다. `GET /auth/me`가 역할·이름을 준다(프론트는 JWT를 해석하지 않는다).
 - 에러 코드는 `ErrorCode` enum과 OpenAPI의 `ErrorResponse.code`가 일치해야 한다.
 
@@ -71,8 +73,12 @@ com.dogyun.kairos.{module}/
 - 로컬 실행: 백엔드를 띄우고 `pnpm dev`. 프론트는 `BACKEND_URL`(기본 `http://localhost:8080`)로 `/api`를 rewrite 한다.
 - OpenAPI가 바뀌면 `pnpm gen:api`로 `src/api/schema.d.ts`를 재생성해 **같은 커밋**에 넣는다(`check:api`가 build·CI를 막는다).
 - API 클라이언트(`src/api/client.ts`): 액세스 토큰은 메모리에만 둔다(storage 금지). 리프레시는 httpOnly 쿠키 + `X-Requested-With: kairos-web`. 401이면 reissue를 한 번만(단일 비행) 시도하고 `/auth/*`는 절대 재시도하지 않는다. 에러 메시지는 `src/api/errors.ts` 표로만 만든다.
-- 금액은 정수만. 계산·표시는 `src/lib/money.ts`로만 하고 나눗셈(`/`, `%`)은 거기서만 쓴다(ESLint가 막는다).
-- `Idempotency-Key`는 생성 POST(회원가입, 판매자 신청, 브랜드·상품 등록, 변경 요청, 관리자 카테고리 생성)가 `useIdempotentSubmit`으로 제출마다 새 키를 보내고 중복 제출을 막는다(생성 성공 뒤 `form.reset`). 상태 전이 엔드포인트(승인·반려·중지·해제, 좋아요, 순서 변경)는 키 없이 이중 제출 가드 + 서버 상태 검사(409)에 기댄다. 서버가 키를 강제하는 경로는 `IdempotencyProperties.paths`뿐이다.
+- 금액은 정수만. 계산·표시는 `src/lib/money.ts`로만 하고 나눗셈(`/`, `%`)은 거기서만 쓴다(ESLint가 막는다). 나눗셈·나머지가 필요하면 `money.ts`의 `floorDiv`/`mod`를 쓴다(시간 계산 포함).
+- `Idempotency-Key`를 보내는 곳은 세 갈래다. 폼 제출(주문 생성, 항목 취소 — 구매자·판매자·관리자 공용 `ItemCancelDialog`, F1 생성 POST: 회원가입, 판매자 신청, 브랜드·상품 등록, 변경 요청, 관리자 카테고리 생성)은 `useIdempotentSubmit`, 폼 없는 요청(장바구니 담기)은 `useIdempotentAction`, 결제 승인은 `features/payment/confirm-key-store`의 `paymentKey`별 키로 마운트당 한 번만 보낸다(새로고침·뒤로 가기에도 같은 키). 발송 처리·가격 변경처럼 키 없이 이중 제출 가드로만 `useIdempotentSubmit`을 쓰는 곳도 있다. 상태 전이 엔드포인트(승인·반려·중지·해제, 좋아요, 순서 변경)는 키 없이 이중 제출 가드 + 서버 상태 검사(409)에 기댄다. 서버가 키를 강제하는 경로는 `IdempotencyProperties.paths`뿐이다(구매 흐름 경로 포함).
+- 키 규칙(`src/api/idempotency.ts`의 `isAnswered`): 답이 없던 시도(네트워크 오류, 5xx, 409 `IDEMPOTENCY_IN_PROGRESS`)만 같은 키로 재시도하고, 서버가 답한 뒤(성공·4xx)의 다음 제출은 새 키를 쓴다. `submit`은 실패하면 던지고 오류 처리는 `onError`에서 한다.
+- 결제 방식: `NEXT_PUBLIC_PG_PROVIDER`(`mock` 기본 | `toss`)는 백엔드 `KAIROS_PG_PROVIDER`와 반드시 같은 값이어야 한다. 프론트 `mock` + 백엔드 `toss`면 승인이 거절되고 주문이 취소된다. 프론트 `toss` + 백엔드 `mock`이면 Mock PG가 접두사 없는 키를 전부 승인하므로 토스에서 실제 승인 없이 주문이 결제 완료가 된다(로컬에서만 가능한 조합). `toss`는 "API 개별 연동" 클라이언트 키를 `NEXT_PUBLIC_TOSS_CLIENT_KEY`에 둔다. 시크릿 키(`TOSS_SECRET_KEY`)는 백엔드 `.env`에만 두고 프론트 파일·번들에 넣지 않는다. 모의 결제 실패 선택지는 `features/demo`에만 있어 데모 빌드에서만 보인다.
+- 합계·배송비·환불액은 서버 값만 표시한다. 프론트가 계산해야 하면 `money.ts` 함수로만 한다.
+- `sessionStorage`는 토큰이 아닌 값에만 쓴다(결제 승인 키 `confirm-key-store`, 주문번호→주문 ID `order-ref-store`). 액세스 토큰 금지 규칙은 그대로다.
 - 로그인 `next` 파라미터는 `safeNext`(`features/auth/redirect.ts`)를 거친다(오픈 리다이렉트 방지). 가드는 클라이언트 레이아웃이며 `middleware`는 없다.
 - 데모 기능은 `features/demo`에만 두고 `NEXT_PUBLIC_DEMO_MODE`(빌드 타임) 리터럴 비교로 감싼다. 데모 백엔드는 demo 프로필에서만 동작하고 prod+demo는 기동 실패다. 번들에 실제 관리자 자격증명을 절대 넣지 않으며, `check:bundle`이 운영 번들에 데모 코드·계정이 없고 데모 빌드에는 있음을 확인한다.
 - `app/`은 조립만, 기능은 `features/`. 시안은 `design/`에 기록으로 두고 고치지 않는다. 핵심 화면은 시안 → 사용자 확인 → 구현, CRUD 화면은 시안의 디자인 토큰을 따른다.

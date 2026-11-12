@@ -298,11 +298,20 @@ class OrderServiceTest {
         assertEquals(17_700L, quote.maxUsablePoints)
         assertEquals(
             listOf(
-                QuoteLine(31L, 1, 30_000, 2_000, 2_187, 4_375, 21_438),
-                QuoteLine(32L, 2, 40_000, 4_000, 2_813, 5_625, 27_562),
+                QuoteLine(31L, 131L, "티셔츠31", "브랜드", "블랙 / M", "https://img.test/sku31.jpg", 30_000, 1L, 1, 30_000, 2_000, 2_187, 4_375, 21_438),
+                QuoteLine(32L, 132L, "티셔츠32", "브랜드", "블랙 / M", "https://img.test/sku32.jpg", 20_000, 2L, 2, 40_000, 4_000, 2_813, 5_625, 27_562),
             ),
             quote.items,
         )
+        assertEquals(
+            listOf(
+                SellerQuote(1L, "판매자1", 30_000, 3_000, "PLATFORM"),
+                SellerQuote(2L, "판매자2", 40_000, 3_000, "PLATFORM"),
+            ),
+            quote.sellerQuotes,
+        )
+        assertEquals(50_000L, quote.freeShippingThreshold)
+        assertEquals(3_000L, quote.baseShippingFee)
         assertEquals(emptyList(), orderRepository.all)
         assertEquals(emptyList(), benefitApplier.reserved)
         assertEquals(emptyList(), benefitApplier.committed)

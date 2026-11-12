@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { basename } from "node:path";
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { basename, join } from "node:path";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 /** 백엔드를 직접 부른다(Bearer). 화면이 검증 대상이 아닌 준비·정리 단계에만 쓴다. */
 export const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8080";
@@ -37,6 +37,7 @@ async function call<T = unknown>(
 export const api = {
   get: <T>(r: APIRequestContext, path: string, token: string | null) => call<T>(r, "GET", path, token),
   post: <T>(r: APIRequestContext, path: string, token: string | null, body?: unknown) => call<T>(r, "POST", path, token, body),
+  patch: <T>(r: APIRequestContext, path: string, token: string | null, body?: unknown) => call<T>(r, "PATCH", path, token, body),
   del: (r: APIRequestContext, path: string, token: string | null) => call(r, "DELETE", path, token),
 };
 
@@ -121,25 +122,37 @@ export async function leafCategoryId(request: APIRequestContext): Promise<number
   return (await leafCategory(request)).leafId;
 }
 
-/** 옵션 색상(블랙·화이트) × 사이즈(S·M) 상품을 API 로 등록한다. */
+type ProductOptions = { name: string; values: { name: string }[] }[];
+
+const DEFAULT_OPTIONS: ProductOptions = [
+  { name: "색상", values: [{ name: "블랙" }, { name: "화이트" }] },
+  { name: "사이즈", values: [{ name: "S" }, { name: "M" }] },
+];
+
+/** 상품을 API 로 등록한다. 기본은 옵션 색상(블랙·화이트) × 사이즈(S·M), options 에 [] 를 주면 옵션 없는 상품이다. */
 export async function registerProduct(
   request: APIRequestContext,
   token: string,
-  { brandId, name, imageFileIds, categoryId }: { brandId: number; name: string; imageFileIds: number[]; categoryId: number },
+  {
+    brandId,
+    name,
+    imageFileIds,
+    categoryId,
+    originalPrice = 50000,
+    salePrice = 39000,
+    options = DEFAULT_OPTIONS,
+  }: { brandId: number; name: string; imageFileIds: number[]; categoryId: number; originalPrice?: number; salePrice?: number; options?: ProductOptions },
 ): Promise<number> {
   const { productId } = await api.post<{ productId: number }>(request, "/api/v1/seller/products", token, {
     brandId,
-    originalPrice: 50000,
-    salePrice: 39000,
+    originalPrice,
+    salePrice,
     content: {
       name,
       description: "E2E 테스트 상품입니다.",
       categoryId,
       imageFileIds,
-      options: [
-        { name: "색상", values: [{ name: "블랙" }, { name: "화이트" }] },
-        { name: "사이즈", values: [{ name: "S" }, { name: "M" }] },
-      ],
+      options,
     },
   });
   return productId;
@@ -159,6 +172,98 @@ export async function createCategory(request: APIRequestContext, admin: string, 
 
 export async function deleteCategory(request: APIRequestContext, admin: string, categoryId: number) {
   await api.del(request, `/api/v1/admin/categories/${categoryId}`, admin);
+}
+
+const SAMPLE_IMAGE = join(__dirname, "../assets/sample.webp");
+
+/**
+ * 구매 E2E 의 준비 단계 한 번에: 판매자 회원 → 입점·승인 → 브랜드 승인 → 옵션 없는 상품 등록·승인 → SKU 재고 설정.
+ * 정가는 판매가보다 넉넉히 크게 잡는다(가격 변경 테스트용).
+ */
+export async function createSellerWithProduct(
+  request: APIRequestContext,
+  admin: string,
+  opts: { sellerName: string; productName: string; price: number; stock: number },
+): Promise<{ sellerToken: string; sellerEmail: string; productId: number; skuId: number }> {
+  const seller = await createUser(request, { name: opts.sellerName });
+  const sid = await applySeller(request, seller.accessToken, `${opts.sellerName} 상사`);
+  await approveSeller(request, admin, sid);
+  const { brandId } = await createApprovedBrand(request, seller.accessToken, admin, `${opts.sellerName} 브랜드`);
+  const imageFileId = await uploadImage(request, seller.accessToken, SAMPLE_IMAGE);
+  const productId = await registerProduct(request, seller.accessToken, {
+    brandId,
+    name: opts.productName,
+    imageFileIds: [imageFileId],
+    categoryId: await leafCategoryId(request),
+    originalPrice: opts.price * 2,
+    salePrice: opts.price,
+    options: [],
+  });
+  await approveProduct(request, admin, productId);
+  const detail = await api.get<{ skus: { skuId: number }[] }>(request, `/api/v1/seller/products/${productId}`, seller.accessToken);
+  const skuId = detail.skus[0]?.skuId;
+  if (skuId === undefined) throw new Error("SKU 가 없습니다");
+  await api.patch(request, `/api/v1/seller/products/${productId}/skus/${skuId}`, seller.accessToken, { extraPrice: 0, stock: opts.stock, onSale: true });
+  return { sellerToken: seller.accessToken, sellerEmail: seller.email, productId, skuId };
+}
+
+/** 판매가를 즉시 바꾼다(판매가 ≤ 정가). */
+export async function changeSalePrice(request: APIRequestContext, sellerToken: string, productId: number, salePrice: number) {
+  await api.patch(request, `/api/v1/seller/products/${productId}/price`, sellerToken, { salePrice });
+}
+
+/** 주문서의 배송지 칸을 직접 입력으로 채운다. */
+/**
+ * 라벨(dt) 바로 다음의 값(dd). 금액은 이 값 노드에 toHaveText(글자 전체 일치)로 단언한다.
+ * 부모 요소에 toContainText("27,000원") 을 쓰면 127,000원도 통과한다.
+ */
+export function valueOf(scope: Page | Locator, label: string): Locator {
+  const exact = new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
+  return scope.locator("dt").filter({ hasText: exact }).locator("xpath=following-sibling::dd[1]");
+}
+
+export async function fillShippingAddress(page: Page) {
+  await page.getByLabel(/^수령인/).fill("홍길동");
+  await page.getByLabel(/^연락처/).fill("010-1234-5678");
+  await page.getByLabel(/^우편번호/).fill("06236");
+  await page.getByLabel(/^주소\s*\*?$/).fill("서울 강남구 테헤란로 1");
+  await page.getByLabel(/^상세 주소/).fill("101호");
+}
+
+/** 결제 페이지의 모의 결제창에서 "결제"를 누르고 주문 완료 화면을 기다린다. */
+export async function payWithMock(page: Page) {
+  const dialog = page.getByRole("dialog", { name: /결제/ });
+  await dialog.getByRole("button", { name: "결제", exact: true }).click();
+  await page.waitForURL((u) => /\/my\/orders\/\d+\/complete$/.test(u.pathname));
+  await expect(page.getByRole("heading", { name: "결제 완료" })).toBeVisible();
+}
+
+const ADDRESS = { receiverName: "홍길동", phone: "010-1234-5678", zipCode: "06236", address1: "서울 강남구 테헤란로 1", address2: "101호", memo: null };
+
+/** API 로 주문을 만들고 모의 결제까지 승인한다(준비 단계 전용). */
+export async function placePaidOrderApi(request: APIRequestContext, buyerToken: string, items: { skuId: number; quantity: number }[]): Promise<{ orderId: number; orderNo: string }> {
+  const quote = await api.post<{ totalAmount: number }>(request, "/api/v1/orders/quote", buyerToken, { items });
+  const order = await api.post<{ orderId: number; orderNo: string; totalAmount: number }>(request, "/api/v1/orders", buyerToken, {
+    items,
+    expectedTotalAmount: quote.totalAmount,
+    pointsToUse: 0,
+    shippingAddress: ADDRESS,
+  });
+  await api.post(request, "/api/v1/payments/confirm", buyerToken, { orderNo: order.orderNo, paymentKey: `mock-${randomUUID()}`, amount: order.totalAmount });
+  return { orderId: order.orderId, orderNo: order.orderNo };
+}
+
+/** 다른 사용자로 로그인한 별도 브라우저 컨텍스트에서 fn 을 실행하고 닫는다. */
+export async function asUser(page: Page, email: string, password: string, fn: (p: Page) => Promise<void>) {
+  const ctx = await page.context().browser()!.newContext({ viewport: { width: 1440, height: 900 }, baseURL: test.info().project.use.baseURL });
+  try {
+    const p = await ctx.newPage();
+    await uiLogin(p, email, password);
+    await p.waitForURL((u) => u.pathname !== "/login");
+    await fn(p);
+  } finally {
+    await ctx.close();
+  }
 }
 
 /** 화면 로그인. next 가 있으면 /login?next= 로 들어간다. */

@@ -103,54 +103,46 @@ export function ProductForm({ mode, initial, leavingRef }: ProductFormProps) {
   const { register, control, formState, watch } = form;
   const { errors } = formState;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
-    if (initial) {
-      const detailPath = `/seller/products/${initial.productId}`;
-      // 상세로 먼저 이동한 뒤 무효화한다. 수정 화면에서 먼저 새 상세를 받으면 "검수 중인 변경 요청" 안내가 잠깐 보인다.
-      const leave = () => {
-        if (leavingRef) leavingRef.current = true;
-        router.push(detailPath);
-        void invalidateProduct();
-      };
-      try {
+  // 상세로 먼저 이동한 뒤 무효화한다. 수정 화면에서 먼저 새 상세를 받으면 "검수 중인 변경 요청" 안내가 잠깐 보인다.
+  const leave = () => {
+    if (leavingRef) leavingRef.current = true;
+    router.push(`/seller/products/${productId}`);
+    void invalidateProduct();
+  };
+
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values, key) => {
+      if (initial) {
         if (mode === "change-request") await changeRequest.mutateAsync({ body: toChangeRequest(values), key });
         else await editContent.mutateAsync(toContentRequest(values));
-      } catch (e) {
-        if (e instanceof ApiError && e.code === "CHANGE_REQUEST_ALREADY_PENDING") {
+        form.reset(form.getValues()); // 제출한 값을 새 기준(dirty 아님)으로 삼는다. 키는 훅이 성공 시 알아서 버린다. 화면 동작을 그대로 두려고 유지
+        toast({ title: mode === "change-request" ? "변경 요청이 접수됐습니다" : "검수 대기 상태로 다시 제출됐습니다" });
+        leave();
+        return;
+      }
+      const { productId: createdId } = await register_.mutateAsync({ body: toRegisterRequest(values), key });
+      // 등록이 끝난 입력을 비워 dirty 상태(이탈 경고)를 없앤다. Idempotency-Key 와는 무관하다(키는 성공하면 훅이 버린다).
+      form.reset(EMPTY);
+      toast({ title: "검수 대기 상태로 등록됐습니다" });
+      router.push(`/seller/products/${createdId}`);
+    },
+    {
+      onError: async (e) => {
+        if (initial && e instanceof ApiError && e.code === "CHANGE_REQUEST_ALREADY_PENDING") {
           toast({ variant: "destructive", title: "이미 검수 중인 변경 요청이 있습니다", description: "철회한 뒤 다시 요청할 수 있습니다." });
           leave();
           return;
         }
         if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
-          setBanner("판매자 상태 때문에 처리할 수 없습니다.");
+          setBanner(initial ? "판매자 상태 때문에 처리할 수 없습니다." : "판매자 상태 때문에 처리할 수 없습니다. 정지 중에는 상품을 등록할 수 없습니다.");
           await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
           return;
         }
         applyFormError(form, e);
-        return;
-      }
-      form.reset(form.getValues()); // 이후 같은 값 재제출에는 새 키가 쓰이도록 dirty 기준을 갱신
-      toast({ title: mode === "change-request" ? "변경 요청이 접수됐습니다" : "검수 대기 상태로 다시 제출됐습니다" });
-      leave();
-      return;
-    }
-    let productId: number;
-    try {
-      ({ productId } = await register_.mutateAsync({ body: toRegisterRequest(values), key }));
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
-        setBanner("판매자 상태 때문에 처리할 수 없습니다. 정지 중에는 상품을 등록할 수 없습니다.");
-        await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
-        return;
-      }
-      applyFormError(form, e);
-      return;
-    }
-    // 같은 값으로 다시 등록하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
-    form.reset(EMPTY);
-    toast({ title: "검수 대기 상태로 등록됐습니다" });
-    router.push(`/seller/products/${productId}`);
-  });
+      },
+    },
+  );
 
   const original = parseWon(watch("originalPrice") ?? "");
   const sale = parseWon(watch("salePrice") ?? "");

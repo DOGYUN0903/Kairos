@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
+vi.mock("@/features/seller/orders/api", () => ({ useSellerOrderCount: () => ({ data: undefined }) }));
 vi.mock("@/auth/useAuth", () => ({ useAuth: () => ({ me: { name: "홍길동" }, logout: vi.fn() }) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 

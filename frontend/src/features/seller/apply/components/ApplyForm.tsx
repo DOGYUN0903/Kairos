@@ -46,25 +46,28 @@ export function ApplyForm({ mode, seller }: { mode: "create" | "update"; seller?
   const { register, formState } = form;
   const { errors } = formState;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
-    try {
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values, key) => {
       if (mode === "create") await apply.mutateAsync({ values, key });
       else await update.mutateAsync({ values });
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "SELLER_ALREADY_EXISTS") {
-        // 이미 신청한 계정: 상태를 다시 읽고 게이트가 맞는 화면을 고르게 한다.
-        await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
-        router.replace("/seller");
-        return;
-      }
-      applyFormError(form, e);
-      return;
-    }
-    // 같은 값으로 다시 신청하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
-    if (mode === "create") form.reset();
-    toast({ title: mode === "create" ? "입점을 신청했습니다." : "신청 내용을 수정해 다시 접수했습니다." });
-    router.replace("/seller");
-  });
+      // 신청이 끝난 입력을 남기지 않게 성공 뒤 폼을 비운다. Idempotency-Key 와는 무관하다(키는 성공하면 훅이 버린다).
+      if (mode === "create") form.reset();
+      toast({ title: mode === "create" ? "입점을 신청했습니다." : "신청 내용을 수정해 다시 접수했습니다." });
+      router.replace("/seller");
+    },
+    {
+      onError: async (e) => {
+        if (e instanceof ApiError && e.code === "SELLER_ALREADY_EXISTS") {
+          // 이미 신청한 계정: 상태를 다시 읽고 게이트가 맞는 화면을 고르게 한다.
+          await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
+          router.replace("/seller");
+          return;
+        }
+        applyFormError(form, e);
+      },
+    },
+  );
 
   const field = (name: keyof ApplyValues, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => {
     const err = errors[name];
