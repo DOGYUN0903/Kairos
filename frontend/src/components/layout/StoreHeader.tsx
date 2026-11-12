@@ -79,7 +79,7 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
                     )}
                   </Link>
                   <Link className={utilLink} href="/my/orders">
-                    마이
+                    마이페이지
                   </Link>
                   <Link className={utilLink} href="/seller">
                     판매자 센터

@@ -27,4 +27,21 @@ describe("StatusChip", () => {
     render(<StatusChip kind="payment" status="WHATEVER" />);
     expect(screen.getByText("WHATEVER")).toHaveClass("chip-paused");
   });
+
+  it("F3_쿠폰·정책·답글_상태", () => {
+    const cases: [Parameters<typeof StatusChip>[0]["kind"], string, string][] = [
+      ["coupon", "AVAILABLE", "사용 가능"],
+      ["coupon", "USED", "사용 완료"],
+      ["coupon", "EXPIRED", "기간 만료"],
+      ["couponPolicy", "ACTIVE", "진행 중"],
+      ["couponPolicy", "ENDED", "종료"],
+      ["couponPolicy", "PERIOD_OVER", "기간 종료"],
+      ["reply", "UNANSWERED", "미답변"],
+    ];
+    for (const [kind, status, label] of cases) {
+      const { unmount } = render(<StatusChip kind={kind} status={status} />);
+      expect(screen.getByText(label)).toBeInTheDocument();
+      unmount();
+    }
+  });
 });

@@ -71,3 +71,11 @@ export function mod(n: number, d: number): number {
   const dd = positiveDivisor(d);
   return ((nn % dd) + dd) % dd;
 }
+
+/** 정률 쿠폰 입력 %(1~100 정수)를 bp 로. 곱셈만 쓴다. */
+export function percentToBp(percent: number): number {
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) {
+    throw new Error(`퍼센트는 1~100의 정수여야 합니다: ${percent}`);
+  }
+  return percent * 100;
+}

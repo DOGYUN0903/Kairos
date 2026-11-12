@@ -52,7 +52,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
   if (q.isError && q.error instanceof ApiError && (q.error.code === "ORDER_NOT_FOUND" || q.error.status === 404)) notFound();
 
   return (
-    <div className="container max-w-[1120px] pb-16 pt-9">
+    <div>
       <nav aria-label="현재 위치" className="mb-3 flex gap-2 text-[13px] text-text-2">
         <Link href="/my/orders" className="hover:underline">
           주문 내역

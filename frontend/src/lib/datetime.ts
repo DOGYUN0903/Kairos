@@ -39,3 +39,30 @@ export function formatCountdown(seconds: number): string {
   const s = Math.max(seconds, 0);
   return `${pad(floorDiv(s, 60))}:${pad(mod(s, 60))}`;
 }
+
+/** 해당 KST 시각이 이미 지났는지(남은 시간 0 이하). */
+export function hasPassedKst(kstLocalDateTime: string, nowMs: number): boolean {
+  return secondsUntilKst(kstLocalDateTime, nowMs) <= 0;
+}
+
+const DATETIME_INPUT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})$/;
+
+/** `<input type="datetime-local">` 값을 서버 KST LocalDateTime 문자열로. 형식이 아니면 null. */
+export function fromDateTimeInput(value: string): string | null {
+  const m = DATETIME_INPUT.exec(value);
+  return m ? `${m[1]}:00` : null;
+}
+
+/** "2026-11-12T10:05:30" → "11월 12일 10:05" (문자열만 다룬다). */
+export function formatDateTimeMinute(s: string): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(s);
+  if (!m) return s;
+  return `${Number(m[1])}월 ${Number(m[2])}일 ${m[3]}`;
+}
+
+/** "2026-01-05T00:00:00" → "1월 5일". */
+export function formatMonthDay(s: string): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return s;
+  return `${Number(m[1])}월 ${Number(m[2])}일`;
+}
