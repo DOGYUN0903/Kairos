@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fromDateTimeInput, formatDateTimeMinute, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString, lastFinishedWeekMonday, isMonday, isWeekFinished, periodLastDay, isPastKst, isCalendarDate, weekLastDay } from "@/lib/datetime";
+import { fromDateTimeInput, formatDateTimeMinute, formatDateTimeMinuteWithYear, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString, lastFinishedWeekMonday, isMonday, isWeekFinished, periodLastDay, isPastKst, isCalendarDate, weekLastDay } from "@/lib/datetime";
 
 describe("datetime", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -110,5 +110,22 @@ describe("정산 주 날짜 함수(KST, 실행 시간대와 무관)", () => {
     expect(weekLastDay("2026-11-02")).toBe("2026-11-08");
     expect(weekLastDay("2026-12-28")).toBe("2027-01-03");
     expect(weekLastDay("x")).toBe("x");
+  });
+});
+
+describe("formatDateTimeMinuteWithYear", () => {
+  const now = Date.parse("2026-11-12T10:00:00+09:00");
+  it("올해는_연도를_붙이지_않는다", () => {
+    expect(formatDateTimeMinuteWithYear("2026-11-09T14:22:00", now)).toBe("11월 9일 14:22");
+  });
+  it("올해가_아니면_연도를_붙인다", () => {
+    expect(formatDateTimeMinuteWithYear("2025-12-30T09:00:00", now)).toBe("2025년 12월 30일 09:00");
+  });
+  it("KST_기준으로_연말_경계를_판정한다", () => {
+    const utcStillOld = Date.parse("2026-12-31T16:00:00Z"); // KST 2027-01-01 01:00
+    expect(formatDateTimeMinuteWithYear("2026-12-31T23:00:00", utcStillOld)).toBe("2026년 12월 31일 23:00");
+  });
+  it("형식이_아니면_그대로", () => {
+    expect(formatDateTimeMinuteWithYear("abc", now)).toBe("abc");
   });
 });

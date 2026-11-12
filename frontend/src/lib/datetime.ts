@@ -60,6 +60,15 @@ export function formatDateTimeMinute(s: string): string {
   return `${Number(m[1])}월 ${Number(m[2])}일 ${m[3]}`;
 }
 
+/** formatDateTimeMinute 에 연도를 더한다: 현재(KST) 연도가 아니면 "2025년 12월 30일 09:00". */
+export function formatDateTimeMinuteWithYear(s: string, nowMs: number): string {
+  const m = /^(\d{4})-/.exec(s);
+  if (!m) return s;
+  const currentYear = new Date(nowMs + KST_OFFSET_MS).getUTCFullYear();
+  const base = formatDateTimeMinute(s);
+  return Number(m[1]) === currentYear ? base : `${m[1]}년 ${base}`;
+}
+
 /** "2026-01-05T00:00:00" → "1월 5일". */
 export function formatMonthDay(s: string): string {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(s);
