@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCancelItem, canConfirmPurchase, canPay, orderHeader, refundLines } from "@/features/orders/actions";
+import { canCancelItem, canConfirmPurchase, canPay, orderHeader, refundLines, showsRemainingAmount } from "@/features/orders/actions";
 import type { OrderDetail, OrderItemResult, SellerOrderResult } from "@/features/orders/api";
 import type { CancelPreview } from "@/features/orders/api";
 
@@ -107,5 +107,20 @@ describe("refundLines", () => {
       { label: "배송비 환불", amount: 3000, negative: false },
       { label: "차감 배송비 반환", amount: 1000, negative: false },
     ]);
+  });
+});
+
+describe("showsRemainingAmount", () => {
+  it("결제된_주문은_남은_결제_금액을_보인다", () => {
+    expect(showsRemainingAmount(order({ status: "PAID", paidAt: "2026-11-12T10:00:00" }))).toBe(true);
+  });
+  it("전액_환불된_주문도_남은_결제_금액_0원을_보인다", () => {
+    expect(showsRemainingAmount(order({ status: "CANCELED", paidAt: "2026-11-12T10:00:00" }))).toBe(true);
+  });
+  it("결제_전에_취소된_주문은_남은_결제_금액을_보이지_않는다", () => {
+    expect(showsRemainingAmount(order({ status: "CANCELED", paidAt: null }))).toBe(false);
+  });
+  it("결제_대기_주문은_남은_결제_금액을_보이지_않는다", () => {
+    expect(showsRemainingAmount(order({ status: "PENDING_PAYMENT", paidAt: null }))).toBe(false);
   });
 });

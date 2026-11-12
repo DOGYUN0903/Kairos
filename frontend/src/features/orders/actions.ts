@@ -37,3 +37,8 @@ export function refundLines(preview: CancelPreview): { label: string; amount: nu
   if (preview.shippingFeeReturned !== 0) lines.push({ label: "차감 배송비 반환", amount: preview.shippingFeeReturned, negative: false });
   return lines;
 }
+
+/** 남은 결제 금액 표시 여부. remainingAmount는 실제로 결제된 주문에서만 의미가 있다(결제 전 취소·결제 대기에서는 숨긴다). */
+export function showsRemainingAmount(order: OrderDetail): boolean {
+  return order.paidAt != null;
+}

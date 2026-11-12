@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Money } from "@/components/common/Money";
+import { showsRemainingAmount } from "@/features/orders/actions";
 import type { OrderDetail } from "@/features/orders/api";
 
 function Row({ label, children, strong = false }: { label: string; children: ReactNode; strong?: boolean }) {
@@ -67,12 +68,14 @@ export function PaymentSummaryCard({ order }: { order: OrderDetail }) {
           </div>
         )}
       </dl>
-      <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4 font-bold">
-        <span>남은 결제 금액</span>
-        <strong className="text-2xl tracking-tight">
-          <Money value={order.remainingAmount} />
-        </strong>
-      </div>
+      {showsRemainingAmount(order) && (
+        <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4 font-bold">
+          <span>남은 결제 금액</span>
+          <strong className="text-2xl tracking-tight">
+            <Money value={order.remainingAmount} />
+          </strong>
+        </div>
+      )}
     </section>
   );
 }
