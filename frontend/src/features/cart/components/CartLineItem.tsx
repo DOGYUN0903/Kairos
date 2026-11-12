@@ -2,41 +2,28 @@
 
 import { Minus, Plus, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Money } from "@/components/common/Money";
-import { useChangeCartQuantity, type CartItem } from "@/features/cart/api";
+import type { CartItem } from "@/features/cart/api";
+import type { QuantitySync } from "@/features/cart/quantity-sync";
 import { clampQuantity, isSelectable, unavailableLabel } from "@/features/cart/selection";
 import { cn } from "@/lib/utils";
 
-const DEBOUNCE_MS = 300;
 const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy focus-visible:ring-offset-1";
 
-/** 입력을 300ms 모아 PATCH 한다. 낙관적 갱신은 없고, 금액은 응답 뒤 다시 읽은 값이다. */
-function CartQuantity({ item }: { item: CartItem }) {
+/** 입력은 QuantitySync 가 300ms 모아 행마다 하나씩 PATCH 한다. 낙관적 갱신은 없고, 금액은 응답 뒤 다시 읽은 값이다. */
+function CartQuantity({ item, sync, dirty }: { item: CartItem; sync: QuantitySync; dirty: boolean }) {
   const id = useId();
-  const change = useChangeCartQuantity();
   const [draft, setDraft] = useState(String(item.quantity));
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 저장되지 않은 입력이 없을 때만 서버 값을 따른다.
   useEffect(() => {
-    if (timer.current === null) setDraft(String(item.quantity));
-  }, [item.quantity]);
-  useEffect(
-    () => () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    },
-    [],
-  );
+    if (!dirty) setDraft(String(item.quantity));
+  }, [item.quantity, dirty]);
 
   const schedule = (raw: string) => {
     setDraft(raw);
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      const next = clampQuantity(raw);
-      setDraft(String(next));
-      if (next !== item.quantity) change.mutate({ cartItemId: item.cartItemId, quantity: next });
-    }, DEBOUNCE_MS);
+    sync.set(item.cartItemId, clampQuantity(raw), item.quantity);
   };
 
   const current = clampQuantity(draft);
@@ -70,11 +57,17 @@ export function CartLineItem({
   checked,
   onToggle,
   onRemove,
+  sync,
+  dirty,
+  removing,
 }: {
   item: CartItem;
   checked: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  sync: QuantitySync;
+  dirty: boolean;
+  removing: boolean;
 }) {
   const selectable = isSelectable(item);
   const href = `/products/${item.productId}`;
@@ -114,7 +107,7 @@ export function CartLineItem({
         </div>
       </div>
       {selectable ? (
-        <CartQuantity item={item} />
+        <CartQuantity item={item} sync={sync} dirty={dirty} />
       ) : (
         <span className="inline-flex h-[26px] items-center justify-self-center whitespace-nowrap rounded border border-border bg-bg px-2.5 text-xs font-bold text-text-2">
           {unavailableLabel(item.availability)}
@@ -124,8 +117,9 @@ export function CartLineItem({
       <button
         type="button"
         onClick={onRemove}
+        disabled={removing}
         aria-label={`${item.productName} 삭제`}
-        className={cn("grid h-8 w-8 place-items-center rounded text-text-3 hover:bg-surface hover:text-navy", ring)}
+        className={cn("grid h-8 w-8 place-items-center rounded text-text-3 hover:bg-surface hover:text-navy disabled:cursor-not-allowed disabled:opacity-50", ring)}
       >
         <X className="h-4 w-4" aria-hidden />
       </button>

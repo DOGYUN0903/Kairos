@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/api/client";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -19,6 +19,7 @@ import {
   toggleItem,
   toggleSeller,
 } from "@/features/cart/selection";
+import { isQuoteStale, useQuantitySync } from "@/features/cart/quantity-sync";
 import { useQuote } from "@/features/checkout/api";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,18 +49,13 @@ function Heading({ count }: { count?: number }) {
 function CartBody({ items }: { items: CartItem[] }) {
   const qc = useQueryClient();
   const remove = useRemoveCartItem();
-  const [sel, setSel] = useState<Set<number>>(() => initialSelection(items));
+  const [rawSel, setSel] = useState<Set<number>>(() => initialSelection(items));
   const [deleting, setDeleting] = useState(false);
-  const first = useRef(true);
+  const [removing, setRemoving] = useState<ReadonlySet<number>>(() => new Set());
+  const { sync, dirty } = useQuantitySync();
 
-  // 장바구니를 다시 읽을 때마다 사라졌거나 구매 불가가 된 항목을 선택에서 뺀다(처음 값은 이미 초기 선택).
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    setSel((prev) => pruneSelection(items, prev));
-  }, [items]);
+  // 화면에서 쓰는 선택은 렌더 중에 걸러서 쓴다(다시 읽은 직후 한 번도 구매 불가 SKU 로 견적을 부르지 않는다).
+  const sel = useMemo(() => pruneSelection(items, rawSel), [items, rawSel]);
 
   const quoteItems = useMemo(() => selectedQuoteItems(items, sel), [items, sel]);
   const quote = useQuote(quoteItems, quoteItems.length > 0);
@@ -70,31 +66,45 @@ function CartBody({ items }: { items: CartItem[] }) {
     if (e instanceof ApiError && e.code === "SKU_NOT_ORDERABLE") void qc.invalidateQueries({ queryKey: queryKeys.cart });
   }, [quote.error, qc]);
 
+  const removeOne = async (id: number) => {
+    if (removing.has(id)) return;
+    setRemoving((s) => new Set(s).add(id));
+    try {
+      await remove.mutateAsync(id);
+    } catch {
+      // 토스트는 훅이 이미 띄웠다.
+    } finally {
+      setRemoving((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+    }
+  };
+
   const groups = groupBySeller(items);
   const selectable = items.filter(isSelectable);
   const selectedIds = items.filter((i) => sel.has(i.cartItemId)).map((i) => i.cartItemId);
   const allOn = selectable.length > 0 && selectable.every((i) => sel.has(i.cartItemId));
 
   const removeSelected = async () => {
-    if (deleting) return;
+    if (deleting || removing.size > 0) return;
     setDeleting(true);
     try {
-      for (const id of selectedIds) await remove.mutateAsync(id);
-    } catch {
-      // 토스트는 훅이 이미 띄웠다. 남은 항목은 그대로 둔다.
+      for (const id of selectedIds) await removeOne(id);
     } finally {
       setDeleting(false);
     }
   };
 
-  const stale = quote.isFetching || quote.isPlaceholderData;
+  const stale = isQuoteStale({ fetching: quote.isFetching, placeholder: quote.isPlaceholderData, unsavedCount: dirty.size });
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_360px] items-start gap-10">
       <div>
         <div className="flex items-center justify-between border-b-2 border-navy pb-3 pt-1.5">
           <label className="flex min-h-9 cursor-pointer items-center gap-2 font-medium">
-            <input type="checkbox" className={check} checked={allOn} disabled={selectable.length === 0} onChange={() => setSel((s) => toggleAll(items, s))} />
+            <input type="checkbox" className={check} checked={allOn} disabled={selectable.length === 0} onChange={() => setSel(toggleAll(items, sel))} />
             전체 선택{" "}
             <span className="text-text-2">
               ({selectedIds.length}/{selectable.length})
@@ -103,7 +113,7 @@ function CartBody({ items }: { items: CartItem[] }) {
           <button
             type="button"
             onClick={() => void removeSelected()}
-            disabled={selectedIds.length === 0 || deleting}
+            disabled={selectedIds.length === 0 || deleting || removing.size > 0}
             className="min-h-9 text-[13px] text-text-2 underline underline-offset-[3px] hover:text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy disabled:cursor-not-allowed disabled:text-text-3 disabled:no-underline"
           >
             선택 삭제
@@ -124,7 +134,7 @@ function CartBody({ items }: { items: CartItem[] }) {
                     className={check}
                     checked={sellerOn}
                     disabled={sellerSelectable.length === 0}
-                    onChange={() => setSel((s) => toggleSeller(items, s, g.sellerId))}
+                    onChange={() => setSel(toggleSeller(items, sel, g.sellerId))}
                   />
                   {g.sellerName}
                 </label>
@@ -135,8 +145,11 @@ function CartBody({ items }: { items: CartItem[] }) {
                   key={item.cartItemId}
                   item={item}
                   checked={sel.has(item.cartItemId)}
-                  onToggle={() => setSel((s) => toggleItem(items, s, item.cartItemId))}
-                  onRemove={() => remove.mutate(item.cartItemId)}
+                  onToggle={() => setSel(toggleItem(items, sel, item.cartItemId))}
+                  onRemove={() => void removeOne(item.cartItemId)}
+                  sync={sync}
+                  dirty={dirty.has(item.cartItemId)}
+                  removing={removing.has(item.cartItemId)}
                 />
               ))}
               {showFoot && (
@@ -163,7 +176,7 @@ function CartBody({ items }: { items: CartItem[] }) {
       </div>
 
       <aside aria-label="결제 예정 금액" className="sticky top-24">
-        <CartSummary selectedIds={selectedIds} quote={quote.data} stale={stale && quoteItems.length > 0} error={quote.error} onRetry={() => void quote.refetch()} />
+        <CartSummary selectedIds={selectedIds} quote={quote.data} stale={stale && selectedIds.length > 0} error={quote.error} onRetry={() => void quote.refetch()} />
       </aside>
     </div>
   );
