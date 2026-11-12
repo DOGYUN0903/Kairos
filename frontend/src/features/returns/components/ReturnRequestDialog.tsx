@@ -57,10 +57,11 @@ function ReturnRequestBody({ orderId, item, onClose }: { orderId: number; item: 
           // 그사이 상태가 바뀌었다: 서버 메시지를 알리고 주문 상세를 다시 읽는다.
           toast({ title: e.message, variant: "destructive" });
           refreshOrder();
+          void qc.invalidateQueries({ queryKey: queryKeys.returns.root });
           onClose();
           return;
         }
-        if (e instanceof ApiError && e.code === "RETURN_INVALID") {
+        if (e instanceof ApiError && e.status === 400 && (e.code === "RETURN_INVALID" || e.code === "INVALID_REQUEST")) {
           setFormError(e.message);
           return;
         }
@@ -98,6 +99,11 @@ function ReturnRequestBody({ orderId, item, onClose }: { orderId: number; item: 
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+          {formError && (
+            <div role="alert" className="notice notice-error">
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="field">
             <span className="label" id="return-reason-label">
               반품 사유<span aria-hidden="true" className="ml-0.5 text-danger">*</span>
@@ -136,11 +142,6 @@ function ReturnRequestBody({ orderId, item, onClose }: { orderId: number; item: 
 
           <ReturnPreviewBox reason={reason} preview={preview} />
 
-          {formError && (
-            <div role="alert" className="notice notice-error">
-              <span>{formError}</span>
-            </div>
-          )}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn btn-ghost" disabled={submitting} onClick={onClose}>
               취소

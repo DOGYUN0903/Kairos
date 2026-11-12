@@ -100,7 +100,7 @@ function Detail({ so }: { so: SellerOrderDetail }) {
         <div>
           <h2 className="flex items-center gap-3 text-xl font-bold">
             <span className="tabular-nums">{so.orderNo}</span>
-            <SellerStatusChip status={so.status} />
+            <SellerStatusChip status={so.status} allItemsReturned={so.allItemsReturned} />
           </h2>
           <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-text-2">
             <Meta label="주문 일시">{formatDateTime(so.orderedAt)}</Meta>

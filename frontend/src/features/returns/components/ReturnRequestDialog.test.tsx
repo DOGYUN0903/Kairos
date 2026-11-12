@@ -147,6 +147,7 @@ describe("ReturnRequestDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(h.toast).toHaveBeenCalledWith({ title: "이미 반품이 요청된 상품입니다.", variant: "destructive" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.orders.detail(42) });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.returns.root });
   });
 
   it("요청이_400이면_창_안에_안내하고_닫지_않는다", async () => {
@@ -156,5 +157,26 @@ describe("ReturnRequestDialog", () => {
     await userEvent.click(submitBtn());
     expect(await screen.findByRole("alert")).toHaveTextContent("반품 요청 내용을 확인해 주세요.");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("INVALID_REQUEST 400도_창_안_맨_위에_안내한다", async () => {
+    h.POST.mockRejectedValue(new ApiError(400, "INVALID_REQUEST", "요청 값이 올바르지 않습니다.", null));
+    const { onClose } = mount();
+    await pick("단순 변심");
+    await userEvent.click(submitBtn());
+    const alert = await screen.findByText("요청 값이 올바르지 않습니다.");
+    const form = alert.closest("form")!;
+    expect(form.firstElementChild).toContainElement(alert);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("새로_고른_사유의_미리보기가_오는_중에는_이전_사유의_금액을_보이지_않고_로딩을_보인다", async () => {
+    mount();
+    await pick("단순 변심");
+    await screen.findByText("14,000원");
+    h.GET.mockReturnValue(new Promise(() => {}));
+    await pick("상품 불량");
+    expect(await screen.findByText("환불 예정 금액을 확인하고 있습니다…")).toBeInTheDocument();
+    expect(screen.queryByText("14,000원")).not.toBeInTheDocument();
   });
 });

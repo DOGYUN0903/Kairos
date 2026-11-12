@@ -79,4 +79,13 @@ describe("ReturnStatusLine", () => {
     await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "이미 판매자가 승인한 반품이라 철회할 수 없습니다.", variant: "destructive" }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.orders.detail(42) });
   });
+
+  it("네트워크_오류로_철회가_실패하면_공통_오류_문구를_보인다", async () => {
+    h.DELETE.mockRejectedValue(new ApiError(0, "INTERNAL_ERROR", "fetch failed: ECONNRESET", null));
+    mount(item("REQUESTED"));
+    await userEvent.click(screen.getByRole("button", { name: "철회" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "반품 철회" }));
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" })));
+    expect(h.toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "fetch failed: ECONNRESET" }));
+  });
 });

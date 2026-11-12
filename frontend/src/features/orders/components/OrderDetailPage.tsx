@@ -82,7 +82,6 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
                 <SellerOrderCard
                   key={so.sellerOrderId}
                   sellerOrder={so}
-                  returnAware
                   shipAction={canConfirmPurchase(so) ? <ConfirmPurchaseButton orderId={orderId} sellerOrderId={so.sellerOrderId} blockedReason={confirmBlockedReason(so)} /> : undefined}
                   renderItemAction={(item) =>
                     canCancelItem(data, so, item) ? (

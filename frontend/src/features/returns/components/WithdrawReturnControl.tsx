@@ -28,7 +28,9 @@ export function WithdrawReturnControl({ orderId, returnId, className = "btn btn-
       await withdrawReturn(returnId);
       toast({ title: "반품 요청을 철회했습니다" });
     } catch (e) {
-      toast({ title: e instanceof ApiError ? e.message : resolveError(e).message, variant: "destructive" });
+      // 서버가 답한 4xx(409 상태 충돌 포함)는 서버 메시지를, 네트워크·5xx 는 공통 오류 문구를 보인다.
+      const answered4xx = e instanceof ApiError && e.status >= 400 && e.status < 500;
+      toast({ title: answered4xx ? e.message : resolveError(e).message, variant: "destructive" });
     } finally {
       void qc.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) });
       void qc.invalidateQueries({ queryKey: queryKeys.returns.root });
