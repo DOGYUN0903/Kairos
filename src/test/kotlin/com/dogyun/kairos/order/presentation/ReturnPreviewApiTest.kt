@@ -7,6 +7,7 @@ import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ReturnPreviewApiTest : CommerceTestSupport() {
 
@@ -99,6 +100,31 @@ class ReturnPreviewApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 상품_쿠폰과_포인트를_쓴_항목의_미리보기는_실제_환불과_같다() {
+        val shop = shop()
+        val sku = shop.sku(30_000)
+        val buyer = newUserToken()
+        val coupon = claimCoupon(buyer, adminCouponPolicy(couponPolicyBody(discountValue = 2_000)))
+        grantPoints(memberIdOf(buyer), 5_000)
+        // 상품 30,000 − 쿠폰 2,000 − 포인트 1,000 + 구매자 배송비 3,000 = 30,000
+        val order = deliveredOrder(buyer, shop.sellerToken, listOf(sku to 1), 30_000, productCoupons = listOf(sku to coupon), pointsToUse = 1_000)
+        val orderId = order.get("orderId").asLong()
+        val itemId = firstItemId(order)
+
+        val p = previewData(buyer, orderId, itemId, "DEFECTIVE")
+
+        assertTrue(p.get("productCouponReturnable").asBoolean())
+        assertEquals(1_000, p.get("pointsRefund").asLong())
+        assertEquals(27_000, p.get("paidAmount").asLong())
+        assertEquals(3_000, p.get("shippingFeeRefund").asLong())
+
+        val completed = completedReturn(buyer, shop.sellerToken, orderId, itemId, "DEFECTIVE")
+        assertEquals(p.get("refundAmount").asLong(), completed.get("refundAmount").asLong())
+        assertEquals(p.get("pointsRefund").asLong(), completed.get("pointsRefund").asLong())
+        assertEquals(p.get("paidAmount").asLong(), completed.get("paidAmount").asLong())
+    }
+
+    @Test
     fun 미리보기는_주문과_반품을_바꾸지_않는다() {
         val shop = shop()
         val sku = shop.sku(30_000)
@@ -171,6 +197,7 @@ class ReturnPreviewApiTest : CommerceTestSupport() {
 
         preview(buyer, 999_999_999L, 1L, "BOGUS").expectCode(400, "RETURN_INVALID")
         preview(buyer, 999_999_999L, 1L, reason = null).expectCode(400, "INVALID_REQUEST")
+        preview(buyer, 999_999_999L, 1L, reason = "").expectCode(400, "INVALID_REQUEST")
         preview(buyer, 999_999_999L, 1L, "CHANGE_OF_MIND").expectCode(404, "ORDER_NOT_FOUND")
     }
 

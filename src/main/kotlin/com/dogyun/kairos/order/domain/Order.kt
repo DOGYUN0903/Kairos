@@ -104,7 +104,7 @@ class Order(
                 itemId, memberId, sellerOrder.sellerId, reason, detail, now,
             ).also { item.requestReturn(it) }
             existing.status == ReturnStatus.WITHDRAWN -> existing.also { item.reopenReturn(reason, detail, now) }
-            else -> throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+            else -> error("checkReturnRequestable 이 걸렀어야 한다")
         }
     }
 
@@ -206,7 +206,8 @@ class Order(
         settle()
     }
 
-    internal fun sellerOrderOf(itemId: Long) = sellerOrders.first { so -> so.items.any { it.id == itemId } }
+    internal fun sellerOrderOf(itemId: Long) =
+        sellerOrders.firstOrNull { so -> so.items.any { it.id == itemId } } ?: throw DomainException(ErrorCode.ORDER_ITEM_NOT_FOUND)
 
     /** 모든 판매자 주문이 끝났으면(확정·취소) 주문을 닫는다. 전부 취소면 CANCELED, 하나라도 확정이면 COMPLETED. */
     private fun settle() {

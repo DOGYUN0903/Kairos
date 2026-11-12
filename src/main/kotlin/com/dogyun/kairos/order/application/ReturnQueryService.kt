@@ -28,6 +28,8 @@ class ReturnQueryService(
      * 자격은 [Order.checkReturnRequestable] 로 요청과 같게 판정하고, 금액은 [ReturnRefundCalculator.preview] 로 계산한다.
      */
     fun previewReturn(memberId: Long, orderId: Long, orderItemId: Long, reason: String): ReturnPreviewResult {
+        // 사유가 비어 있으면 파라미터가 없는 것과 같다(반품 요청 API 의 빈 사유와도 같다). 모르는 값만 RETURN_INVALID.
+        if (reason.isBlank()) throw DomainException(ErrorCode.INVALID_REQUEST)
         val returnReason = parseReturnReason(reason)
         val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)

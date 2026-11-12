@@ -1460,7 +1460,7 @@ export interface paths {
          * @description 이 항목을 `reason` 사유로 반품 요청하면 얼마를 돌려받는지 보여 준다. 수거 확인 때 실제 환불과 같은 계산이지만 **예상값**이다.
          *     계산은 호출 시점의 주문 상태로 하며, 같은 주문의 다른 항목이 취소·반품되면 실제 환불은 달라질 수 있다
          *     (발송 구간 배송비 회수는 주문당 한 번, 판매자 귀책 반품의 발송 배송비 환불은 그 판매자 주문에서 마지막으로 끝나는 반품).
-         *     아무것도 바꾸지 않는다. 자격 판정은 반품 요청과 같아서, 미리보기가 성공하면 바로 뒤의 요청도 성공하고 실패하면 같은 코드로 실패한다.
+         *     아무것도 바꾸지 않는다. 자격 판정은 반품 요청과 같아서, 같은 시점·같은 상태라면 미리보기가 성공하면 요청도 성공하고 미리보기가 실패하면 요청도 같은 코드로 실패한다. (그사이 상태나 반품 가능 기한이 바뀌면 달라질 수 있다.)
          */
         get: operations["previewMyOrderItemReturn"];
         put?: never;
@@ -7438,7 +7438,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description `RETURN_INVALID`(모르는 사유 — 반품 요청과 같다) 또는 `INVALID_REQUEST`(사유 누락) */
+            /** @description `RETURN_INVALID`(모르는 사유 — 반품 요청과 같다) 또는 `INVALID_REQUEST`(사유 누락 또는 빈 값) */
             400: {
                 headers: {
                     [name: string]: unknown;
