@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { joinDot } from "@/lib/join-dot";
 import { useQueryClient } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
 import Link from "next/link";
@@ -318,7 +319,7 @@ function CheckoutBody({ items, mode, created, onOrderCreated }: { items: Checkou
                 <div className="text-xs text-text-2">{pickerLine.brandName}</div>
                 <div className="truncate font-medium">{pickerLine.productName}</div>
                 <div className="text-text-2">
-                  {pickerLine.optionDisplayName} · 수량 {pickerLine.quantity}개 · <Money value={pickerLine.lineAmount} />
+                  {joinDot(pickerLine.optionDisplayName, `수량 ${pickerLine.quantity}개`)} · <Money value={pickerLine.lineAmount} />
                 </div>
               </div>
             </div>

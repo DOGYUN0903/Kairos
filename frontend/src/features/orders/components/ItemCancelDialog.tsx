@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { joinDot } from "@/lib/join-dot";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { ApiError } from "@/api/client";
@@ -126,7 +127,7 @@ export function ItemCancelDialog({ item, cancel, notice, canSubmit = true, onSpe
             {item.brandName && <div className="text-xs text-text-2">{item.brandName}</div>}
             <div className="truncate font-medium">{item.productName}</div>
             <div className="text-[13px] text-text-2">
-              {item.optionDisplayName} · 수량 {item.quantity}개
+              {joinDot(item.optionDisplayName, `수량 ${item.quantity}개`)}
             </div>
           </div>
         </div>

@@ -56,7 +56,8 @@ export function OrderItems({ quote, selection, onPickCoupon, requoting }: Props)
                     <div className="text-xs text-text-2">{l.brandName}</div>
                     <div className="truncate font-medium">{l.productName}</div>
                     <div className="text-[13px] text-text-2">
-                      {l.optionDisplayName} · <Money value={l.unitPrice} />
+                      {l.optionDisplayName && `${l.optionDisplayName} · `}
+                      <Money value={l.unitPrice} />
                     </div>
                   </div>
                   <div className="w-20 text-right text-[13px] text-text-2">수량 {l.quantity}개</div>

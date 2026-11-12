@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { joinDot } from "@/lib/join-dot";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -160,7 +161,7 @@ function Detail({ so }: { so: SellerOrderDetail }) {
                           <div className="min-w-0">
                             <span className="block truncate font-medium">{item.productName}</span>
                             <span className="text-xs text-text-2">
-                              {item.brandName} · {item.optionDisplayName}
+                              {joinDot(item.brandName, item.optionDisplayName)}
                             </span>
                           </div>
                         </div>
