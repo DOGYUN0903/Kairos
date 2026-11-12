@@ -136,6 +136,43 @@ class OrderQuoteApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 추가금이_있는_SKU와_같은_판매자의_SKU_두_개를_견적하면_단가와_판매자_합계가_맞다() {
+        val token = newUserToken()
+        approvedSeller(token)
+        val productId = onSaleProduct(token, approvedBrand(token), leafCategory(), listOf(uploadImage(token)), originalPrice = 15_000, salePrice = 12_000)
+        val (extraSku, plainSku) = skuIdsOf(token, productId).sorted()
+        patch(
+            "/api/v1/seller/products/$productId/skus/$extraSku", token,
+            mapOf("extraPrice" to 2_500, "stock" to 5, "onSale" to true),
+        ).andExpect { status { isOk() } }
+        val user = newUserToken()
+
+        val quote = json(
+            post("/api/v1/orders/quote", user, quoteBody(listOf(extraSku to 2, plainSku to 1), emptyList(), null, 0)).andExpect { status { isOk() } },
+        ).get("data")
+
+        val lines = quote.get("items").associateBy { it.get("skuId").asLong() }
+        assertEquals(2, lines.size)
+        // 단가 = 판매가 + SKU 추가금, 줄 금액 = 단가 × 수량.
+        assertEquals(14_500L, lines.getValue(extraSku).get("unitPrice").asLong())
+        assertEquals(2, lines.getValue(extraSku).get("quantity").asInt())
+        assertEquals(29_000L, lines.getValue(extraSku).get("lineAmount").asLong())
+        assertEquals(12_000L, lines.getValue(plainSku).get("unitPrice").asLong())
+        assertEquals(1, lines.getValue(plainSku).get("quantity").asInt())
+        assertEquals(12_000L, lines.getValue(plainSku).get("lineAmount").asLong())
+        // 같은 판매자의 두 줄은 판매자 견적 하나로 묶이고 배송비는 판매자당 한 번이다.
+        val sellerQuote = quote.get("sellerQuotes").single()
+        assertEquals(lines.getValue(extraSku).get("sellerId").asLong(), sellerQuote.get("sellerId").asLong())
+        assertEquals(lines.getValue(plainSku).get("sellerId").asLong(), sellerQuote.get("sellerId").asLong())
+        assertEquals(41_000L, sellerQuote.get("itemsAmount").asLong())
+        assertEquals(3_000L, sellerQuote.get("shippingFee").asLong())
+        assertEquals("BUYER", sellerQuote.get("shippingFeePayer").asText())
+        assertEquals(41_000L, quote.get("itemsAmount").asLong())
+        assertEquals(3_000L, quote.get("buyerShippingFee").asLong())
+        assertEquals(44_000L, quote.get("totalAmount").asLong())
+    }
+
+    @Test
     fun 견적_항목에_표시용_상품_정보가_있다() {
         val (_, sku) = skuOf(20_000)
         val quote = plainQuote("" to sku)
