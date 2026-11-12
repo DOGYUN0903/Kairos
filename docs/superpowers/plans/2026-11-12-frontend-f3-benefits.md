@@ -22,6 +22,7 @@
 - 서버가 `Idempotency-Key`를 강제하는 요청(쿠폰 받기, 쿠폰 정책 등록 2종, 후기 작성, 주문 생성)은 `useIdempotentSubmit`/`useIdempotentAction`으로 보낸다. 키 규칙은 F2 그대로(`src/api/idempotency.ts`의 `isAnswered`). 후기 수정·삭제, 답글, 정책 종료, 좋아요는 키 없이 처리 중 재호출을 막는다.
 - 데모 전용 코드는 `src/features/demo`에만. F3는 데모 전용 코드를 추가하지 않는다. 어떤 번들에도 `KAIROS_ADMIN`·토스 시크릿 키가 없어야 한다(`pnpm check:bundle`).
 - `design/`의 기존 시안 파일은 고치지 않는다(새 파일 추가, `index.html` 링크 추가, `assets/kairos.css`에 클래스 **추가**만 허용).
+- **시안 게이트**: Task 7~13(화면 구현)은 Task 1의 시안을 사용자가 확인한 뒤에만 시작한다. 화면은 확인된 시안(`design/*.html`)의 구조·문구·클래스를 따른다. Task 2~6은 기다리지 않는다(Task 6의 `MyPageShell`은 구조만 만들고, 모양은 Task 7이 확인된 `user-mypage.html`에 맞춘다).
 - 구매자 전용 페이지는 `RequireAuth`로 감싼다(`(store)/layout.tsx`에는 가드가 없다). 판매자 페이지는 기존 판매자 콘솔 가드, 관리자 페이지는 기존 관리자 가드를 그대로 쓴다.
 - 프론트 테스트 이름은 한국어. 순수 로직은 `.ts` + `.test.ts`(Vitest), 화면 흐름은 E2E. 각 프론트 태스크의 검증: `cd frontend && pnpm lint && pnpm typecheck && pnpm test`.
 - 의존성을 추가하지 않는다(필요하면 BLOCKED로 보고). claude.ai Artifact·Claude Design·Figma 토큰 사용 금지.
@@ -130,16 +131,16 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
   - `최소_주문_금액이_없으면_항상_충족한다` — `minOrderAmount=null`, `meetsMinimum(0) == true`
 - [ ] **Step 2: 실패 확인 → `meetsMinimum` 구현 → `DiscountAllocator.allocate`의 두 비교(`(terms.minOrderAmount ?: 0) > amounts[i]`, `(cartCoupon.minOrderAmount ?: 0) > target`)를 `!terms.meetsMinimum(...)`로 바꾼다.** 다른 줄은 건드리지 않는다.
 - [ ] **Step 3: `./gradlew test --tests '*CouponTermsTest' --tests '*DiscountAllocatorTest' --tests '*OrderServiceTest' --tests '*RefundCalculatorTest'` 통과(기존 테스트 무수정) → Commit** `refactor(backend): 쿠폰 최소 금액 판정을 CouponTerms로 추출`
-- [ ] **Step 4: OpenAPI에 `QuoteCoupon`과 두 필드를 추가한다.** `quoteOrder` 설명에 "`availableCoupons`·`cartCoupons`는 내 사용 가능한 쿠폰이며 `usable`·`expectedDiscount`는 주문 생성과 같은 판정이다. 장바구니 쿠폰은 요청에 담긴 상품 쿠폰을 적용한 뒤 금액으로 판정한다"를 적는다.
+- [ ] **Step 4: OpenAPI에 `QuoteCoupon`과 두 필드를 추가한다.** `quoteOrder` 설명에 "`availableCoupons`·`cartCoupons`는 내 사용 가능한 쿠폰이며 `usable`·`expectedDiscount`는 주문 생성과 같은 판정이다. 상품 쿠폰의 `usable`은 그 항목에 그 쿠폰만 썼을 때의 판정이다(한 쿠폰을 두 항목에 쓰거나 한 항목에 두 장 쓰는 것은 별도로 `ORDER_INVALID`). 장바구니 쿠폰은 요청에 담긴 상품 쿠폰을 적용한 뒤 금액으로 판정한다"를 적는다. (`OpenApiContractTest`는 경로만 비교한다 — 필드는 API 테스트의 단언으로 확인한다.)
 - [ ] **Step 5: 실패하는 테스트 — `OrderServiceTest`에 추가**(Fake `BenefitApplier.listUsable`이 준비한 쿠폰을 돌려준다). C3 스펙 §6 주문(b1 30,000×1 판매자 B, c1 20,000×2 판매자 C):
   - `견적은_항목마다_대상이_맞는_상품_쿠폰과_예상_할인을_준다` — 플랫폼 정액 2,000(`ALL_PRODUCTS`), 판매자 C 정률 10% 최대 5,000(`SELLER`) 보유 → b1 목록 = [플랫폼 쿠폰 `expectedDiscount=2000`], c1 목록 = [판매자 쿠폰 `4000`, 플랫폼 쿠폰 `2000`](할인 큰 순), 전부 `usable=true`
   - `장바구니_쿠폰은_상품_쿠폰_적용_뒤_금액으로_판정한다` — 장바구니 10% 최대 5,000 최소 50,000: 상품 쿠폰 없이 `usable=true, expectedDiscount=5000`; 위 두 상품 쿠폰을 요청에 담아도(합계 64,000) `usable=true, expectedDiscount=5000`
-  - `상품_쿠폰으로_합계가_최소_금액_아래로_내려가면_장바구니_쿠폰은_사용_불가다` — 최소 68,000 장바구니 쿠폰: 상품 쿠폰 없으면 `usable=true`, b1에 2,000 쿠폰을 담으면 `usable=false, unusableReason=MIN_AMOUNT_NOT_MET, expectedDiscount=null`
+  - `상품_쿠폰으로_합계가_최소_금액_아래로_내려가면_장바구니_쿠폰은_사용_불가다` — 최소 69,000 장바구니 쿠폰: 상품 쿠폰 없으면(대상 70,000) `usable=true`, b1에 2,000 쿠폰을 담으면(대상 68,000) `usable=false, unusableReason=MIN_AMOUNT_NOT_MET, expectedDiscount=null`. 경계도 고정: 최소 68,000 쿠폰은 같은 요청에서 `usable=true`(대상 = 최소 금액)
   - `최소_금액_미달_상품_쿠폰은_사용_불가로_목록에_남는다` — 최소 35,000 상품 쿠폰: b1(30,000) 목록에 `usable=false, MIN_AMOUNT_NOT_MET`, c1(40,000) 목록에 `usable=true`
   - `상품_쿠폰이_전액을_덮으면_장바구니_쿠폰은_할인할_금액이_없다` — 항목 전부에 lineAmount 이상 정액 쿠폰을 담은 요청: 모든 장바구니 쿠폰 `usable=false, NOTHING_TO_DISCOUNT`
   - `대상이_다른_쿠폰과_종류가_다른_쿠폰은_목록에_없다` — 다른 판매자의 `SELLER` 쿠폰, 다른 상품의 `PRODUCT` 쿠폰은 어느 항목에도 없고, 장바구니 쿠폰은 `availableCoupons`에 없고, 상품 쿠폰은 `cartCoupons`에 없다
   - `정렬은_사용_가능_먼저_예상_할인_큰_순_만료_빠른_순이다`
-  - **일치 테스트(Review Focus 2)** `usable인_쿠폰은_고르면_성공하고_아닌_쿠폰은_거절된다` — 위 쿠폰들을 섞은 견적에서, 각 항목의 `availableCoupons`와 `cartCoupons` 전부에 대해 그 쿠폰 하나를 추가로 고른 견적을 다시 부른다: `usable=true`면 성공하고 그 쿠폰의 실제 할인(`productCouponDiscount` 또는 `cartCouponDiscount`)이 `expectedDiscount`와 같다, `usable=false`면 `DomainException`(`COUPON_MIN_AMOUNT_NOT_MET` 또는 `COUPON_NOT_APPLICABLE`)
+  - **일치 테스트(Review Focus 2)** `usable인_쿠폰은_고르면_성공하고_아닌_쿠폰은_거절된다` — 판정의 뜻을 그대로 검증한다. (가) 상품 쿠폰: 쿠폰·포인트 없는 견적의 각 항목 `availableCoupons` 전부에 대해 **`{그 sku → 그 쿠폰}` 하나만**(장바구니 쿠폰 없음, 포인트 0) 담아 견적한다 — `usable=true`면 성공하고 그 줄의 `productCouponDiscount == expectedDiscount`, `usable=false`면 `COUPON_MIN_AMOUNT_NOT_MET`. (나) 장바구니 쿠폰: 상품 쿠폰 선택 P(없음 / b1에 2,000 / 전액 덮음 세 가지)로 받은 견적의 `cartCoupons` 전부에 대해 **같은 P에 `cartCouponId`만 더해**(포인트 0) 견적한다 — `usable=true`면 성공하고 `cartCouponDiscount == expectedDiscount`, `usable=false`면 `COUPON_MIN_AMOUNT_NOT_MET`(이유 `MIN_AMOUNT_NOT_MET`) 또는 `COUPON_NOT_APPLICABLE`(이유 `NOTHING_TO_DISCOUNT`)
 - [ ] **Step 6: 실패 확인 → 구현.** `OrderService.quote`가 `benefitApplier.listUsable(memberId)`를 한 번 부르고, `ReservedCoupon` → `CouponTerms` 변환은 기존 변환(`allocate`가 쓰는 것)을 재사용한다. 상품 쿠폰: `kind == PRODUCT && appliesTo(productId, sellerId)`인 것만 항목 목록에, `usable = meetsMinimum(lineAmount)`, `expectedDiscount = discountFor(lineAmount)`(usable일 때만). 장바구니 쿠폰: `target = order.itemsAmount − allocation.productCouponDiscount`; `target <= 0`이면 `NOTHING_TO_DISCOUNT`, 아니면 `meetsMinimum(target)`·`discountFor(target)`. 이 조립은 `OrderService` 안의 private 함수나 `order/application`의 작은 클래스에 둔다(도메인 계산 클래스에 넣지 않는다). benefit 쪽: `findAvailableByMember`(상태 `AVAILABLE`, `expires_at > now`, 회원 일치)와 `listUsableCoupons`(기존 `termsOf` 재사용 + 정책 이름·쿠폰 만료일).
 - [ ] **Step 7: 실패하는 테스트 — `OrderQuoteCouponsApiTest`**(실제 DB)
   - `견적_응답에_내_쿠폰_목록이_있다` — 쿠폰 정책 생성·발급 후 `POST /orders/quote`: `data.items[0].availableCoupons[0].couponId`, `usable`, `expectedDiscount`, `data.cartCoupons` 존재
@@ -162,7 +163,7 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 - Test: 신규 `review/application/ReviewStateQueryServiceTest.kt`, 수정 `order/application/OrderQueryServiceTest.kt`, 신규 `order/presentation/OrderItemReviewStateApiTest.kt`
 
 **Interfaces:**
-- Produces (OpenAPI): `OrderItemResult.review?: OrderItemReview`(선택 필드 — 구매자 주문 상세에서만 채움). `OrderItemReview { status: NOT_ELIGIBLE|WRITABLE|WRITTEN|EXPIRED|DELETED (required), reviewId?: int64|null, writableUntil?: LocalDateTime|null }`
+- Produces (OpenAPI): `OrderItemResult.review`: `OrderItemReview`에 `nullable: true`, required 아님(기존 `returnRequest`와 같은 선언 방식 — 판매자·관리자 응답에는 `"review": null`로 나간다. 구매자 주문 상세에서만 채움). `OrderItemReview { status: NOT_ELIGIBLE|WRITABLE|WRITTEN|EXPIRED|DELETED (required), reviewId?: int64|null, writableUntil?: LocalDateTime|null }`
 - Produces (Kotlin):
   - `order/application/ReviewStateReader.kt`: `interface ReviewStateReader { fun statesOf(candidates: List<ReviewCandidate>): Map<Long, ItemReviewState> }` · `data class ReviewCandidate(val orderItemId: Long, val confirmedAt: LocalDateTime)` · `data class ItemReviewState(val status: String, val reviewId: Long?, val writableUntil: LocalDateTime?)`
   - `review/application/ReviewStateQueryService.statesOf(candidates: List<Pair<Long, LocalDateTime>>): Map<Long, ReviewStateResult>` — 상태 `WRITABLE`/`WRITTEN`/`EXPIRED`/`DELETED`만 돌려준다(`NOT_ELIGIBLE`은 order가 정한다)
@@ -182,7 +183,7 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
   - `구매_확정된_항목은_후기_상태를_reader에서_받는다`
   - `확정_전_판매자_주문의_항목과_취소된_항목은_NOT_ELIGIBLE이고_reader에_묻지_않는다` — 후보 목록에 없음
   - `주문_한_건의_후기_상태는_한_번에_조회한다` — 판매자 주문 2개·항목 3개에서 Fake 호출 1회
-  - `판매자와_관리자_주문_조회에는_review가_없다` — `getForSeller`·`getForAdmin` 결과의 `review == null`, Fake 호출 0회
+  - `판매자와_관리자_주문_조회의_review는_null이다` — `getForSeller`·`getForAdmin` 결과의 `review == null`, Fake 호출 0회
 - [ ] **Step 5: 구현.** `OrderQueryService.getMine`만 후보(판매자 주문 `CONFIRMED` + 항목 `ORDERED` + `confirmedAt` 있음)를 모아 `reviewStateReader.statesOf`를 한 번 부른다. `ReviewStateReaderImpl`은 `ReviewStateQueryService`를 부른다(`ReviewService`를 주입하지 않는다 — 빈 순환).
 - [ ] **Step 6: 실패하는 테스트 — `OrderItemReviewStateApiTest`**(실제 DB, 기존 `CommerceTestSupport`의 주문·발송·확정 헬퍼)
   - `확정_전에는_NOT_ELIGIBLE_확정_후에는_WRITABLE_작성_후에는_WRITTEN_삭제_후에는_DELETED다` — 한 주문으로 네 단계를 차례로 확인(`reviewId`는 작성 응답의 값과 같다)
@@ -233,29 +234,29 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 **Interfaces:**
 - Produces:
   - `money.ts`: `percentToBp(percent: number): number`(1~100의 정수만, 아니면 throw — `percent * 100`), 기존 `formatBp` 재사용
-  - `datetime.ts`: `hasPassedKst(kstLocalDateTime: string, nowMs: number): boolean`(`secondsUntilKst(...) <= 0`), `fromDateTimeInput(value: string): string | null`(`"2026-11-12T10:00"` → `"2026-11-12T10:00:00"`, 형식이 아니면 null), `formatDateTimeMinute(s: string): string`(`"11월 12일 10:00"` — 문자열만 다룬다)
+  - `datetime.ts`: `hasPassedKst(kstLocalDateTime: string, nowMs: number): boolean`(`secondsUntilKst(...) <= 0`), `fromDateTimeInput(value: string): string | null`(`"2026-11-12T10:00"` → `"2026-11-12T10:00:00"`, 형식이 아니면 null), `formatDateTimeMinute(s: string): string`(`"11월 12일 10:00"` — 문자열만 다룬다), `formatMonthDay(s: string): string`(`"11월 12일"`)
   - `features/coupons/discount-text.ts`: `type DiscountTerms = { discountType: "FIXED" | "RATE"; discountValue: number; maxDiscount?: number | null; minOrderAmount?: number | null }` · `discountLabel(t): string` · `conditionLabel(t): string | null`
   - `features/coupons/expiry.ts`: `isExpiringSoon(expiresAt: string, nowMs: number): boolean`(남은 시간 0 초과 7일 이하)
-  - `query-keys.ts`: `coupons: { policiesRoot, policies(productId?: number), mine(params?) , mineRoot }`, `points: { root, summary, transactions(params?) }`, `reviews: { productRoot(productId), product(productId, page), mine(params?), mineRoot }`, `likes: { root, list(params?) }`, `sellerCoupons: { lists, list(params?) }`, `sellerReviews: { lists, list(params?) }`, `adminCoupons: { lists, list(params?) }`, `adminMemberPoints: (memberId: number, params?)`; `checkout.quote(items, selection?)`로 인자 추가(기존 호출은 그대로 동작)
+  - `query-keys.ts`: `coupons: { policiesRoot, policies(productId?: number), mine(params?) , mineRoot }`, `points: { root, summary, transactions(params?) }`, `reviews: { productRoot(productId), product(productId, page), mine(params?), mineRoot }`, `likes: { root, list(params?) }`, `sellerCoupons: { lists, list(params?) }`, `sellerReviews: { lists, list(params?) }`, `adminCoupons: { lists, list(params?) }`, `adminMemberPoints: (memberId: number, params?)`; `checkout.quote(items, benefit?)`로 인자 추가 — `benefit`이 없으면 **넷째 원소를 넣지 않는다**(`["checkout","quote",items]`가 `[…, items, benefit]`의 접두사로 남아 기존 무효화가 계속 맞는다. 테스트로 고정)
   - `features/mypage/menu.ts`: `MY_MENU: { href: string; label: string }[]` = 주문 내역 `/my/orders`, 쿠폰 `/my/coupons`, 포인트 `/my/points`, 내 후기 `/my/reviews`, 좋아요 `/my/likes` · `activeMenuHref(pathname: string): string | null`(`/my/orders/12` → `/my/orders`)
   - `MyPageShell`: 왼쪽 메뉴(현재 항목 `aria-current="page"`) + 오른쪽 내용
 
 - [ ] **Step 1: 실패하는 테스트**
   - `money.test.ts`: `percentToBp(10) === 1000`, `percentToBp(1) === 100`, `percentToBp(100) === 10000`, `0`·`101`·`10.5`·`NaN`은 throw; `formatBp(1000)`은 `"10%"`, `formatBp(1050)`은 기존 규칙대로(기존 테스트가 있으면 추가하지 않는다)
-  - `datetime.test.ts`: `hasPassedKst("2026-11-12T10:00:00", <그 시각의 ms>) === true`, 1초 전은 false(브라우저 시간대와 무관 — KST 고정); `fromDateTimeInput("2026-11-12T10:00") === "2026-11-12T10:00:00"`, `"2026-11-12"`·`""`는 null; `formatDateTimeMinute("2026-11-12T10:05:30") === "11월 12일 10:05"`
+  - `datetime.test.ts`: `hasPassedKst("2026-11-12T10:00:00", <그 시각의 ms>) === true`, 1초 전은 false(브라우저 시간대와 무관 — KST 고정); `fromDateTimeInput("2026-11-12T10:00") === "2026-11-12T10:00:00"`, `"2026-11-12"`·`""`는 null; `formatDateTimeMinute("2026-11-12T10:05:30") === "11월 12일 10:05"`, `formatMonthDay("2026-01-05T00:00:00") === "1월 5일"`
   - `discount-text.test.ts`: 정액 3,000 → `"3,000원 할인"`; 정률 1000bp 최대 5,000 → `"10% 할인 (최대 5,000원)"`; 정률 최대 없음 → `"10% 할인"`; 최소 30,000 → `conditionLabel === "30,000원 이상 구매 시"`; 최소 없음·0 → `null`
   - `expiry.test.ts`: 정확히 7일 남음 true, 7일 1초 false, 이미 지남 false
   - `menu.test.ts`: `activeMenuHref("/my/orders/12") === "/my/orders"`, `"/my/coupons"`, `"/my/orders/12/pay"`은 `"/my/orders"`, `"/cart"`는 null
   - `errors.test.ts`: `REVIEW_INVALID`·`COUPON_POLICY_INVALID`는 `form`, `REVIEW_NOT_FOUND`는 `toast`(표에 없으면 서버 메시지), `COUPON_SOLD_OUT` 메시지 `"쿠폰이 모두 소진되었습니다."`, `COUPON_POLICY_ENDED` 메시지 `"종료된 쿠폰입니다."`
   - `StatusChip.test.tsx`: 쿠폰 `AVAILABLE` "사용 가능"·`USED` "사용 완료"·`EXPIRED` "기간 만료", 정책 `ACTIVE` "진행 중"·`ENDED` "종료"·`PERIOD_OVER` "기간 종료", 답글 `UNANSWERED` "미답변"
 - [ ] **Step 2: 실패 확인 → 구현 → 통과.**
-- [ ] **Step 3: 라우트 이동과 틀.** 두 `page.tsx`를 `(menu)` 그룹으로 옮기고 각 파일의 `RequireAuth`는 `(menu)/layout.tsx`로 올린다(layout: `RequireAuth` → `MyPageShell`). `app/(store)/my/page.tsx`는 `redirect("/my/orders")`. `pay`·`complete` 페이지는 옮기지 않는다. `pnpm build`로 `/my/orders`, `/my/orders/[orderId]`, `/my/orders/[orderId]/pay`, `/my/orders/[orderId]/complete`가 모두 빌드되는지 확인한다(라우트 충돌 없음).
-- [ ] **Step 4: 헤더·사이드 메뉴.** `StoreHeader`의 "주문 내역" 링크 문구를 "마이페이지"로(href `/my/orders` 유지 — 기존 E2E가 이 링크를 문구로 찾으면 E2E도 함께 고친다. `grep -rn "주문 내역" frontend/e2e`). 판매자 사이드 메뉴에 "쿠폰 관리"(`/seller/coupons`)·"후기 관리"(`/seller/reviews`), 관리자 사이드 메뉴에 "쿠폰 관리"(`/admin/coupons`)·"회원 포인트"(`/admin/members/points`).
+- [ ] **Step 3: 라우트 이동과 틀.** 두 `page.tsx`를 `(menu)` 그룹으로 옮기고 각 파일의 `RequireAuth`는 `(menu)/layout.tsx`로 올린다(layout: `<Suspense>` → `RequireAuth` → `MyPageShell` — `RequireAuth`가 `useSearchParams`를 쓰므로 Suspense 경계가 필요하다. 각 page의 기존 `<Suspense>`는 그대로 둔다). `OrderListPage`·`OrderDetailPage`의 바깥 여백·너비 컨테이너가 틀 안에서 겹치면 그 컴포넌트를 고친다. `app/(store)/my/page.tsx`는 `redirect("/my/orders")`. `pay`·`complete` 페이지는 옮기지 않는다. `pnpm build`로 `/my/orders`, `/my/orders/[orderId]`, `/my/orders/[orderId]/pay`, `/my/orders/[orderId]/complete`가 모두 빌드되는지 확인한다(라우트 충돌 없음).
+- [ ] **Step 4: 헤더·사이드 메뉴.** `StoreHeader`의 "마이" 링크(`/my/orders`) 문구를 "마이페이지"로 바꾼다(href 유지. 기존 E2E는 이 링크를 문구로 찾지 않는다). 판매자 사이드 메뉴에 "쿠폰 관리"(`/seller/coupons`)·"후기 관리"(`/seller/reviews`), 관리자 사이드 메뉴에 "쿠폰 관리"(`/admin/coupons`)·"회원 포인트"(`/admin/members/points`).
 - [ ] **Step 5: `pnpm lint && pnpm typecheck && pnpm test && pnpm build` → Commit** `feat(frontend): F3 공통 기반(마이페이지 틀, 할인 문구, 쿼리 키) 추가`
 
 ---
 
-### Task 7: 쿠폰 받기와 내 쿠폰 (구현 전 Task 1 사용자 확인 필요)
+### Task 7: 쿠폰 받기와 내 쿠폰
 
 스펙 §8-1, §8-3. 시안 `design/user-product-detail-benefit.html`, `user-mypage.html`.
 
@@ -274,7 +275,7 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 
 - [ ] **Step 1: 실패하는 테스트 — `claim-error.test.ts`**(위 네 경우) **와 탭·상태 파싱 테스트**(모르는 값 → 기본)
 - [ ] **Step 2: 실패 확인 → 구현 → 통과.**
-- [ ] **Step 3: 화면.** `CouponCard`(이름, `discountLabel`, `conditionLabel`, 발급 주체·종류 표시, 기간, 상품 하나 대상이면 `targetProductName ?? "상품 #" + targetProductId`). `ClaimableCouponList`: 받기 버튼은 `useIdempotentAction` — 성공 토스트 `"쿠폰을 받았습니다. {formatDate(expiresAt)}까지 사용할 수 있습니다."`, 정책 목록(`coupons.policiesRoot`)·내 쿠폰(`coupons.mineRoot`) 무효화. 실패는 `claimOutcome` → 토스트(+`refetch`면 정책 목록 무효화). `claimed`면 "받음" 비활성. 받는 중인 카드의 버튼은 비활성.
+- [ ] **Step 3: 화면.** 먼저 `MyPageShell`의 모양을 확인된 시안 `user-mypage.html`에 맞춘다. `CouponCard`(이름, `discountLabel`, `conditionLabel`, 발급 주체·종류 표시, 기간, 상품 하나 대상이면 `targetProductName ?? "상품 #" + targetProductId`). `ClaimableCouponList`: 받기 버튼은 `useIdempotentAction` — 성공 토스트 `"쿠폰을 받았습니다. {formatMonthDay(expiresAt)}까지 사용할 수 있습니다."`, 정책 목록(`coupons.policiesRoot`)·내 쿠폰(`coupons.mineRoot`) 무효화. 실패는 `claimOutcome` → 토스트(+`refetch`면 정책 목록 무효화). `claimed`면 "받음" 비활성. 받는 중인 카드의 버튼은 비활성.
 - [ ] **Step 4: 상품 상세.** `ProductCouponSection`: 비로그인이면 API를 부르지 않고 "로그인하고 쿠폰 받기" 링크(`/login?next=<현재 경로>`, 기존 `safeNext` 규칙). 로그인이면 목록, 0개면 영역을 그리지 않는다. 시안의 기준 개수를 넘으면 "쿠폰 모두 보기" 창.
 - [ ] **Step 5: `/my/coupons`.** 탭 `?tab=`, 내 쿠폰 필터 `?status=`·`?page=`. 내 쿠폰 카드: `StatusChip`, 만료일, `isExpiringSoon`이면 "곧 만료", `USED`면 사용일 + "주문 보기"(`/my/orders/{usedOrderId}`). 안내 한 줄 "사용할 수 있는 쿠폰은 주문서에서 자동으로 보입니다". 빈 상태·오류 상태.
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 쿠폰 받기와 내 쿠폰 화면 추가`
@@ -287,7 +288,8 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 
 **Files:**
 - Create: `features/checkout/{benefit-selection.ts,points-input.ts,quote-recovery.ts}`(+테스트), `features/checkout/components/{BenefitSection,CouponPickerDialog,PointsField}.tsx`
-- Modify: `features/checkout/{api.ts,checkout-guard.ts}`(+테스트), `features/checkout/components/{CheckoutPage,CheckoutSummary,OrderItems}.tsx`, `features/payment/pay-state.ts`(+테스트), `features/orders/components/{ItemCancelDialog,PaymentSummaryCard}.tsx`(+테스트)
+- Create: `features/points/api.ts`(`usePointSummary`만 — Task 9가 이어서 채운다)
+- Modify: `features/checkout/{api.ts,checkout-guard.ts}`(+테스트), `features/checkout/components/{CheckoutPage,CheckoutSummary,OrderItems}.tsx`, `features/payment/pay-state.ts`(+테스트), `features/orders/api.ts`(취소 무효화), `features/orders/components/{CancelItemDialog,OrderDetailPage,PaymentSummaryCard}.tsx`(+테스트)
 
 **Interfaces:**
 - Consumes: Task 2의 `QuoteCoupon`·`availableCoupons`·`cartCoupons`; Task 6의 쿼리 키·`discountLabel`; `points` 요약은 이 태스크가 `features/points/api.ts`의 `usePointSummary()`를 먼저 만든다(Task 9가 이어서 쓴다)
@@ -307,7 +309,7 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
   - `points-input.ts`: `validatePoints(raw: string, maxUsable: number): { ok: true; points: number } | { ok: false; reason: "NOT_NUMBER" | "NOT_UNIT" | "OVER_MAX" }`(빈 문자열은 `{ ok: true, points: 0 }`; `/^\d+$/`만 숫자) · `pointsMessage(reason, maxUsable): string` — `"숫자만 입력해 주세요"`, `"10P 단위로 입력해 주세요"`, `"최대 {n}P까지 사용할 수 있습니다"` · `pointsDisabledReason(balance: number, maxUsable: number): string | null` — `maxUsable === 0`일 때 잔액이 0이면 `"보유 포인트가 없습니다"`, 아니면 `"이 주문에는 포인트를 사용할 수 없습니다 (1,000P 이상 보유 시, 상품 금액의 30%까지)"`
   - `quote-recovery.ts`: `recoverSelection(code: string, current: BenefitSelection, lastGood: BenefitSelection): { next: BenefitSelection; notice: string } | null` — 포인트 코드(`POINT_EXCEEDS_LIMIT`·`POINT_INSUFFICIENT`·`POINT_INVALID_AMOUNT`)이고 `current.points > 0` → `setPoints(current, 0)`, notice `"쿠폰이 바뀌어 포인트 사용을 초기화했습니다."`; 쿠폰 코드(`COUPON_MIN_AMOUNT_NOT_MET`·`COUPON_NOT_APPLICABLE`·`COUPON_NOT_AVAILABLE`·`COUPON_NOT_FOUND`) → `lastGood`가 `current`와 다르면 `lastGood`, 같으면 `EMPTY_SELECTION`(이미 `EMPTY_SELECTION`이면 null), notice `"쿠폰을 사용할 수 없어 선택을 되돌렸습니다."`; 그 밖의 코드와 더 물러설 곳이 없으면 null(오류 상태를 보인다)
   - `checkout/api.ts`: `useQuote(items, selection: BenefitSelection, enabled)` — 본문에 `toBenefitBody(selection)`, 쿼리 키 `queryKeys.checkout.quote(items, toBenefitBody(selection))`. `keepPreviousData` 유지(선택이 바뀌는 동안 `isPlaceholderData`가 true라 기존 `canPay`가 결제를 막는다)
-  - `checkout-guard.ts`: `afterOrderHref(orderId, orderStatus, totalAmount)` — `PAID` → 완료, `totalAmount === 0`이고 `PAID` 아님 → `/my/orders/{id}`, 그 외 기존 결제 페이지 · `payButtonLabel(totalAmount: number): string` — 0이면 `"주문하기"`, 아니면 `"{formatKrw} 결제하기"` · `orderErrorAction(code: string): "CLEAR_COUPONS" | "CLEAR_POINTS" | null`
+  - `checkout-guard.ts`: 기존 `canPay` 입력에 `pointsSettled: boolean`을 더한다(포인트 입력 칸의 문자열이 검증을 통과하고 그 값이 `selection.points`와 같을 때만 true — 입력 지연 중이거나 `15`처럼 잘못된 값이 칸에 있으면 결제를 막는다) · `submitSnapshot(s: { quote: OrderQuote | undefined; quoteSelection: BenefitSelection | null; selection: BenefitSelection; payable: boolean }): { expectedTotalAmount: number; benefit: ReturnType<typeof toBenefitBody> } | null` — `payable`이 false거나 견적이 없거나 `quoteSelection`(그 견적을 만든 선택)이 현재 `selection`과 다르면 null, 아니면 **같은 견적에서** 금액과 선택을 꺼낸다 · `afterOrderHref(orderId, orderStatus, totalAmount)` — `PAID` → 완료, `totalAmount === 0`이고 `PAID` 아님 → `/my/orders/{id}`, 그 외 기존 결제 페이지 · `payButtonLabel(totalAmount: number): string` — 0이면 `"주문하기"`, 아니면 `"{formatKrw} 결제하기"` · `orderErrorAction(code: string): "CLEAR_COUPONS" | "CLEAR_POINTS" | null`
   - `pay-state.ts`: `canPay`는 `order.totalAmount > 0`도 요구한다
 
 - [ ] **Step 1: 실패하는 테스트 — `benefit-selection.test.ts`**
@@ -315,19 +317,19 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
   - `null을_고르면_그_상품의_쿠폰이_빠진다`, `장바구니_쿠폰을_고르고_해제한다`, `clearCoupons는_포인트를_남긴다`
   - `toBenefitBody는_skuId_오름차순이다` — `{5: 1, 2: 3}` → `[{skuId:2,couponId:3},{skuId:5,couponId:1}]`
   - `입력_객체를_바꾸지_않는다`(불변), `isSameSelection`은 키 순서와 무관
-- [ ] **Step 2: `points-input.test.ts`** (Review Focus 4) — `""` → 0; `"1000"`(max 5000) ok; `"15"` → `NOT_UNIT`; `"-10"`·`"1e3"`·`" 100"`·`"10.0"`·`"abc"` → `NOT_NUMBER`; `"5010"`(max 5000) → `OVER_MAX`; `"5000"` ok; `"0"` ok; `pointsDisabledReason(0, 0)`, `(900, 0)`, `(5000, 0)`, `(5000, 1000) === null`
+- [ ] **Step 2: `points-input.test.ts`** (Review Focus 4) — `""` → 0; `"1000"`(max 5000) ok; `"15"` → `NOT_UNIT`; `"-10"`·`"1e3"`·`" 100"`·`"10.0"`·`"abc"` → `NOT_NUMBER`; `"5010"`(max 5000) → `OVER_MAX`; `"5000"` ok; `"0"` ok; `"  "`(공백만) → `NOT_NUMBER`; `pointsDisabledReason(0, 0)`, `(900, 0)`, `(5000, 0)`, `(5000, 1000) === null`
 - [ ] **Step 3: `quote-recovery.test.ts`** (Review Focus 3)
   - `포인트_오류면_포인트만_0으로_되돌린다`(쿠폰 유지)
   - `쿠폰_오류면_직전_성공_선택으로_되돌린다`
   - `직전_선택과_같으면_전부_비운다`
   - `이미_빈_선택이면_null이다`(오류 상태로)
   - `포인트가_0인데_포인트_오류면_null이다`, `모르는_코드는_null이다`
-- [ ] **Step 4: `checkout-guard.test.ts`·`pay-state.test.ts`에 추가** — `afterOrderHref(7, "PAID", 0)` 완료, `(7, "PENDING_PAYMENT", 0)` → `/my/orders/7`, `(7, "PENDING_PAYMENT", 49000)` 결제 페이지(기존 단언 유지); `payButtonLabel(0) === "주문하기"`, `payButtonLabel(49000) === "49,000원 결제하기"`; `orderErrorAction("COUPON_NOT_AVAILABLE") === "CLEAR_COUPONS"`(쿠폰 4코드), `("POINT_INSUFFICIENT") === "CLEAR_POINTS"`(포인트 3코드), `("ORDER_PRICE_CHANGED") === null`; `canPay`는 `totalAmount: 0`인 결제 대기 주문에 false
+- [ ] **Step 4: `checkout-guard.test.ts`·`pay-state.test.ts`에 추가** — `afterOrderHref(7, "PAID", 0)` 완료, `(7, "PENDING_PAYMENT", 0)` → `/my/orders/7`, `(7, "PENDING_PAYMENT", 49000)` 결제 페이지(기존 단언 유지); `payButtonLabel(0) === "주문하기"`, `payButtonLabel(49000) === "49,000원 결제하기"`; `orderErrorAction("COUPON_NOT_AVAILABLE") === "CLEAR_COUPONS"`(쿠폰 4코드), `("POINT_INSUFFICIENT") === "CLEAR_POINTS"`(포인트 3코드), `("ORDER_PRICE_CHANGED") === null`; `pay-state`의 `canPay`는 `totalAmount: 0`인 결제 대기 주문에 false; 주문서 `canPay`는 `pointsSettled: false`면 false; **(Review Focus 1)** `submitSnapshot`: 견적의 선택과 현재 선택이 다르면 null, `payable=false`면 null, 같으면 `expectedTotalAmount === quote.totalAmount`이고 `benefit`이 `toBenefitBody(quoteSelection)`과 같다
 - [ ] **Step 5: 실패 확인 → 순수 함수 구현 → 통과.**
-- [ ] **Step 6: 화면 — 선택과 견적.** `CheckoutBody`가 `selection`(useState)과 `lastGoodRef`(견적이 placeholder가 아닌 성공일 때 그 견적을 만든 선택으로 갱신)를 갖는다. `useQuote(items, selection, !orderCreated)`. 견적 오류 시 effect: `recoverSelection(code, selection, lastGoodRef.current)` → 있으면 `setSelection(next)` + 토스트(notice, 쿠폰 오류는 서버 메시지를 함께), 없으면 기존 오류 상태. **같은 오류 객체에 대해 한 번만** 복구를 시도한다(무한 반복 방지 — 오류 참조를 ref에 기억).
+- [ ] **Step 6: 화면 — 선택과 견적.** `CheckoutBody`가 `selection`(useState)과 `lastGoodRef`(견적이 placeholder가 아닌 성공일 때 그 견적을 만든 선택으로 갱신)를 갖는다. `useQuote(items, selection, !orderCreated)`. 견적 오류 시 effect: `recoverSelection(code, selection, lastGoodRef.current)` → 있으면 `setSelection(next)` + 토스트(notice, 쿠폰 오류는 서버 메시지를 함께), 없으면 기존 오류 상태. **같은 오류 객체에 대해 한 번만** 복구를 시도한다(무한 반복 방지 — 오류 참조를 ref에 기억). 복구할 때마다 `queryKeys.checkout.quotes`를 무효화한다(캐시에 남은 옛 견적이 죽은 쿠폰을 쓸 수 있다고 보이지 않게). 복구 중에는 화면을 오류 상태로 바꾸지 말고 마지막 정상 견적을 그대로 둔 채 결제만 막는다(`recoverSelection`이 null일 때만 오류 상태). 기존 `ORDER_PRICE_CHANGED` 처리의 견적 무효화도 `queryKeys.checkout.quotes`로 바꾼다.
 - [ ] **Step 7: 화면 — 영역.** `OrderItems`의 각 줄에 `availableCoupons.length > 0`이면 "쿠폰 선택 (n장 사용 가능)"/적용 중이면 쿠폰 이름과 `−{productCouponDiscount}`(견적의 그 줄 값) + "변경". `BenefitSection`: 장바구니 쿠폰 줄(`cartCoupons`가 비면 "사용 가능한 쿠폰이 없습니다"), `PointsField`. `CouponPickerDialog`(라디오 목록): 쓸 수 있는 쿠폰은 `discountLabel`·`conditionLabel`·만료일·`−{expectedDiscount}`; 쓸 수 없는 쿠폰은 흐리게 + 이유(`MIN_AMOUNT_NOT_MET` → `conditionLabel` 문구 + " 사용 가능", `NOTHING_TO_DISCOUNT` → "할인할 금액이 없습니다"), 선택 불가; `couponAppliedElsewhere`면 "다른 상품에 적용됨" 표시(고를 수 있다); 맨 위 "적용 안 함". `PointsField`: `usePointSummary()` 잔액 "보유 {n}P", 입력은 로컬 문자열 → `validatePoints(raw, quote.maxUsablePoints)` → ok면 지연 뒤 `setPoints`, 아니면 칸 아래 `pointsMessage`(견적 요청 없음), "최대 사용"은 `quote.maxUsablePoints`를 넣는다, `pointsDisabledReason`이 있으면 입력·버튼 비활성 + 이유. 견적이 복구로 포인트를 0으로 되돌리면 입력 칸도 비운다.
-- [ ] **Step 8: 화면 — 요약과 제출.** `CheckoutSummary`: 상품 금액, 상품 쿠폰 할인, 장바구니 쿠폰 할인, 포인트 사용(셋은 0이 아닐 때만, 음수 표기), 배송비, 결제 금액 — 전부 견적 값. 버튼 문구 `payButtonLabel(quote.totalAmount)`. 제출 본문: `items`, `shippingAddress`, `expectedTotalAmount: quote.totalAmount`, 그리고 **그 견적을 만든 선택**의 `toBenefitBody`(Review Focus 1 — 견적이 placeholder거나 fetching이면 기존 `QuoteNotReadyError` 경로). 성공: `afterOrderHref(orderId, orderStatus, totalAmount)`로 `router.replace`, 무효화에 `coupons.mineRoot`·`points.root` 추가. 오류: `orderErrorAction` → `CLEAR_COUPONS`면 `clearCoupons` + 토스트 "쿠폰을 사용할 수 없습니다. 다시 선택해 주세요.", `CLEAR_POINTS`면 `setPoints(…, 0)` + `points.root` 무효화 + 서버 메시지 토스트; `ORDER_PRICE_CHANGED`는 F2 동작 유지(선택 유지). 자동 재제출 없음.
-- [ ] **Step 9: 주문 상세·취소 안내**(스펙 §7-5). `PaymentSummaryCard`: 상품 쿠폰 할인, 장바구니 쿠폰 할인, 포인트 사용, 되돌려받은 포인트 줄(0이 아닐 때만, 시안 순서). `ItemCancelDialog`에 선택 prop `benefitNotice?: { pointsAllocated: number; hasProductCoupon: boolean; hasCartCoupon: boolean }`를 더해 구매자 주문 상세에서만 넘긴다: `pointsAllocated > 0` → "사용한 포인트 {n}P가 함께 돌아옵니다", `hasProductCoupon` → "사용한 상품 쿠폰은 유효기간이 남아 있으면 돌아옵니다", `hasCartCoupon` → "장바구니 쿠폰은 주문 전체를 취소해야 돌아옵니다". 취소 성공 무효화에 `coupons.mineRoot`·`points.root`. 컴포넌트 테스트: 세 문구의 노출 조건, 요약 줄의 0 숨김.
+- [ ] **Step 8: 화면 — 요약과 제출.** `CheckoutSummary`: 상품 금액, 상품 쿠폰 할인, 장바구니 쿠폰 할인, 포인트 사용(셋은 0이 아닐 때만, 음수 표기), 배송비, 결제 금액 — 전부 견적 값. 버튼 문구 `payButtonLabel(quote.totalAmount)`. 제출 본문: `items`, `shippingAddress`, 그리고 `submitSnapshot(...)`의 `expectedTotalAmount`·`benefit`(Review Focus 1 — null이면 기존 `QuoteNotReadyError` 경로). 기존 `shownRef`가 견적·`payable`·그 견적의 선택을 **같은 렌더에서** 함께 담게 한다. `PointsField`는 칸의 문자열 상태(`pointsSettled`)를 위로 알린다. 성공: `afterOrderHref(orderId, orderStatus, totalAmount)`로 `router.replace`, 무효화에 `coupons.mineRoot`·`points.root` 추가. 오류: `orderErrorAction` → `CLEAR_COUPONS`면 `clearCoupons` + 토스트 "쿠폰을 사용할 수 없습니다. 다시 선택해 주세요.", `CLEAR_POINTS`면 `setPoints(…, 0)` + `points.root` 무효화 + 서버 메시지 토스트(두 경우 모두 `checkout.quotes` 무효화); `ORDER_PRICE_CHANGED`는 F2 동작 유지(선택 유지). 자동 재제출 없음.
+- [ ] **Step 9: 주문 상세·취소 안내**(스펙 §7-5). `PaymentSummaryCard`: 상품 쿠폰 할인, 장바구니 쿠폰 할인, 포인트 사용, 되돌려받은 포인트 줄(0이 아닐 때만, 시안 순서). 공용 `ItemCancelDialog`는 고치지 않는다. 이미 있는 `notice` prop을 채우는 구매자용 래퍼 `CancelItemDialog`에 문구를 더한다(`OrderDetailPage`가 항목의 `pointsAllocated`·`productCouponId`와 주문의 `cartCouponId`를 넘긴다). 문구는 순수 함수 `benefitNotices({ pointsAllocated, hasProductCoupon, hasCartCoupon }): string[]`로 만든다: `pointsAllocated > 0` → "사용한 포인트 {n}P가 함께 돌아옵니다", `hasProductCoupon` → "사용한 상품 쿠폰은 유효기간이 남아 있으면 돌아옵니다", `hasCartCoupon` → "장바구니 쿠폰은 주문 전체를 취소해야 돌아옵니다". 취소 성공 무효화(`features/orders/api.ts`)에 `coupons.mineRoot`·`points.root`. 테스트: `benefitNotices`의 세 문구 노출 조건, 요약 줄의 0 숨김.
 - [ ] **Step 10: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 주문서에 쿠폰·포인트 사용과 0원 결제 추가`
 
 ---
@@ -362,20 +364,21 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 - Consumes: Task 3의 `OrderItemResult.review`, Task 4의 `ReviewResult.images`; `features/files/api.ts`의 `uploadImage`; `useIdempotentSubmit`
 - Produces:
   - `schemas.ts`: `reviewFormSchema`(zod) — `rating` 1~5 정수 필수(미선택 메시지 "별점을 선택해 주세요"), `content`는 **앞뒤 공백을 뺀 길이** 10~1000(메시지 "10자 이상 입력해 주세요"), `imageFileIds` 최대 3개 · `contentLength(raw: string): number`(trim 뒤 `length` — 서버와 같은 기준)
-  - `image-rules.ts`: `checkImageFile(file: { type: string; size: number }): "OK" | "BAD_TYPE" | "TOO_LARGE"`(jpeg·png·webp, 5MB = `5 * 1024 * 1024` 이하) · `canAddImage(count: number): boolean`(3 미만)
-  - `review-state.ts`: `reviewAction(review: OrderItemReview | undefined): { kind: "none" } | { kind: "write"; until: string } | { kind: "view"; reviewId: number } | { kind: "text"; text: string }` — `WRITABLE` → write(`writableUntil`), `WRITTEN` → view, `EXPIRED` → `"후기 작성 기한이 지났습니다"`, `DELETED` → `"삭제한 후기는 다시 작성할 수 없습니다"`, `NOT_ELIGIBLE`·undefined → none
+  - `image-rules.ts`: `canAddImage(count: number): boolean`(3 미만). 형식·크기 검사는 새로 만들지 않고 `components/common/ImageUploader.tsx`의 `validateImageFile`·`MAX_IMAGE_BYTES`·`ACCEPTED_IMAGE_TYPES`를 쓴다(내보내지 않았으면 export만 추가)
+  - `review-state.ts`: `reviewAction(review: OrderItemReview | null | undefined): { kind: "none" } | { kind: "write"; until: string } | { kind: "view"; reviewId: number } | { kind: "text"; text: string }` — `WRITABLE` → write(`writableUntil`), `WRITTEN` → view, `EXPIRED` → `"후기 작성 기한이 지났습니다"`, `DELETED` → `"삭제한 후기는 다시 작성할 수 없습니다"`, `NOT_ELIGIBLE`·null·undefined → none
   - `api.ts`: `useProductReviews(productId, page)`(인증 불필요), `useMyReviews(page)`, `writeReview(orderId, orderItemId, body, key)`, `editReview(reviewId, body)`, `deleteReview(reviewId)`
   - `rewardNotice(rewardPoints: number): string` — `"후기를 등록했습니다. {n}P가 적립되었습니다."`(0이면 `"후기를 등록했습니다."`)
   - `ReviewFormDialog` props: `mode: "create" | "edit"`, `product: { name; optionDisplayName?; thumbnailUrl? }`, `initial?: { rating; content; images: { fileId; url }[] }`, `onSubmitted()`
 
 - [ ] **Step 1: 실패하는 테스트** (Review Focus 5)
   - `schemas.test.ts`: 공백 20자 실패; `"  아주 좋아요 추천합니다  "`(trim 12자) 통과; trim 9자 실패·10자 통과; 1000자 통과·1001자 실패; 이모지 포함 문자열은 `contentLength`가 JS `length` 기준임을 고정(서버가 Kotlin `String.length` — 같은 UTF-16 단위); 별점 0·6·2.5 실패; 사진 4장 실패
-  - `image-rules.test.ts`: `image/gif` → `BAD_TYPE`; 5MB 정확히 OK, 5MB+1 → `TOO_LARGE`; `canAddImage(2)` true, `(3)` false
-  - `review-state.test.ts`: 다섯 상태 + undefined
+  - `image-rules.test.ts`: `canAddImage(2)` true, `(3)` false(형식·크기는 기존 `ImageUploader.test.tsx`가 이미 다룬다 — 없는 경계만 그 파일에 추가)
+  - `ReviewFormDialog.test.tsx`(컴포넌트): `사진을_올리는_동안_제출_버튼이_막힌다`(업로드 Promise를 붙잡아 둔 상태에서 버튼 `disabled`, 끝나면 풀림), `이미_작성한_후기면_창을_닫고_주문_상세를_다시_읽는다`(`writeReview`가 409 `REVIEW_ALREADY_WRITTEN` → `onSubmitted`가 아닌 닫힘 콜백 호출 + `orders.detail` 무효화)
+  - `review-state.test.ts`: 다섯 상태 + null + undefined
 - [ ] **Step 2: 실패 확인 → 구현 → 통과.**
 - [ ] **Step 3: 별점 컴포넌트.** `StarRating`(표시 전용, `aria-label="5점 만점에 {n}점"`), `StarRatingInput`(라디오 그룹 — `role="radiogroup"`, 방향키로 이동, 각 별 `aria-label="{n}점"`). 컴포넌트 테스트: 방향키로 값이 바뀐다, 선택 값의 `aria-checked`.
-- [ ] **Step 4: `ReviewFormDialog`.** 사진: `ReviewImagePicker` — 파일 선택 시 `checkImageFile`로 먼저 거르고(안내 "jpg, png, webp만 올릴 수 있습니다" / "5MB 이하만 올릴 수 있습니다") `uploadImage`; 올리는 동안 제출 버튼 비활성과 "사진을 올리는 중입니다"; 미리보기와 삭제 버튼(`aria-label="사진 삭제"`); 3장이면 추가 버튼 숨김. 글자 수 표시 `{contentLength}/1000`. 적립 안내(작성: "글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다" / 수정: "수정해도 추가 적립은 없습니다").
-  - 작성: `useIdempotentSubmit` → `writeReview`. 성공 → `rewardNotice(rewardPoints)` 토스트, 무효화 `orders.detail(orderId)`·`reviews.mineRoot`·`points.root`·`reviews.productRoot(productId)`·`catalog.product(productId)`. 오류: `REVIEW_ALREADY_WRITTEN`·`REVIEW_NOT_ELIGIBLE` → 창 닫기 + 서버 메시지 토스트 + `orders.detail` 무효화; `REVIEW_INVALID`·`FILE_NOT_OWNED` → 폼 상단.
+- [ ] **Step 4: `ReviewFormDialog`.** 사진: `ReviewImagePicker` — 파일 선택 시 `validateImageFile`로 먼저 거르고(안내 "jpg, png, webp만 올릴 수 있습니다" / "5MB 이하만 올릴 수 있습니다") `uploadImage`; 올리는 동안 제출 버튼 비활성과 "사진을 올리는 중입니다"; 미리보기와 삭제 버튼(`aria-label="사진 삭제"`); 3장이면 추가 버튼 숨김. 글자 수 표시 `{contentLength}/1000`. 적립 안내(작성: "글 후기 100P, 사진 후기 500P. 작성 후 사진을 추가해도 추가 적립은 없습니다" / 수정: "수정해도 추가 적립은 없습니다").
+  - 작성: `useIdempotentSubmit` → `writeReview`. 성공 → `rewardNotice(rewardPoints)` 토스트, 무효화 `orders.detail(orderId)`·`reviews.mineRoot`·`points.root`·`reviews.productRoot(productId)`·`catalog.product(productId)`. 오류: `REVIEW_ALREADY_WRITTEN`·`REVIEW_NOT_ELIGIBLE` → 창 닫기 + 서버 메시지 토스트 + `orders.detail` 무효화; `REVIEW_INVALID`·`INVALID_REQUEST`·`FILE_NOT_OWNED` → 폼 상단.
   - 수정: `editReview`(처리 중 재제출 막기), 기존 사진은 `initial.images`의 `fileId`를 유지. 성공 → "후기를 수정했습니다", 무효화 `reviews.mineRoot`·`reviews.productRoot`·`catalog.product`.
 - [ ] **Step 5: 주문 상세.** `OrderItemReviewAction`(`reviewAction` 결과로 그림): write → "후기 작성" 버튼 + `"{formatDateTimeMinute(until)}까지 작성 가능"`; view → "내 후기 보기"(`/my/reviews`); text → 문구. 구매자 주문 상세의 `OrderItemRow`에만 붙인다(판매자·관리자 화면이 같은 컴포넌트를 쓰면 prop으로 끈다).
 - [ ] **Step 6: `/my/reviews`.** `ReviewCard`(상품 링크, 별점, 본문, 사진, 작성일 — `modifiedAt !== createdAt`이면 "수정됨", `rewardPoints`, 판매자 답글), "수정"(`ReviewFormDialog` edit), "삭제"(`ConfirmDialog` — "삭제하면 이 상품에 후기를 다시 쓸 수 없고, 적립된 포인트는 회수되지 않습니다" → `deleteReview`; `REVIEW_NOT_FOUND`는 조용히 목록 무효화). 삭제 성공 무효화: `reviews.mineRoot`·`reviews.productRoot`·`catalog.product`·`orders.root`. 빈 상태 + 주문 내역 링크. `?page=`.
@@ -390,12 +393,13 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 
 **Files:**
 - Create: `features/likes/{api.ts,components/MyLikesPage.tsx}`, `app/(store)/my/(menu)/likes/page.tsx`
+- Modify: `features/catalog/components/LikeButton.tsx`(+테스트), `features/catalog/api.ts`
 
 **Interfaces:**
 - Produces: `useMyLikes(page: number)` · `isOnSale(productStatus: string): boolean`(`ON_SALE`만 true — `features/likes/api.ts` 옆 순수 함수, 테스트 포함)
 
 - [ ] **Step 1: 테스트 — `isOnSale`**(`ON_SALE` true; `PAUSED`·`ENDED`·`PENDING_REVIEW`·`REJECTED`·모르는 값 false)
-- [ ] **Step 2: 화면.** F1 `ProductCard`의 모양을 따르되 `LikedProduct`에 없는 필드(정가·할인율·평점)는 그리지 않는다 — `ProductCard`가 선택 prop으로 받을 수 있으면 재사용, 아니면 같은 클래스의 얇은 카드. 판매 중이 아니면 흐리게 + "판매 종료". 하트는 F1 `LikeButton`(liked=true로 시작) — 취소 성공 시 `likes.root` 무효화. 빈 상태 "좋아요한 상품이 없습니다" + 상품 목록 링크. `?page=`.
+- [ ] **Step 2: 화면.** F1 `ProductCard`의 모양을 따르되 `LikedProduct`에 없는 필드(정가·할인율·평점)는 그리지 않는다 — `ProductCard`가 선택 prop으로 받을 수 있으면 재사용, 아니면 같은 클래스의 얇은 카드. 판매 중이 아니면 흐리게 + "판매 종료". 하트는 F1 `LikeButton` — `likeCount` prop을 선택으로 바꾸고(없으면 숫자를 그리지 않는다. 기존 호출부는 그대로), `useToggleLike`의 성공 무효화에 `likes.root`를 더한다. `LikeButton.test.tsx`에 `likeCount가_없으면_숫자를_그리지_않는다` 추가. 기존 `LikeButton`의 색 클래스는 건드리지 않는다. 빈 상태 "좋아요한 상품이 없습니다" + 상품 목록 링크. `?page=`.
 - [ ] **Step 3: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 좋아요 목록 화면 추가`
 
 ---
@@ -456,7 +460,7 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 - Modify: `frontend/e2e/fixtures/api.ts`, 필요하면 기존 spec(헤더 링크 문구)
 
 **Interfaces:**
-- Produces(픽스처, 전부 API 직접 호출): `createSellerCouponPolicy(sellerToken, body)`, `createAdminCouponPolicy(adminToken, body)`, `claimCoupon(buyerToken, policyId)`, `placePaidOrder(buyerToken, items, opts?)`(기존 주문·모의 결제 헬퍼 재사용), `shipDeliverConfirm(sellerToken, buyerToken, order)`, `writeReview(buyerToken, orderId, orderItemId, { withPhoto })`, `uploadTestImage(token)`(기존 `e2e/assets` 이미지), `getPointBalance(buyerToken)`. 관리자 토큰은 기존 `admin.spec.ts`가 쓰는 방식 그대로.
+- Produces(픽스처, 전부 API 직접 호출): `createSellerCouponPolicy(sellerToken, body)`, `createAdminCouponPolicy(adminToken, body)`, `claimCoupon(buyerToken, policyId)`, 기존 `placePaidOrderApi`(주문·모의 결제) 재사용, `shipDeliverConfirm(sellerToken, buyerToken, order)`(발송 → `PATCH /seller/orders/{id}/deliver` → 구매 확정), `writeReview(buyerToken, orderId, orderItemId, { withPhoto })`, `uploadTestImage(token)`(기존 `e2e/assets` 이미지), `getPointBalance(buyerToken)`. 관리자 토큰은 기존 `admin.spec.ts`가 쓰는 방식 그대로.
 
 - [ ] **Step 1: 픽스처를 추가하고, 기존 E2E를 먼저 돌려 라우트 이동(Task 6) 뒤에도 전부 통과하는지 확인한다.** 실행 방법은 `frontend/scripts/e2e-server.sh`와 `playwright.config.ts`의 주석을 따른다(백엔드 `local,demo`, Mock PG, 데모가 아닌 빌드, `:3100`). DB는 임시 스키마를 쓴다(기존 `kairos` DB의 데모 계정 비밀번호를 알 수 없다 — 세션 전용 환경 변수로 띄우고 끝나면 스키마를 지운다).
 - [ ] **Step 2: `c3-coupon-checkout.spec.ts`**(금액은 전부 `toHaveText` 정확 비교). 숫자 고정: 판매자 B 상품 b1 30,000원, 판매자 C 상품 c1 20,000원(수량 2). 쿠폰: 플랫폼 상품 쿠폰 정액 2,000(전 상품), 판매자 C 상품 쿠폰 10% 최대 5,000, 플랫폼 장바구니 쿠폰 10% 최대 5,000 최소 50,000, 플랫폼 상품 쿠폰 정액 1,000 최소 35,000(전 상품 — b1에는 쓸 수 없음). 전부 수량 무제한.
@@ -466,10 +470,11 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
   - c1 창에서 b1에 쓴 2,000 쿠폰이 "다른 상품에 적용됨"
   - 결제 → 주문 상세 결제 요약에 같은 할인 → `/my/coupons?tab=mine&status=USED`에 세 장
   - c1 항목 취소 창의 쿠폰 안내 문구 → 취소 → 내 쿠폰 "사용 가능"에 판매자 C 쿠폰이 돌아옴
-  - **0원 결제**: 판매자 D 상품 60,000원 1개 + 플랫폼 상품 쿠폰 정액 60,000(상품 하나 대상) → 버튼 "주문하기", 포인트 입력 비활성 → 결제창 없이 주문 완료 화면, 주문 상세 결제 금액 `0원`
-- [ ] **Step 3: `c3-points.spec.ts`.** 준비(API): 구매자가 60,000원 주문 → 확정(600P) → 사진 후기(500P) → 잔액 1,100P. 화면: 30,000원 상품 주문서에서 "보유 1,100P", "최대 사용" → 입력 칸 `1100`, 포인트 사용 `−1,100원`, 결제 금액이 서버 견적과 일치(배송비 3,000 포함 `31,900원`) → 입력을 `15`로 바꾸면 "10P 단위로 입력해 주세요"가 뜨고 결제 금액은 그대로이며 견적 요청이 나가지 않음(`page.waitForRequest`로 확인하지 말고, 요청 수를 세는 라우트 관찰로 확인) → `1100`으로 되돌려 결제 → `/my/points`에 "주문 사용 −1,100P" → 항목 취소 → "주문 취소 환급 +1,100P", 잔액 1,100P.
+  - **0원 결제**: 판매자 D 상품 60,000원 1개 + 플랫폼 상품 쿠폰 정액 60,000(상품 하나 대상) → 버튼 "주문하기" → 결제창(모의 결제 창)이 뜨지 않고 주문 완료 화면, 주문 상세 결제 금액 `0원`
+- [ ] **Step 3: `c3-points.spec.ts`.** 준비(API): 구매자가 60,000원 주문 → 확정(600P) → 사진 후기(500P) → 잔액 1,100P. 화면: 30,000원 상품 주문서에서 "보유 1,100P", "최대 사용" → 입력 칸 `1100`, 포인트 사용 `−1,100원`, 결제 금액이 서버 견적과 일치(배송비 3,000 포함 `31,900원`) → 입력을 `15`로 바꾸면 "10P 단위로 입력해 주세요"가 뜨고 견적 요청이 나가지 않고(요청 수를 세는 라우트 관찰로 확인) **결제하기 버튼이 비활성**이 됨 → `1100`으로 되돌려 결제 → `/my/points`에 "주문 사용 −1,100P" → 항목 취소 → "주문 취소 환급 +1,100P", 잔액 1,100P.
 - [ ] **Step 4: `c3-review.spec.ts`.** 주문 → (API)발송·배송 완료 → 화면에서 구매 확정(확인 창에 1% 안내 문구) → "후기 작성" + "까지 작성 가능" → 별점 5, 본문 9자면 제출 불가·10자면 가능, 사진 1장 → "500P가 적립되었습니다" → 주문 상세가 "내 후기 보기" → 상품 상세 "후기 1개"와 평균 `5.0` → 판매자 로그인, 후기 관리에서 "미답변" → 답글 등록 → 상품 상세에 답글 → 구매자 `/my/reviews`에서 수정(본문만 바꿈, 사진 1장 유지 확인) → 삭제 → 주문 상세 "삭제한 후기는 다시 작성할 수 없습니다", 상품 상세 "아직 후기가 없습니다". 이어서 좋아요: 상품 상세에서 좋아요 → `/my/likes`에 카드 → 카드 하트로 취소 → 빈 상태.
-- [ ] **Step 5: 전체 E2E(F1·F2·F3) 통과 → Commit** `test(frontend): C3 혜택·후기 E2E 3개 추가`. 임시 스키마 삭제, 서버·Gradle 정리.
+- [ ] **Step 5: 양식 경로 확인** — `c3-coupon-checkout.spec.ts`의 판매자 C 쿠폰(10% 최대 5,000)만은 API가 아니라 **판매자 쿠폰 관리 화면의 등록 양식**으로 만든다(%→bp 변환이 실제로 맞는지 화면에서 한 번 검증: 표에 "10% 할인 (최대 5,000원)").
+- [ ] **Step 6: 전체 E2E(F1·F2·F3) 통과 → Commit** `test(frontend): C3 혜택·후기 E2E 3개 추가`. 임시 스키마 삭제, 서버·Gradle 정리.
 
 ---
 
@@ -482,4 +487,5 @@ app/admin/coupons/page.tsx  admin/members/points/page.tsx
 
 - [ ] **Step 1: `CLAUDE.md`** — 문서 목록에 F3 스펙·계획 추가, "현재 단계" 갱신, 프론트엔드 절에 F3 규칙 추가: (1) 주문서는 견적이 유일한 진실 — 할인·한도·예상 할인을 프론트가 계산하지 않는다, (2) 서버 강제 멱등 요청 목록에 쿠폰 받기·쿠폰 정책 등록·후기 작성, (3) 프론트 계산 허용 목록에 포인트 10의 배수 검사와 %→bp, (4) 마이페이지 라우트 그룹 구조. 백엔드 절에 `CouponTerms.meetsMinimum`이 최소 금액 판정의 단일 위치임을 한 줄.
 - [ ] **Step 2: 전체 검증** — `./gradlew test`, `cd frontend && pnpm check:api && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:bundle`. 출력의 통과 수를 기록한다.
-- [ ] **Step 3: Commit** `docs: F3 혜택·후기 화면 규칙과 현재 단계 갱신` → Gradle 데몬·미리보기 서버 정리.
+- [ ] **Step 3: 수동 점검**(스펙 §13) — 시안 5개와 실제 화면 대조, 데모 빌드에서 관리자(쿠폰 등록) → 구매자(받기·주문·확정·후기) → 판매자(답글) 흐름 한 번. 결과를 보고서에 적는다(하지 못한 항목은 "미실시"와 이유 — 오케스트레이터가 PR 본문에 옮긴다).
+- [ ] **Step 4: Commit** `docs: F3 혜택·후기 화면 규칙과 현재 단계 갱신` → Gradle 데몬·미리보기 서버 정리.
