@@ -3,6 +3,7 @@ import { resolveError } from "@/api/errors";
 import { isAnswered } from "@/api/idempotency";
 import type { components } from "@/api/schema";
 import { recallOrderId } from "@/features/payment/order-ref-store";
+import { parseId } from "@/lib/ids";
 
 export type ConfirmPaymentResponse = components["schemas"]["ConfirmPaymentResponse"];
 
@@ -17,7 +18,6 @@ export type ConfirmView =
 export type ConfirmResult = { ok: true; data: ConfirmPaymentResponse } | { ok: false; error: unknown };
 
 const DIGITS = /^\d{1,15}$/;
-const ORDER_ID = /^[1-9]\d{0,15}$/;
 
 /**
  * 성공 주소의 쿼리(토스 형식: orderId=주문번호, paymentKey, amount + 우리 oid=숫자 주문 ID)를 읽는다.
@@ -28,8 +28,7 @@ export function parseConfirmParams(sp: { get(name: string): string | null }): Co
   const paymentKey = sp.get("paymentKey");
   const amount = sp.get("amount");
   if (!orderNo || !paymentKey || amount === null || !DIGITS.test(amount)) return null;
-  const oid = sp.get("oid");
-  const orderId = oid !== null && ORDER_ID.test(oid) ? Number(oid) : recallOrderId(orderNo);
+  const orderId = parseId(sp.get("oid")) ?? recallOrderId(orderNo);
   return { orderNo, paymentKey, amount: Number(amount), orderId };
 }
 

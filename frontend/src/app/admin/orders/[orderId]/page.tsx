@@ -1,9 +1,11 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import { AdminOrderDetailPage } from "@/features/admin/orders/components/AdminOrderDetailPage";
+import { parseId } from "@/lib/ids";
 
 export default function AdminOrderPage() {
-  const { orderId } = useParams<{ orderId: string }>();
-  return <AdminOrderDetailPage orderId={Number(orderId)} />;
+  const orderId = parseId(useParams<{ orderId: string }>().orderId);
+  if (orderId === null) notFound();
+  return <AdminOrderDetailPage orderId={orderId} />;
 }

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PanelActions, PanelDesc, StatusPanel } from "@/features/payment/components/StatusPanel";
 import { recallOrderId } from "@/features/payment/order-ref-store";
+import { parseId } from "@/lib/ids";
 
-const ORDER_ID = /^[1-9]\d{0,15}$/;
 const DEFAULT_MESSAGE = "결제가 완료되지 않았습니다";
 const MESSAGE_LIMIT = 200;
 
@@ -14,9 +14,8 @@ export function FailPage() {
   const sp = useSearchParams();
   // message 는 주소에서 온 값이다. 글자 수를 제한하고 텍스트로만 보여준다.
   const message = sp.get("message")?.trim().slice(0, MESSAGE_LIMIT) || DEFAULT_MESSAGE;
-  const oid = sp.get("oid");
   const orderNo = sp.get("orderId");
-  const orderId = oid !== null && ORDER_ID.test(oid) ? Number(oid) : orderNo ? recallOrderId(orderNo) : null;
+  const orderId = parseId(sp.get("oid")) ?? (orderNo ? recallOrderId(orderNo) : null);
 
   return (
     <div className="container max-w-[880px] pb-16 pt-12">

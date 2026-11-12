@@ -106,6 +106,15 @@ describe("parseConfirmParams", () => {
     expect(parseConfirmParams(q(`oid=abc&orderId=${ORDER_NO}&paymentKey=mock-a&amount=48000`))?.orderId).toBe(77);
   });
 
+  it("oid가_안전한_정수가_아니면_저장해_둔_주문_ID를_쓴다", () => {
+    rememberOrderRef(ORDER_NO, 77);
+    // 16자리지만 Number.MAX_SAFE_INTEGER 를 넘는 값은 주문 ID 로 쓰지 않는다(조회가 꺼진 채 멈춘다).
+    for (const oid of ["9007199254740992", "9999999999999999", "0", "1.5"]) {
+      expect(parseConfirmParams(q(`oid=${oid}&orderId=${ORDER_NO}&paymentKey=mock-a&amount=48000`))?.orderId, oid).toBe(77);
+    }
+    expect(parseConfirmParams(q(`oid=9007199254740991&orderId=${ORDER_NO}&paymentKey=mock-a&amount=48000`))?.orderId).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
   it("oid도_저장된_값도_없으면_주문_ID는_null이다", () => {
     expect(parseConfirmParams(q(`orderId=${ORDER_NO}&paymentKey=mock-a&amount=48000`))?.orderId).toBeNull();
   });
