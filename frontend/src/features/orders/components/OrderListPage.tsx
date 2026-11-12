@@ -7,12 +7,9 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { Pagination } from "@/components/common/Pagination";
 import { useMyOrders } from "@/features/orders/api";
+import { parsePage } from "@/features/orders/page-param";
 import { OrderCard } from "@/features/orders/components/OrderCard";
 import { queryKeys } from "@/lib/query-keys";
-
-function parsePage(raw: string | null): number {
-  return raw !== null && /^\d{1,6}$/.test(raw) ? Number(raw) : 0;
-}
 
 /** 주문 내역. ?page=(0부터)가 페이지의 진실이다. */
 export function OrderListPage() {

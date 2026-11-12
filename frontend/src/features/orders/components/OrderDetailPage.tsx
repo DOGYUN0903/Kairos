@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
@@ -14,6 +14,8 @@ import { OrderStatusHeader } from "@/features/orders/components/OrderStatusHeade
 import { PaymentSummaryCard } from "@/features/orders/components/PaymentSummaryCard";
 import { SellerOrderCard } from "@/features/orders/components/SellerOrderCard";
 import { ShippingAddressCard } from "@/features/orders/components/ShippingAddressCard";
+import { expiredRecheckInterval, isPastExpiry, shouldRefetchAtExpiry } from "@/features/orders/expiry";
+import { secondsUntilKst } from "@/lib/datetime";
 import { needsPolling, usePollingWindow } from "@/features/orders/polling";
 
 function useNow(): number {
@@ -29,13 +31,31 @@ function useNow(): number {
 export function OrderDetailPage({ orderId }: { orderId: number }) {
   const [polling, setPolling] = useState(false);
   const win = usePollingWindow(polling);
-  const q = useOrder(orderId, { refetchInterval: win.interval });
+  // 시계는 이 페이지 하나뿐이다(헤더의 카운트다운도 이 값으로 그린다).
   const now = useNow();
+  const [expiryInterval, setExpiryInterval] = useState<number | false>(false);
+  const q = useOrder(orderId, { refetchInterval: win.interval || expiryInterval });
+  const wasPast = useRef(false);
+  const pastSince = useRef<number | null>(null);
   const [target, setTarget] = useState<OrderItemResult | null>(null);
 
   const data = q.data;
   const needs = data ? needsPolling(data) : false;
   useEffect(() => setPolling(needs), [needs]);
+
+  // 결제 대기 주문이 기한을 넘는 순간 한 번 다시 읽고, 서버가 취소할 때까지 10초마다(최대 2분) 다시 확인한다.
+  const isPast = data ? isPastExpiry(data.status, secondsUntilKst(data.expiresAt, now)) : false;
+  const refetch = q.refetch;
+  useEffect(() => {
+    if (shouldRefetchAtExpiry(wasPast.current, isPast)) {
+      pastSince.current = Date.now();
+      void refetch();
+    }
+    if (!isPast) pastSince.current = null;
+    wasPast.current = isPast;
+  }, [isPast, refetch]);
+  const nextInterval = expiredRecheckInterval(isPast, pastSince.current === null ? 0 : now - pastSince.current);
+  useEffect(() => setExpiryInterval(nextInterval), [nextInterval]);
 
   if (q.isError && q.error instanceof ApiError && (q.error.code === "ORDER_NOT_FOUND" || q.error.status === 404)) notFound();
 
@@ -60,7 +80,6 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
               order={data}
               nowMs={now}
               pollExpired={win.expired}
-              onExpire={() => void q.refetch()}
               onRefresh={() => void q.refetch()}
             />
             <div className="mt-4">

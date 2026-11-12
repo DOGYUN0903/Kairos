@@ -1,5 +1,8 @@
 import type { CancelPreview, OrderDetail, OrderItemResult, SellerOrderResult } from "@/features/orders/api";
-import { secondsUntilKst } from "@/lib/datetime";
+import { canPay } from "@/features/payment/pay-state";
+
+// 결제창을 열어도 되는가의 기준은 결제 페이지와 같은 한 곳(payment/pay-state)에 둔다.
+export { canPay };
 
 /** 주문 PAID + 판매자 주문 PAID(발송 전) + 항목 ORDERED 일 때만 취소 버튼을 둔다. */
 export function canCancelItem(order: OrderDetail, sellerOrder: SellerOrderResult, item: OrderItemResult): boolean {
@@ -15,18 +18,12 @@ function paymentChecking(order: OrderDetail): boolean {
   return payment === "IN_PROGRESS" || payment === "UNKNOWN";
 }
 
-/** 결제창을 열어도 되는가: 결제 대기이고, 기한이 남았고, 결제가 진행 중·결과 미확정이 아니다. */
-export function canPay(order: OrderDetail, nowMs: number): boolean {
-  if (order.status !== "PENDING_PAYMENT") return false;
-  if (secondsUntilKst(order.expiresAt, nowMs) === 0) return false;
-  return !paymentChecking(order);
-}
-
 export type OrderHeaderKind = "pending" | "checking" | "paid" | "completed" | "canceled";
 
 /** 상태 헤더 종류. 결제가 확인 중이면 주문 상태보다 우선한다(결과를 단정하지 않는다). */
 export function orderHeader(order: OrderDetail, nowMs: number): OrderHeaderKind {
-  void nowMs; // 기한이 지나도 서버가 취소할 때까지는 결제 대기 헤더를 유지한다(시각으로 상태를 추측하지 않는다).
+  // nowMs 는 쓰지 않는다: 기한이 지나도 서버가 취소할 때까지는 결제 대기 헤더를 유지한다(시각으로 상태를 추측하지 않고 서버가 정한다).
+  void nowMs;
   if (order.status === "CANCELED") return "canceled";
   if (order.status === "COMPLETED") return "completed";
   if (paymentChecking(order)) return "checking";

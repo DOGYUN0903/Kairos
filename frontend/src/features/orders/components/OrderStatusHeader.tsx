@@ -15,13 +15,11 @@ export function OrderStatusHeader({
   order,
   nowMs,
   pollExpired,
-  onExpire,
   onRefresh,
 }: {
   order: OrderDetail;
   nowMs: number;
   pollExpired: boolean;
-  onExpire: () => void;
   onRefresh: () => void;
 }) {
   const kind = orderHeader(order, nowMs);
@@ -42,7 +40,7 @@ export function OrderStatusHeader({
       desc = "남은 시간 안에 결제하지 않으면 주문이 자동으로 취소됩니다.";
       side = (
         <>
-          <PayCountdown expiresAt={order.expiresAt} onExpire={onExpire} />
+          <PayCountdown expiresAt={order.expiresAt} nowMs={nowMs} />
           <Link className="btn btn-primary btn-lg" href={`/my/orders/${order.orderId}/pay`}>
             결제하기
           </Link>
