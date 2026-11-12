@@ -113,6 +113,8 @@ data class OrderItemResult(
     val paidAmount: Long,
     val pointsRefunded: Long,
     val returnRequest: ReturnRequestSummary?,
+    /** 후기 상태. 구매자 주문 상세에서만 채우고 판매자·관리자 응답에서는 null. */
+    val review: ItemReviewState? = null,
 )
 
 data class SellerOrderResult(

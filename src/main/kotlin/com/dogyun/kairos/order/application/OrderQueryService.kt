@@ -25,6 +25,7 @@ class OrderQueryService(
     private val paymentGateway: PaymentGateway,
     private val productReader: ProductReader,
     private val properties: OrderProperties,
+    private val reviewStateReader: ReviewStateReader,
 ) {
 
     /**
@@ -50,7 +51,19 @@ class OrderQueryService(
     fun getMine(memberId: Long, orderId: Long): OrderDetail {
         val order = orderRepository.findById(orderId)?.takeIf { it.memberId == memberId }
             ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
-        return toDetail(order)
+        return toDetail(order, reviewStatesOf(order))
+    }
+
+    /**
+     * 후기 상태 후보(확정된 판매자 주문의 `ORDERED` 항목)만 모아 reader 에 한 번 묻는다. 나머지 항목은 묻지 않고 `NOT_ELIGIBLE` 이다.
+     */
+    private fun reviewStatesOf(order: Order): Map<Long, ItemReviewState> {
+        val candidates = order.sellerOrders.flatMap { so ->
+            val confirmedAt = so.confirmedAt
+            if (so.status != SellerOrderStatus.CONFIRMED || confirmedAt == null) emptyList()
+            else so.items.filter { it.status == OrderItemStatus.ORDERED }.map { ReviewCandidate(requireNotNull(it.id), confirmedAt) }
+        }
+        return if (candidates.isEmpty()) emptyMap() else reviewStateReader.statesOf(candidates)
     }
 
     /**
@@ -169,7 +182,8 @@ class OrderQueryService(
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
     }
 
-    private fun toDetail(order: Order): OrderDetail {
+    /** [reviewStates] 가 null 이면(판매자·관리자) 항목의 `review` 는 null 이고, 아니면 맵에 없는 항목은 `NOT_ELIGIBLE` 이다. */
+    private fun toDetail(order: Order, reviewStates: Map<Long, ItemReviewState>? = null): OrderDetail {
         val orderId = requireNotNull(order.id)
         val thumbnails = thumbnailsOf(order.allItems)
         return OrderDetail(
@@ -194,7 +208,7 @@ class OrderQueryService(
             paidAt = order.paidAt,
             createdAt = requireNotNull(order.createdAt),
             shippingAddress = order.shippingAddress.toResult(),
-            sellerOrders = order.sellerOrders.map { it.toResult(thumbnails) },
+            sellerOrders = order.sellerOrders.map { it.toResult(thumbnails, reviewStates) },
             payment = findPayment(orderId),
         )
     }
@@ -230,7 +244,7 @@ class OrderQueryService(
         createdAt = requireNotNull(order.createdAt),
     )
 
-    private fun SellerOrder.toResult(thumbnails: Map<Long, String>) = SellerOrderResult(
+    private fun SellerOrder.toResult(thumbnails: Map<Long, String>, reviewStates: Map<Long, ItemReviewState>? = null) = SellerOrderResult(
         sellerOrderId = requireNotNull(id),
         sellerId = sellerId,
         sellerName = sellerName,
@@ -245,10 +259,10 @@ class OrderQueryService(
         returnableUntil = returnableUntil(properties.returnWindow),
         allItemsReturned = allItemsReturned,
         hasOpenReturn = hasOpenReturn,
-        items = items.map { it.toResult(thumbnails) },
+        items = items.map { it.toResult(thumbnails, reviewStates) },
     )
 
-    private fun OrderItem.toResult(thumbnails: Map<Long, String>) = OrderItemResult(
+    private fun OrderItem.toResult(thumbnails: Map<Long, String>, reviewStates: Map<Long, ItemReviewState>? = null) = OrderItemResult(
         orderItemId = requireNotNull(id),
         skuId = skuId,
         productId = productId,
@@ -272,6 +286,7 @@ class OrderQueryService(
         paidAmount = paidAmount,
         pointsRefunded = pointsRefunded,
         returnRequest = returnRequest?.toSummary(),
+        review = reviewStates?.let { it[id] ?: ItemReviewState("NOT_ELIGIBLE", null, null) },
     )
 
     private fun ShippingAddress.toResult() = ShippingAddressResult(receiverName, phone, zipCode, address1, address2, memo)

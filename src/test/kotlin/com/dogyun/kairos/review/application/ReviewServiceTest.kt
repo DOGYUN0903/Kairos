@@ -36,6 +36,9 @@ class ReviewServiceTest {
         override fun findById(id: Long): Review? = rows[id]?.takeIf { id !in deleted }?.let(::copy)
         override fun findByIdForUpdate(id: Long): Review? = findById(id)
         override fun existsAnyByOrderItemId(orderItemId: Long): Boolean = rows.values.any { it.orderItemId == orderItemId }
+        override fun findStatesByOrderItemIds(ids: Collection<Long>): Map<Long, com.dogyun.kairos.review.domain.ReviewRowState> =
+            rows.values.filter { it.orderItemId in ids }
+                .associate { it.orderItemId to com.dogyun.kairos.review.domain.ReviewRowState(requireNotNull(it.id), it.id in deleted) }
         override fun delete(review: Review): Boolean = deleted.add(requireNotNull(review.id))
         override fun findPageByProductId(productId: Long, page: Int, size: Int) = page { it.productId == productId }
         override fun findPageByMemberId(memberId: Long, page: Int, size: Int) = page { it.memberId == memberId }
@@ -144,6 +147,22 @@ class ReviewServiceTest {
         assertError(ErrorCode.REVIEW_NOT_ELIGIBLE) { service.write(MEMBER, ORDER, 11L, cmd()) }
         confirmedItem(orderItemId = 12L, confirmedAt = NOW.minusDays(90))
         service.write(MEMBER, ORDER, 12L, cmd())
+    }
+
+    @Test
+    fun 작성_API의_판정과_같다() {
+        val stateService = ReviewStateQueryService(reviews, ReviewProperties(Duration.ofDays(90)), clock)
+        val atLimit = NOW.minusDays(90)
+        val pastLimit = NOW.minusDays(90).minusSeconds(1)
+        confirmedItem(orderItemId = 21L, confirmedAt = atLimit)
+        confirmedItem(orderItemId = 22L, confirmedAt = pastLimit)
+
+        val states = stateService.statesOf(listOf(21L to atLimit, 22L to pastLimit))
+
+        assertEquals("WRITABLE", states.getValue(21L).status)
+        service.write(MEMBER, ORDER, 21L, cmd())
+        assertEquals("EXPIRED", states.getValue(22L).status)
+        assertError(ErrorCode.REVIEW_NOT_ELIGIBLE) { service.write(MEMBER, ORDER, 22L, cmd()) }
     }
 
     @Test

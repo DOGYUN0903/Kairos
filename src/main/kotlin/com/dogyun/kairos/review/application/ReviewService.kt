@@ -4,6 +4,7 @@ import com.dogyun.kairos.common.domain.DomainException
 import com.dogyun.kairos.common.domain.ErrorCode
 import com.dogyun.kairos.review.domain.Review
 import com.dogyun.kairos.review.domain.ReviewRepository
+import com.dogyun.kairos.review.domain.reviewWritableUntil
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -33,7 +34,7 @@ class ReviewService(
         val item = orderItemReader.findConfirmedItem(memberId, orderItemId)?.takeIf { it.orderId == orderId }
             ?: throw DomainException(ErrorCode.ORDER_ITEM_NOT_FOUND)
         val confirmedAt = item.confirmedAt ?: throw DomainException(ErrorCode.REVIEW_NOT_ELIGIBLE)
-        if (confirmedAt.plus(properties.writeDeadline).isBefore(now())) throw DomainException(ErrorCode.REVIEW_NOT_ELIGIBLE)
+        if (reviewWritableUntil(confirmedAt, properties.writeDeadline).isBefore(now())) throw DomainException(ErrorCode.REVIEW_NOT_ELIGIBLE)
 
         val review = Review.create(
             orderItemId, item.productId, item.productName, memberId, item.sellerId, cmd.rating, cmd.content, cmd.imageFileIds,

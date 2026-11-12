@@ -425,3 +425,14 @@ class FakePointEarner : PointEarner {
         return paidAmount / 100
     }
 }
+
+/** statesOf 호출 횟수와 후보를 기록한다. 응답은 [states] 에 넣은 것만 돌려준다. */
+class FakeReviewStateReader : ReviewStateReader {
+    val states = mutableMapOf<Long, ItemReviewState>()
+    val calls = mutableListOf<List<ReviewCandidate>>()
+
+    override fun statesOf(candidates: List<ReviewCandidate>): Map<Long, ItemReviewState> {
+        calls += candidates
+        return states.filterKeys { id -> candidates.any { it.orderItemId == id } }
+    }
+}

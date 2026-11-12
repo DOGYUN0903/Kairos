@@ -18,6 +18,10 @@ interface ReviewJpaRepository : JpaRepository<ReviewEntity, Long> {
     @Query("select count(*) from review where order_item_id = :orderItemId", nativeQuery = true)
     fun countAnyByOrderItemId(@Param("orderItemId") orderItemId: Long): Long
 
+    /** `@SQLRestriction` 을 피해 삭제된 행까지 본다. 행은 `[id, order_item_id, status]` 순서다. */
+    @Query("select id, order_item_id, status from review where order_item_id in (:orderItemIds)", nativeQuery = true)
+    fun findStateRowsByOrderItemIds(@Param("orderItemIds") orderItemIds: Collection<Long>): List<Array<Any>>
+
     fun findAllByProductId(productId: Long, pageable: Pageable): Page<ReviewEntity>
     fun findAllByMemberId(memberId: Long, pageable: Pageable): Page<ReviewEntity>
     fun findAllBySellerId(sellerId: Long, pageable: Pageable): Page<ReviewEntity>

@@ -3395,6 +3395,25 @@ export interface components {
             pointsRefunded: number;
             /** @description 이 항목의 반품 요청(없으면 null) */
             returnRequest?: components["schemas"]["ReturnRequestSummary"] | null;
+            /** @description 후기 상태. 구매자 주문 상세에서만 채우고 판매자·관리자 응답에서는 null */
+            review?: components["schemas"]["OrderItemReview"] | null;
+        };
+        OrderItemReview: {
+            /**
+             * @description 구매 확정 전이거나 취소·반품된 항목은 NOT_ELIGIBLE, 작성 기한이 지나면 EXPIRED, 삭제한 후기는 DELETED(다시 쓸 수 없음)
+             * @enum {string}
+             */
+            status: "NOT_ELIGIBLE" | "WRITABLE" | "WRITTEN" | "EXPIRED" | "DELETED";
+            /**
+             * Format: int64
+             * @description WRITTEN 일 때
+             */
+            reviewId?: number | null;
+            /**
+             * Format: date-time
+             * @description WRITABLE·EXPIRED 일 때. 구매 확정 시각 + 작성 기한(초 단위 시각, 이 시각까지 작성할 수 있다)
+             */
+            writableUntil?: string | null;
         };
         /** @enum {string} */
         ReturnStatus: "REQUESTED" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "REFUNDING" | "COMPLETED" | "CANCELED_BY_ADMIN";

@@ -4,6 +4,7 @@ import com.dogyun.kairos.common.domain.PageResult
 import com.dogyun.kairos.review.domain.Review
 import com.dogyun.kairos.review.domain.ReviewImage
 import com.dogyun.kairos.review.domain.ReviewRepository
+import com.dogyun.kairos.review.domain.ReviewRowState
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -28,6 +29,12 @@ class ReviewRepositoryImpl(private val jpaRepository: ReviewJpaRepository) : Rev
     override fun findByIdForUpdate(id: Long): Review? = jpaRepository.findLockedById(id)?.let(::toDomain)
 
     override fun existsAnyByOrderItemId(orderItemId: Long): Boolean = jpaRepository.countAnyByOrderItemId(orderItemId) > 0
+
+    override fun findStatesByOrderItemIds(ids: Collection<Long>): Map<Long, ReviewRowState> =
+        if (ids.isEmpty()) emptyMap()
+        else jpaRepository.findStateRowsByOrderItemIds(ids).associate { row ->
+            (row[1] as Number).toLong() to ReviewRowState((row[0] as Number).toLong(), row[2] as String != "ACTIVE")
+        }
 
     /** 호출자는 [findByIdForUpdate] 로 행을 잠근 뒤 부른다. 잠근 행이 ACTIVE 면 이번 호출이 지운 것이다. */
     override fun delete(review: Review): Boolean {

@@ -17,6 +17,11 @@ interface ReviewRepository {
     /** 삭제된 후기를 포함한다(삭제 후 재작성 금지). 최종 방어선은 `UNIQUE(order_item_id)` 다. */
     fun existsAnyByOrderItemId(orderItemId: Long): Boolean
 
+    /**
+     * 주문 항목 ID → 후기 행 상태. 삭제된 후기를 포함하고, 후기가 없는 항목은 맵에 없다. 쿼리 한 번.
+     */
+    fun findStatesByOrderItemIds(ids: Collection<Long>): Map<Long, ReviewRowState>
+
     /** 소프트 삭제. 이번 호출이 ACTIVE → DELETED 로 바꿨으면 true. */
     fun delete(review: Review): Boolean
 
@@ -25,3 +30,6 @@ interface ReviewRepository {
     fun findPageByMemberId(memberId: Long, page: Int, size: Int): PageResult<Review>
     fun findPageBySellerId(sellerId: Long, page: Int, size: Int): PageResult<Review>
 }
+
+/** 후기 행의 상태만 담은 값. [deleted] 는 소프트 삭제 여부. */
+data class ReviewRowState(val reviewId: Long, val deleted: Boolean)
