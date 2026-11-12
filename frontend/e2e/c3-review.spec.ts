@@ -112,7 +112,7 @@ test("구매 확정 → 후기 작성(사진) → 판매자 답글 → 수정 �
     await page.goto("/my/likes");
     const cardLink = page.getByRole("link", { name: new RegExp(productName) }).first();
     await expect(cardLink).toBeVisible();
-    await page.getByRole("button", { name: "좋아요", exact: true }).click();
+    await page.getByRole("button", { name: `${productName} 좋아요 취소`, exact: true }).click();
     await expect(page.getByText("좋아요한 상품이 없습니다", { exact: true })).toBeVisible();
 
     const liked = await api.get<{ content: unknown[] }>(request, "/api/v1/products/me/likes", buyer.accessToken);
