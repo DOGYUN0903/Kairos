@@ -13,6 +13,25 @@ data class PlaceOrderResult(
     val paymentStatus: String,
 )
 
+/** 견적에 보여 주는 내 쿠폰 한 장과 판정. enum 값은 이름 문자열. */
+data class QuoteCoupon(
+    val couponId: Long,
+    val name: String,
+    /** PLATFORM, SELLER */
+    val issuerType: String,
+    /** FIXED, RATE */
+    val discountType: String,
+    val discountValue: Long,
+    val maxDiscount: Long?,
+    val minOrderAmount: Long?,
+    val expiresAt: LocalDateTime,
+    val usable: Boolean,
+    /** MIN_AMOUNT_NOT_MET, NOTHING_TO_DISCOUNT. usable 이면 null */
+    val unusableReason: String? = null,
+    /** usable 일 때만 */
+    val expectedDiscount: Long? = null,
+)
+
 data class QuoteLine(
     val skuId: Long,
     val productId: Long,
@@ -30,6 +49,8 @@ data class QuoteLine(
     val cartCouponAllocated: Long,
     val pointsAllocated: Long,
     val paidAmount: Long,
+    /** 이 항목에 쓸 수 있는 내 상품 쿠폰 */
+    val availableCoupons: List<QuoteCoupon> = emptyList(),
 )
 
 data class SellerQuote(
@@ -55,6 +76,8 @@ data class OrderQuote(
     val totalAmount: Long,
     /** 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(잔액이 최소 사용 잔액 미만이면 0) */
     val maxUsablePoints: Long,
+    /** 쓸 수 있는 내 장바구니 쿠폰 */
+    val cartCoupons: List<QuoteCoupon> = emptyList(),
 )
 
 data class ConfirmPaymentResult(

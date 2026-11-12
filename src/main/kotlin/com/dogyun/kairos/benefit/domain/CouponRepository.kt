@@ -22,5 +22,7 @@ interface CouponRepository {
 
     /** `USED → AVAILABLE`, 주문·사용 시각 비움. 만료됐으면 돌리지 않고 false. */
     fun restoreIfNotExpired(couponId: Long, now: LocalDateTime): Boolean
+    /** 회원의 `AVAILABLE` 이고 [now] 에 만료되지 않은 쿠폰 전부(발급 순). */
+    fun findAvailableByMember(memberId: Long, now: LocalDateTime): List<Coupon>
     fun findUsedByOrderId(orderId: Long): List<Coupon>
 }

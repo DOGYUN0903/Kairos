@@ -357,6 +357,15 @@ class FakeBenefitApplier : BenefitApplier {
         coupons[couponId] = ReservedCoupon(couponId, couponId, "CART", "PLATFORM", "NONE", null, null, discountType, value, max, min)
     }
 
+    /** 견적의 "내 쿠폰" 목록. [coupons] 와 별개로 테스트가 채운다(비어 있으면 목록도 비어 있다). */
+    val usable = mutableListOf<UsableCoupon>()
+
+    fun hold(couponId: Long, name: String = "쿠폰$couponId", expiresAt: LocalDateTime = LocalDateTime.of(2026, 12, 31, 0, 0)) {
+        usable += UsableCoupon(coupons.getValue(couponId), name, expiresAt)
+    }
+
+    override fun listUsable(memberId: Long): List<UsableCoupon> = usable.toList()
+
     private fun lookup(couponIds: Collection<Long>): Map<Long, ReservedCoupon> = couponIds.associateWith {
         coupons[it] ?: throw DomainException(ErrorCode.COUPON_NOT_FOUND)
     }

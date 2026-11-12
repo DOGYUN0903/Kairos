@@ -109,6 +109,7 @@ class OrderService(
         // 표시용 필드는 도메인 OrderLine 에 넣지 않고 SKU 조회 결과를 skuId 로 다시 매핑한다.
         val skuInfos = productReader.findOrderableSkus(quantities.keys)
         val policy = properties.shippingPolicy()
+        val usableCoupons = benefitApplier.listUsable(memberId)
         val afterCoupon = order.itemsAmount - allocation.productCouponDiscount - allocation.cartCouponDiscount
         OrderQuote(
             items = order.allItems.sortedBy { it.skuId }.map {
@@ -118,6 +119,7 @@ class OrderService(
                     unitPrice = it.salePrice + it.extraPrice, sellerId = skuInfos.getValue(it.skuId).sellerId,
                     quantity = it.quantity, lineAmount = it.lineAmount, productCouponDiscount = it.productCouponDiscount,
                     cartCouponAllocated = it.cartCouponAllocated, pointsAllocated = it.pointsAllocated, paidAmount = it.paidAmount,
+                    availableCoupons = productCouponOptions(usableCoupons, it.productId, skuInfos.getValue(it.skuId).sellerId, it.lineAmount),
                 )
             },
             sellerQuotes = order.sellerOrders.map {
@@ -132,8 +134,42 @@ class OrderService(
             buyerShippingFee = order.buyerShippingFee,
             totalAmount = order.totalAmount,
             maxUsablePoints = DiscountAllocator.maxUsablePoints(afterCoupon, reservation.pointBalance, reservation.pointPolicy),
+            cartCoupons = cartCouponOptions(usableCoupons, order.itemsAmount - allocation.productCouponDiscount),
         )
     }
+
+    /** 항목 하나에 쓸 수 있는 상품 쿠폰. 판정은 [DiscountAllocator] 와 같은 [CouponTerms] 규칙(그 쿠폰만 썼을 때). */
+    private fun productCouponOptions(usable: List<UsableCoupon>, productId: Long, sellerId: Long, lineAmount: Long): List<QuoteCoupon> =
+        usable.mapNotNull { u ->
+            val terms = u.terms.toTerms()
+            if (terms.kind != CouponKind.PRODUCT || !terms.appliesTo(productId, sellerId)) return@mapNotNull null
+            if (terms.meetsMinimum(lineAmount)) u.toQuoteCoupon(terms, usable = true, reason = null, discount = terms.discountFor(lineAmount))
+            else u.toQuoteCoupon(terms, usable = false, reason = "MIN_AMOUNT_NOT_MET", discount = null)
+        }.sortedForQuote()
+
+    /** 장바구니 쿠폰 판정: [target] 은 요청의 상품 쿠폰 적용 뒤 합계. */
+    private fun cartCouponOptions(usable: List<UsableCoupon>, target: Long): List<QuoteCoupon> =
+        usable.mapNotNull { u ->
+            val terms = u.terms.toTerms()
+            if (terms.kind != CouponKind.CART) return@mapNotNull null
+            when {
+                target <= 0 -> u.toQuoteCoupon(terms, usable = false, reason = "NOTHING_TO_DISCOUNT", discount = null)
+                !terms.meetsMinimum(target) -> u.toQuoteCoupon(terms, usable = false, reason = "MIN_AMOUNT_NOT_MET", discount = null)
+                else -> u.toQuoteCoupon(terms, usable = true, reason = null, discount = terms.discountFor(target))
+            }
+        }.sortedForQuote()
+
+    private fun UsableCoupon.toQuoteCoupon(terms: CouponTerms, usable: Boolean, reason: String?, discount: Long?) = QuoteCoupon(
+        couponId = terms.couponId, name = name, issuerType = terms.issuer.name, discountType = terms.discountType.name,
+        discountValue = terms.discountValue, maxDiscount = terms.maxDiscount, minOrderAmount = terms.minOrderAmount,
+        expiresAt = expiresAt, usable = usable, unusableReason = reason, expectedDiscount = discount,
+    )
+
+    /** 사용 가능 먼저, 예상 할인 큰 순, 만료 빠른 순(마지막은 쿠폰 ID 로 고정). */
+    private fun List<QuoteCoupon>.sortedForQuote() = sortedWith(
+        compareByDescending<QuoteCoupon> { it.usable }.thenByDescending { it.expectedDiscount ?: 0L }
+            .thenBy { it.expiresAt }.thenBy { it.couponId },
+    )
 
     /**
      * 쿠폰 지정 검증(benefit 을 부르기 전): 같은 쿠폰 ID 중복(상품 쿠폰끼리·장바구니와), 한 SKU 에 상품 쿠폰 두 장,

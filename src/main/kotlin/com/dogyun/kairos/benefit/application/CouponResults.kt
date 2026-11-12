@@ -75,3 +75,6 @@ data class CouponTermsResult(
     val maxDiscount: Long?,
     val minOrderAmount: Long?,
 )
+
+/** 내가 쓸 수 있는 쿠폰 한 장: 정책 조건·정책 이름·쿠폰 만료일. */
+data class UsableCouponResult(val terms: CouponTermsResult, val name: String, val expiresAt: LocalDateTime)

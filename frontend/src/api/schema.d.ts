@@ -1098,6 +1098,9 @@ export interface paths {
          * 주문 금액 미리보기 (쿠폰·포인트 적용)
          * @description 주문 생성과 같은 계산으로 항목별 할인·배분·`paidAmount` 와 PG 결제 금액을 돌려준다. 쿠폰 상태·포인트·재고를 바꾸지 않고
          *     저장하지 않으므로 `Idempotency-Key` 가 없다. `maxUsablePoints` 는 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(10P 단위)다.
+         *     `availableCoupons`·`cartCoupons` 는 내 사용 가능한 쿠폰이며 `usable`·`expectedDiscount` 는 주문 생성과 같은 판정이다.
+         *     상품 쿠폰의 `usable` 은 그 항목에 그 쿠폰만 썼을 때의 판정이다(한 쿠폰을 두 항목에 쓰거나 한 항목에 두 장 쓰는 것은 별도로 `ORDER_INVALID`).
+         *     장바구니 쿠폰은 요청에 담긴 상품 쿠폰을 적용한 뒤 금액으로 판정한다.
          */
         post: operations["quoteOrder"];
         delete?: never;
@@ -3146,6 +3149,42 @@ export interface components {
             pointsAllocated: number;
             /** Format: int64 */
             paidAmount: number;
+            /** @description 이 항목에 쓸 수 있는 내 상품 쿠폰(대상이 맞는 것만). 사용 가능 먼저, 예상 할인 큰 순, 만료 빠른 순 */
+            availableCoupons: components["schemas"]["QuoteCoupon"][];
+        };
+        QuoteCoupon: {
+            /** Format: int64 */
+            couponId: number;
+            name: string;
+            /** @enum {string} */
+            issuerType: "PLATFORM" | "SELLER";
+            /** @enum {string} */
+            discountType: "FIXED" | "RATE";
+            /**
+             * Format: int64
+             * @description 정액은 원, 정률은 bp(10000 = 100%)
+             */
+            discountValue: number;
+            /** Format: int64 */
+            maxDiscount?: number | null;
+            /** Format: int64 */
+            minOrderAmount?: number | null;
+            /**
+             * Format: date-time
+             * @description 오프셋 없는 LocalDateTime(KST)
+             */
+            expiresAt: string;
+            usable: boolean;
+            /**
+             * @description `usable=false` 일 때만
+             * @enum {string|null}
+             */
+            unusableReason?: "MIN_AMOUNT_NOT_MET" | "NOTHING_TO_DISCOUNT" | null;
+            /**
+             * Format: int64
+             * @description `usable=true` 일 때만
+             */
+            expectedDiscount?: number | null;
         };
         SellerQuote: {
             /** Format: int64 */
@@ -3191,6 +3230,8 @@ export interface components {
             totalAmount: number;
             /** Format: int64 */
             maxUsablePoints: number;
+            /** @description 쓸 수 있는 내 장바구니 쿠폰. 요청의 상품 쿠폰 적용 뒤 금액으로 판정한다. 정렬은 `availableCoupons` 와 같다 */
+            cartCoupons: components["schemas"]["QuoteCoupon"][];
         };
         ShipRequest: {
             carrierCode: string;

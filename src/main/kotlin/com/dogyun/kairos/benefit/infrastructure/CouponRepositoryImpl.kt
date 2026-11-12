@@ -59,6 +59,13 @@ class CouponRepositoryImpl(
     override fun restoreIfNotExpired(couponId: Long, now: LocalDateTime): Boolean =
         jpaRepository.restoreIfNotExpired(couponId, now) == 1
 
+    override fun findAvailableByMember(memberId: Long, now: LocalDateTime): List<Coupon> {
+        val c = QCouponEntity.couponEntity
+        return queryFactory.selectFrom(c)
+            .where(c.memberId.eq(memberId), c.couponStatus.eq(CouponStatus.AVAILABLE), c.expiresAt.gt(now))
+            .orderBy(c.id.asc()).fetch().map(::toDomain)
+    }
+
     override fun findUsedByOrderId(orderId: Long): List<Coupon> = jpaRepository.findUsedByOrderId(orderId).map(::toDomain)
 
     /** 조건부 UPDATE 가 영속성 컨텍스트를 거치지 않으므로 항상 DB 에서 새로 읽는다. */
