@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCancelItem, canConfirmPurchase, canPay, orderHeader, refundLines, showsRemainingAmount } from "@/features/orders/actions";
+import { canCancelItem, canConfirmPurchase, canPay, confirmBlockedReason, orderHeader, refundLines, sellerOrderChip, showsRemainingAmount } from "@/features/orders/actions";
 import type { OrderDetail, OrderItemResult, SellerOrderResult } from "@/features/orders/api";
 import type { CancelPreview } from "@/features/orders/api";
 
@@ -32,12 +32,30 @@ describe("canConfirmPurchase", () => {
   it("배송 완료이고 열린 반품이 없으면 확정할 수 있다", () => {
     expect(canConfirmPurchase(seller("DELIVERED", false))).toBe(true);
   });
-  it("열린 반품이 있으면 확정할 수 없다", () => {
-    expect(canConfirmPurchase(seller("DELIVERED", true))).toBe(false);
+  it("열린 반품이 있어도 버튼은 보인다(비활성과 이유는 confirmBlockedReason 이 정한다)", () => {
+    expect(canConfirmPurchase(seller("DELIVERED", true))).toBe(true);
   });
   it("배송 완료가 아니면 확정할 수 없다", () => {
     expect(canConfirmPurchase(seller("SHIPPING"))).toBe(false);
     expect(canConfirmPurchase(seller("CONFIRMED"))).toBe(false);
+  });
+});
+
+describe("confirmBlockedReason", () => {
+  it("열린 반품이 있으면 이유를 돌려준다", () => {
+    expect(confirmBlockedReason(seller("DELIVERED", true))).toBe("반품이 진행 중인 상품이 있어 확정할 수 없습니다");
+  });
+  it("열린 반품이 없으면 null", () => {
+    expect(confirmBlockedReason(seller("DELIVERED", false))).toBeNull();
+  });
+});
+
+describe("sellerOrderChip", () => {
+  it("모든 항목이 반품되면 전체 반품", () => {
+    expect(sellerOrderChip({ status: "CONFIRMED", allItemsReturned: true } as SellerOrderResult)).toBe("ALL_RETURNED");
+  });
+  it("그 밖에는 판매자 주문 상태 그대로", () => {
+    expect(sellerOrderChip({ status: "DELIVERED", allItemsReturned: false } as SellerOrderResult)).toBe("DELIVERED");
   });
 });
 

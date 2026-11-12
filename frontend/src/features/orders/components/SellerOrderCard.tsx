@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Store } from "lucide-react";
 import { Money } from "@/components/common/Money";
 import { StatusChip } from "@/components/common/StatusChip";
+import { sellerOrderChip } from "@/features/orders/actions";
 import { carrierName } from "@/features/orders/carriers";
 import type { OrderItemResult, SellerOrderResult } from "@/features/orders/api";
 import { OrderItemRow } from "@/features/orders/components/OrderItemRow";
@@ -16,6 +17,7 @@ export function SellerOrderCard({
   renderItemNote,
   shipAction,
   footer,
+  returnAware = false,
 }: {
   sellerOrder: SellerOrderResult;
   renderItemAction?: (item: OrderItemResult) => ReactNode;
@@ -23,6 +25,8 @@ export function SellerOrderCard({
   renderItemNote?: (item: OrderItemResult) => ReactNode;
   shipAction?: ReactNode;
   footer?: ReactNode;
+  /** 구매자 주문 상세만 켠다: 모든 항목이 반품된 판매자 주문의 칩을 "전체 반품"으로 보인다(판매자·관리자 화면은 그대로). */
+  returnAware?: boolean;
 }) {
   const carrier = carrierName(sellerOrder.carrierCode);
   const tracking = sellerOrder.trackingNumber;
@@ -34,7 +38,7 @@ export function SellerOrderCard({
           <Store className="h-4 w-4" aria-hidden />
           {sellerOrder.sellerName}
         </span>
-        <StatusChip kind="sellerOrder" status={sellerOrder.status} />
+        <StatusChip kind="sellerOrder" status={returnAware ? sellerOrderChip(sellerOrder) : sellerOrder.status} />
       </div>
       {showShip && (
         <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3 text-[13px] text-text-2">

@@ -42,3 +42,22 @@ describe("PaymentSummaryCard", () => {
     expect(screen.getByText("3,000P")).toBeTruthy();
   });
 });
+
+describe("PaymentSummaryCard 반품 배송비 차감 안내", () => {
+  const withItems = (...items: { returnRequest: { status: string; returnFee: number } | null }[]) =>
+    order({ refundedAmount: 14000, sellerOrders: [{ items }] as unknown as OrderDetail["sellerOrders"] });
+  const NOTE = "반품 배송비가 차감된 금액입니다";
+
+  it("반품이_완료되고_반품비가_있는_항목이_있으면_보인다", () => {
+    render(<PaymentSummaryCard order={withItems({ returnRequest: { status: "COMPLETED", returnFee: 3000 } })} />);
+    expect(screen.getByText(NOTE)).toBeTruthy();
+  });
+  it("판매자_귀책처럼_반품비가_0이면_보이지_않는다", () => {
+    render(<PaymentSummaryCard order={withItems({ returnRequest: { status: "COMPLETED", returnFee: 0 } })} />);
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+  it("완료되지_않은_반품이나_반품이_없으면_보이지_않는다", () => {
+    render(<PaymentSummaryCard order={withItems({ returnRequest: { status: "REFUNDING", returnFee: 3000 } }, { returnRequest: null })} />);
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+});

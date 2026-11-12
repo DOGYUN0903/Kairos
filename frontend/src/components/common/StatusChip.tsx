@@ -43,6 +43,7 @@ const table: Record<Kind, Record<string, [string, Tone]>> = {
     DELIVERED: ["배송 완료", "onsale"],
     CONFIRMED: ["구매 확정", "onsale"],
     CANCELED: ["취소", "ended"],
+    ALL_RETURNED: ["전체 반품", "ended"],
   },
   orderItem: {
     ORDERED: ["주문 완료", "info"],

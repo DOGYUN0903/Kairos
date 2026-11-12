@@ -7,13 +7,15 @@ import { useNow } from "@/hooks/useNow";
 import { ApiError } from "@/api/client";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
-import { canCancelItem, canConfirmPurchase } from "@/features/orders/actions";
+import { canCancelItem, canConfirmPurchase, confirmBlockedReason } from "@/features/orders/actions";
 import { useOrder, type OrderItemResult } from "@/features/orders/api";
 import { CancelItemDialog } from "@/features/orders/components/CancelItemDialog";
 import { ConfirmPurchaseButton } from "@/features/orders/components/ConfirmPurchaseButton";
 import { OrderStatusHeader } from "@/features/orders/components/OrderStatusHeader";
 import { PaymentSummaryCard } from "@/features/orders/components/PaymentSummaryCard";
 import { SellerOrderCard } from "@/features/orders/components/SellerOrderCard";
+import { ReturnEntryAction, ReturnEntryNote } from "@/features/returns/components/ReturnEntry";
+import { ReturnStatusLine } from "@/features/returns/components/ReturnStatusLine";
 import { OrderItemReviewAction, OrderItemReviewNote } from "@/features/reviews/components/OrderItemReviewAction";
 import { ShippingAddressCard } from "@/features/orders/components/ShippingAddressCard";
 import { expiredRecheckInterval, isPastExpiry, shouldRefetchAtExpiry } from "@/features/orders/expiry";
@@ -80,17 +82,27 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
                 <SellerOrderCard
                   key={so.sellerOrderId}
                   sellerOrder={so}
-                  shipAction={canConfirmPurchase(so) ? <ConfirmPurchaseButton orderId={orderId} sellerOrderId={so.sellerOrderId} /> : undefined}
+                  returnAware
+                  shipAction={canConfirmPurchase(so) ? <ConfirmPurchaseButton orderId={orderId} sellerOrderId={so.sellerOrderId} blockedReason={confirmBlockedReason(so)} /> : undefined}
                   renderItemAction={(item) =>
                     canCancelItem(data, so, item) ? (
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTarget(item)}>
                         취소
                       </button>
                     ) : (
-                      <OrderItemReviewAction orderId={orderId} item={item} />
+                      <div className="flex flex-col items-end gap-1.5">
+                        <ReturnEntryAction orderId={orderId} sellerOrder={so} item={item} nowMs={now} />
+                        <OrderItemReviewAction orderId={orderId} item={item} />
+                      </div>
                     )
                   }
-                  renderItemNote={(item) => <OrderItemReviewNote item={item} />}
+                  renderItemNote={(item) => (
+                    <>
+                      <OrderItemReviewNote item={item} />
+                      <ReturnEntryNote sellerOrder={so} item={item} nowMs={now} />
+                      <ReturnStatusLine orderId={orderId} item={item} />
+                    </>
+                  )}
                 />
               ))}
             </div>

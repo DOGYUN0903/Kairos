@@ -13,6 +13,11 @@ function Row({ label, children, strong = false }: { label: string; children: Rea
   );
 }
 
+/** 반품이 완료되고 반품비가 있는 항목이 있는가(비교만 한다. 차감액은 합산하지 않는다). */
+function hasReturnFeeDeduction(order: OrderDetail): boolean {
+  return (order.sellerOrders ?? []).some((so) => so.items.some((i) => i.returnRequest?.status === "COMPLETED" && i.returnRequest.returnFee > 0));
+}
+
 /** 결제 요약. 모든 금액은 서버 응답 값 그대로이고 화면에서 더하거나 빼지 않는다. */
 export function PaymentSummaryCard({ order }: { order: OrderDetail }) {
   return (
@@ -52,6 +57,9 @@ export function PaymentSummaryCard({ order }: { order: OrderDetail }) {
               −<Money value={order.refundedAmount} />
             </span>
           </Row>
+        )}
+        {order.refundedAmount !== 0 && hasReturnFeeDeduction(order) && (
+          <div className="col-span-2 -mt-1.5 pl-2.5 text-xs text-text-3">반품 배송비가 차감된 금액입니다</div>
         )}
         {order.pointsRefunded !== 0 && (
           <Row label="되돌려받은 포인트">{formatPoints(order.pointsRefunded)}</Row>
