@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 import { Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/auth/useAuth";
+import { useCartCount } from "@/features/cart/api";
 
 const utilLink = "flex h-[52px] min-w-14 items-center justify-center rounded px-3 text-[13px] text-text-2 hover:bg-surface hover:text-navy";
 
@@ -21,6 +22,7 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
   const { status, me, logout } = useAuth();
   const router = useRouter();
   const [keyword, setKeyword] = useState("");
+  const cartCount = useCartCount();
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -65,6 +67,20 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
               )}
               {status === "authenticated" && (
                 <>
+                  <Link className={`${utilLink} relative`} href="/cart" aria-label={cartCount ? `장바구니 ${cartCount}개` : "장바구니"}>
+                    장바구니
+                    {cartCount !== null && cartCount > 0 && (
+                      <span
+                        aria-hidden
+                        className="absolute right-0.5 top-1.5 min-w-4 rounded-lg bg-navy px-1 text-center text-[10px] font-bold leading-4 text-white"
+                      >
+                        {cartCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link className={utilLink} href="/my/orders">
+                    마이
+                  </Link>
                   <Link className={utilLink} href="/seller">
                     판매자 센터
                   </Link>

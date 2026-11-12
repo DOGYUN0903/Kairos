@@ -11,6 +11,7 @@ import { Money } from "@/components/common/Money";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCategories, useProduct, type ProductDetail } from "@/features/catalog/api";
 import { findCategoryPath } from "@/features/catalog/category-path";
+import { AddToCartButtons } from "@/features/cart/components/AddToCartButtons";
 import { LikeButton } from "@/features/catalog/components/LikeButton";
 import { OptionSelector } from "@/features/catalog/components/OptionSelector";
 import { ProductGallery } from "@/features/catalog/components/ProductGallery";
@@ -142,7 +143,7 @@ function PurchasePanel({ product }: { product: ProductDetail }) {
 
       <div className="mt-4 grid grid-cols-[52px_1fr] items-center gap-2">
         <LikeButton productId={product.productId} liked={product.liked} likeCount={product.likeCount} />
-        <p className="text-sm text-text-2">구매 기능은 곧 열립니다.</p>
+        <AddToCartButtons skuId={sku?.skuId ?? null} quantity={qty} disabled={product.soldOut || skuSoldOut} />
       </div>
 
       <dl className="mt-5 grid grid-cols-[72px_1fr] gap-y-1.5 text-xs text-text-2">
