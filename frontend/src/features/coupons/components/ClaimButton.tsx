@@ -18,6 +18,7 @@ export function ClaimButton({ policy }: { policy: Pick<CouponPolicyResult, "poli
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.coupons.policiesRoot }),
         qc.invalidateQueries({ queryKey: queryKeys.coupons.mineRoot }),
+        qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes }),
       ]);
     },
     {

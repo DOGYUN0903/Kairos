@@ -31,6 +31,8 @@ export function useQuote(items: { skuId: number; quantity: number }[], selection
       selection,
     }),
     enabled: enabled && items.length > 0,
+    // 견적은 캐시에서 내주지 않는다: 다시 마운트하거나 선택으로 돌아와도 항상 서버에 다시 묻는다.
+    staleTime: 0,
     placeholderData: keepPreviousData,
     retry: false,
   });

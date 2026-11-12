@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +20,13 @@ const ORDERS = "/my/orders";
  * 결제 승인 처리(/checkout/success). 모의 결제와 토스가 같은 쿼리로 들어온다.
  * 승인 요청은 마운트당 한 번만 나가고, 결과를 모르면 완료도 실패도 말하지 않는다.
  */
+/** 결제 실패·거절로 서버가 쿠폰·포인트를 돌려주면 내 쿠폰·포인트·견적 캐시가 낡는다. */
+function invalidateBenefits(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: queryKeys.points.root });
+  void qc.invalidateQueries({ queryKey: queryKeys.coupons.mineRoot });
+  void qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes });
+}
+
 export function ConfirmPage() {
   const sp = useSearchParams();
   const { status } = useAuth();
@@ -41,6 +48,7 @@ export function ConfirmPage() {
   useEffect(() => {
     if (!view || view.kind === "pending") return;
     void qc.invalidateQueries({ queryKey: queryKeys.orders.root });
+    invalidateBenefits(qc);
     if (approvedOrderId !== null) {
       void qc.invalidateQueries({ queryKey: queryKeys.cart });
       // 뒤로 가기로 승인 화면에 돌아오지 않게 교체 이동한다.
@@ -185,6 +193,11 @@ function PendingPoll({ orderId, orderNo }: { orderId: number; orderNo: string })
   useEffect(() => {
     if (mismatch || unreadable || paid || canceled) setSettled(true);
   }, [mismatch, unreadable, paid, canceled]);
+
+  useEffect(() => {
+    // 결제가 취소로 끝나면 서버가 주문을 취소하고 쿠폰·포인트를 돌려준다.
+    if (canceled) invalidateBenefits(qc);
+  }, [canceled, qc]);
 
   useEffect(() => {
     if (!paid) return;

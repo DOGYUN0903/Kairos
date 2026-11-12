@@ -90,7 +90,7 @@ function MineTab({ status, page, go }: { status: CouponStatus; page: number; go:
         ))}
       </div>
       <Note>사용할 수 있는 쿠폰은 주문서에서 자동으로 보입니다</Note>
-      {q.isError && !data ? (
+      {q.isError ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : !data ? (
         <PageSkeleton />

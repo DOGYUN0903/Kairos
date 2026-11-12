@@ -25,7 +25,7 @@ export function PointsPage() {
       <MyPageHead title="포인트" />
       <PointSummaryCard />
       <h2 className="mt-8 text-lg font-bold">포인트 내역</h2>
-      {q.isError && !data ? (
+      {q.isError ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : !data ? (
         <PageSkeleton />
