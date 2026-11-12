@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canPay, shouldRedirectToCart, unavailableDestination } from "@/features/checkout/checkout-guard";
 import { useForm } from "react-hook-form";
 import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
@@ -60,20 +61,25 @@ export function CheckoutPage() {
 function CheckoutResolve({ parsed }: { parsed: CheckoutParams }) {
   const router = useRouter();
   const cart = useCart();
-  const items = useMemo(() => resolveCheckoutItems(parsed, cart.data), [parsed, cart.data]);
+  const resolved = useMemo(() => resolveCheckoutItems(parsed, cart.data), [parsed, cart.data]);
   const cartMode = parsed.mode === "cart";
-  const empty = cartMode && cart.isSuccess && items === null;
+  // 주문이 만들어지면 잠그고, 그 뒤 장바구니 재조회로 항목·화면이 바뀌거나 /cart 로 튕기지 않게 마지막 항목을 고정한다.
+  const [orderCreated, setOrderCreated] = useState(false);
+  const lastItems = useRef<CheckoutItem[] | null>(null);
+  if (resolved && !orderCreated) lastItems.current = resolved;
+  const items = orderCreated ? lastItems.current : resolved;
+  const empty = cartMode && cart.isSuccess && resolved === null;
 
   useEffect(() => {
-    if (empty) router.replace("/cart");
-  }, [empty, router]);
+    if (shouldRedirectToCart({ empty, orderCreated })) router.replace("/cart");
+  }, [empty, orderCreated, router]);
 
-  if (cartMode && cart.isError) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
+  if (!orderCreated && cartMode && cart.isError) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
   if (!items) return <PageSkeleton />;
-  return <CheckoutBody items={items} mode={parsed.mode} />;
+  return <CheckoutBody items={items} mode={parsed.mode} orderCreated={orderCreated} onOrderCreated={() => setOrderCreated(true)} />;
 }
 
-function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutParams["mode"] }) {
+function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: CheckoutItem[]; mode: CheckoutParams["mode"]; orderCreated: boolean; onOrderCreated: () => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const quote = useQuote(items, true);
@@ -84,13 +90,24 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
     defaultValues: { receiverName: "", phone: "", zipCode: "", address1: "", address2: "", memo: "" },
   });
 
-  const leave = () => (mode === "cart" ? router.replace("/cart") : router.back());
-
-  // 화면에 보이는 견적(로딩·갱신·오류가 아닌 확정 값)만 결제할 수 있다.
+  // 화면에 보이는 견적(로딩·갱신·오류가 아닌 확정 값)만 결제할 수 있다. 주문이 만들어진 뒤에는 다시 열리지 않는다.
   const shown = quote.data;
-  const payable = shown !== undefined && !quote.isFetching && !quote.isPlaceholderData && !quote.isError;
+  const payable = canPay({
+    hasQuote: shown !== undefined,
+    fetching: quote.isFetching,
+    placeholder: quote.isPlaceholderData,
+    errored: quote.isError,
+    orderCreated,
+    submitting: false,
+  });
   const shownRef = useRef({ shown, payable });
   shownRef.current = { shown, payable };
+
+  // 항상 정해진 위치로 보낸다(history 에 기대면 새 탭·직접 진입에서 앱을 떠난다).
+  const leave = () => router.replace(unavailableDestination(mode, shownRef.current.shown?.items[0]?.productId));
+  // state 가 반영되기 전의 연타·Enter 도 막도록 ref 로도 잠근다.
+  const createdRef = useRef(false);
+  if (orderCreated) createdRef.current = true;
 
   useEffect(() => {
     const e = quote.error;
@@ -104,8 +121,9 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
   const { onSubmit, submitting } = useIdempotentSubmit(
     form,
     async (values, key) => {
-      const { shown: q } = shownRef.current;
-      if (!q) throw new Error("견적이 없습니다.");
+      // 보낼 순간에 확정된 견적이 아니면(재조회 중·오류·이미 주문됨) 아무것도 하지 않는다.
+      const { shown: q, payable: ok } = shownRef.current;
+      if (!q || !ok || createdRef.current) return;
       setPriceChanged(false);
       const res = await createOrder(
         {
@@ -116,6 +134,9 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
         },
         key,
       );
+      // 이동이 끝나기 전에 다시 눌러도 두 번째 주문이 만들어지지 않도록 영구히 잠근다.
+      createdRef.current = true;
+      onOrderCreated();
       router.replace(res.orderStatus === "PAID" ? `/my/orders/${res.orderId}/complete` : `/my/orders/${res.orderId}/pay?auto=1`);
     },
     {
@@ -144,7 +165,7 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
       noValidate
       onSubmit={(e) => {
         // Enter 로도 제출되므로 버튼 비활성만으로는 부족하다.
-        if (!shownRef.current.payable) {
+        if (!shownRef.current.payable || createdRef.current) {
           e.preventDefault();
           return;
         }
@@ -152,7 +173,7 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
       }}
       className="grid grid-cols-[minmax(0,1fr)_360px] items-start gap-10"
     >
-      <fieldset disabled={submitting} className="flex min-w-0 flex-col gap-6">
+      <fieldset disabled={submitting || orderCreated} className="flex min-w-0 flex-col gap-6">
         {priceChanged && (
           <div className="notice notice-warn" role="alert">
             <CircleAlert className="h-4 w-4 flex-none" aria-hidden />
@@ -174,7 +195,7 @@ function CheckoutBody({ items, mode }: { items: CheckoutItem[]; mode: CheckoutPa
         <OrderItems quote={shown} />
       </fieldset>
       <aside aria-label="결제 금액" className="sticky top-24">
-        <CheckoutSummary quote={shown} payable={payable} submitting={submitting} />
+        <CheckoutSummary quote={shown} payable={payable} submitting={submitting || orderCreated} />
       </aside>
     </form>
   );

@@ -24,12 +24,11 @@ export function useQuote(items: { skuId: number; quantity: number }[], enabled: 
   });
 }
 
-/** 주문 생성. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 성공하면 장바구니·주문 목록·견적을 무효화한다. */
+/** 주문 생성. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 성공하면 주문 목록을 무효화한다(장바구니는 결제 승인 때 서버가 비우므로 여기서 건드리지 않는다). */
 export function useCreateOrder() {
   const qc = useQueryClient();
   return async (body: CreateOrderRequest, key: string): Promise<CreateOrderResponse> => {
     const res = unwrap<CreateOrderResponse>(await api.POST("/api/v1/orders", { params: { header: { [IDEMPOTENCY_HEADER]: key } }, body }));
-    void qc.invalidateQueries({ queryKey: queryKeys.cart });
     void qc.invalidateQueries({ queryKey: queryKeys.orders.root });
     return res;
   };
