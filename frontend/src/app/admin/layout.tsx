@@ -12,6 +12,7 @@ const nav = (reviewBadge: number | undefined): NavItem[] => [
   { href: "/admin/review", label: "검수", ...(reviewBadge ? { badge: reviewBadge } : {}) },
   { href: "/admin/categories", label: "카테고리" },
   { href: "/admin/sellers", label: "판매자" },
+  { href: "/admin/orders", label: "주문" },
   { href: "/admin/hotdeals", label: "핫딜", disabled: true, soonLabel: "준비 중" },
 ];
 
