@@ -236,7 +236,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
 
 **Interfaces:**
 - Produces:
-  - `isAnswered(e: unknown): boolean`(`src/api/idempotency.ts`에 추가) — 서버가 답한 실패인가: `e instanceof ApiError && e.status >= 400 && e.status < 500`. **`ApiError`의 `status === 0`(네트워크 오류·본문 없음, `client.ts`가 그렇게 만든다), `>= 500`, `ApiError`가 아닌 오류는 false**(응답을 받지 못함).
+  - `isAnswered(e: unknown): boolean`(`src/api/idempotency.ts`에 추가) — 서버가 답한 실패인가: `e instanceof ApiError && e.status >= 400 && e.status < 500`. 단, 코드 `IDEMPOTENCY_IN_PROGRESS`(409)는 **false**다 — 같은 키의 첫 요청이 아직 처리 중이라는 뜻이지 저장된 결과가 아니므로 키를 유지해야 한다(리뷰 반영 2026-11-12). **`ApiError`의 `status === 0`(네트워크 오류·본문 없음, `client.ts`가 그렇게 만든다), `>= 500`, `ApiError`가 아닌 오류는 false**(응답을 받지 못함).
   - `useIdempotentSubmit(form, submit, opts?: { onError?: (e: unknown) => void })` — **계약 변경**: `submit`은 실패하면 **반드시 던진다**(안에서 삼키지 않는다). 훅이 잡아서 ① 키를 정하고 ② `opts.onError(e)`를 부르고 ③ 삼킨다(`onSubmit`·`retry`는 reject하지 않는다). 키 규칙: `submit`이 resolve되거나 `isAnswered(e)`면 저장된 키를 버린다(다음 제출은 새 키). 그렇지 않으면(응답 없음) 키를 유지해 같은 값 재제출·`retry()`가 같은 키를 쓴다. 값이 바뀌면 지금처럼 새 키.
   - 기존 호출자 6곳(`features/seller/apply/components/ApplyForm.tsx`, `features/seller/products/components/{ProductForm,PriceDialog}.tsx`, `features/seller/brands/components/BrandDialog.tsx`, `features/auth/components/SignupForm.tsx`, `features/admin/categories/components/CategoryDialog.tsx`)을 새 계약으로 옮긴다: `submit` 안의 `try/catch`를 없애고 같은 처리를 `onError`로 옮긴다(화면 동작은 그대로).
   - `useIdempotentAction<TArgs>(action: (args: TArgs, key: string) => Promise<void>, opts?: { onError?: (e: unknown) => void }): { run: (args: TArgs) => Promise<void>; pending: boolean }` — 폼 없는 요청용. 같은 계약·같은 키 규칙(직전 시도가 응답 없이 실패했고 `JSON.stringify(args)`가 같으면 같은 키), 처리 중 재호출 무시.
