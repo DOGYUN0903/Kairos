@@ -128,9 +128,20 @@ test("쿠폰 받기부터 상품·장바구니 쿠폰 결제, 사용 완료 목�
       await expect(page.getByRole("button", { name: "59,000원 결제하기" })).toBeEnabled();
     });
 
+    // 주문이 만들어진 뒤에는 견적(POST /orders/quote)을 다시 부르지 않는다(주문 직후 재견적이 409 를 내던 회귀 방지).
+    let orderCreated = false;
+    const quoteStatusesAfterOrder: number[] = [];
+    page.on("response", (res) => {
+      const { pathname } = new URL(res.url());
+      if (res.request().method() !== "POST") return;
+      if (pathname === "/api/v1/orders") orderCreated = true;
+      else if (pathname === "/api/v1/orders/quote" && orderCreated) quoteStatusesAfterOrder.push(res.status());
+    });
     await page.getByRole("button", { name: "59,000원 결제하기" }).click();
     await page.waitForURL((u) => /\/my\/orders\/\d+\/pay$/.test(u.pathname));
     await payWithMock(page);
+    expect(orderCreated, "주문 생성 응답을 관찰하지 못했습니다").toBe(true);
+    expect(quoteStatusesAfterOrder.filter((s) => s === 409)).toHaveLength(0);
 
     const orders = await api.get<{ content: { orderId: number }[] }>(request, "/api/v1/orders", buyer.accessToken);
     expect(orders.content).toHaveLength(1);

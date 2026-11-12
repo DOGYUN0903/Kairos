@@ -385,3 +385,94 @@ export async function writeReview(
 export async function getPointBalance(request: APIRequestContext, buyerToken: string): Promise<number> {
   return (await api.get<{ balance: number }>(request, "/api/v1/points/me", buyerToken)).balance;
 }
+
+/** ---- F4 반품·정산 준비 단계 ---- */
+
+/** 시연 데이터의 판매자(비밀번호는 KAIROS_DEMO_PASSWORD). 정산 시연 주문이 이 판매자에게 있다. */
+export const DEMO_SELLER_EMAIL = "seller@kairos.demo";
+
+/** 한 판매자의 두 번째 상품. createSellerWithProduct 가 만든 브랜드(`${sellerName} 브랜드`)에 옵션 없는 상품을 더하고 재고를 정한다. */
+export async function addProductToSeller(
+  request: APIRequestContext,
+  admin: string,
+  seller: { sellerToken: string },
+  opts: { sellerName: string; productName: string; price: number; stock: number },
+): Promise<{ productId: number; skuId: number }> {
+  const brandId = await brandIdByName(request, seller.sellerToken, `${opts.sellerName} 브랜드`);
+  const imageFileId = await uploadImage(request, seller.sellerToken, SAMPLE_IMAGE);
+  const productId = await registerProduct(request, seller.sellerToken, {
+    brandId,
+    name: opts.productName,
+    imageFileIds: [imageFileId],
+    categoryId: await leafCategoryId(request),
+    originalPrice: opts.price * 2,
+    salePrice: opts.price,
+    options: [],
+  });
+  await approveProduct(request, admin, productId);
+  const detail = await api.get<{ skus: { skuId: number }[] }>(request, `/api/v1/seller/products/${productId}`, seller.sellerToken);
+  const skuId = detail.skus[0]?.skuId;
+  if (skuId === undefined) throw new Error("SKU 가 없습니다");
+  await api.patch(request, `/api/v1/seller/products/${productId}/skus/${skuId}`, seller.sellerToken, { extraPrice: 0, stock: opts.stock, onSale: true });
+  return { productId, skuId };
+}
+
+/** 주문에서 상품 ID 로 주문 항목 ID 를 찾는다. */
+export async function orderItemIdOf(request: APIRequestContext, buyerToken: string, orderId: number, productId: number): Promise<number> {
+  for (const so of (await orderDetail(request, buyerToken, orderId)).sellerOrders) {
+    const item = so.items.find((i) => i.productId === productId);
+    if (item) return item.orderItemId;
+  }
+  throw new Error(`주문 ${orderId} 에 상품 ${productId} 항목이 없습니다`);
+}
+
+export type ReturnReasonCode = "CHANGE_OF_MIND" | "DEFECTIVE" | "WRONG_DELIVERY";
+
+/** 구매자 반품 요청(API). returnId 를 돌려준다. */
+export async function requestReturnApi(request: APIRequestContext, buyerToken: string, orderId: number, orderItemId: number, reason: ReturnReasonCode, detail?: string): Promise<number> {
+  const r = await api.post<{ returnId: number }>(request, `/api/v1/orders/${orderId}/items/${orderItemId}/returns`, buyerToken, { reason, ...(detail ? { detail } : {}) });
+  return r.returnId;
+}
+
+/** 반품 승인(API). 판매자 토큰이면 판매자 경로, 관리자면 관리자 경로. */
+export async function approveReturnApi(request: APIRequestContext, token: string, returnId: number, as: "seller" | "admin" = "seller") {
+  await api.patch(request, `/api/v1/${as}/returns/${returnId}/approve`, token);
+}
+
+/** 수거 확인(API). 환불이 실행되고 반품 응답(상태·환불액)을 돌려준다. */
+export async function receiveReturnApi(request: APIRequestContext, token: string, returnId: number, as: "seller" | "admin" = "seller") {
+  return api.patch<{ status: string; refundAmount: number }>(request, `/api/v1/${as}/returns/${returnId}/receive`, token);
+}
+
+/**
+ * 한국 시간 기준 가장 최근에 끝난 주의 월요일(YYYY-MM-DD). 정산 시연 주문이 이 주에 있고,
+ * 백엔드의 정산 시작일(KAIROS_SETTLEMENT_STARTDATE)도 이 날짜여야 한다.
+ */
+export function lastWeekMondayKst(nowMs = Date.now()): string {
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul", dateStyle: "short" }).format(nowMs);
+  const d = new Date(`${today}T00:00:00Z`);
+  const sinceMonday = [6, 0, 1, 2, 3, 4, 5][d.getUTCDay()]!; // 일요일=0 → 월요일 이후 경과일
+  d.setUTCDate(d.getUTCDate() - sinceMonday - 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 월요일 날짜의 그 주 일요일(YYYY-MM-DD). */
+export function sundayOf(monday: string): string {
+  const d = new Date(`${monday}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 6);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * 반품 환불 내역 상자(RefundBreakdown)의 줄 값. 합계 줄의 라벨에는 "예상"이 붙을 수 있어(환불 예정 금액) 앞부분만 맞춘다.
+ * 부모에 toContainText 를 쓰지 않도록 값 노드(dd)를 돌려준다.
+ */
+export function refundValue(scope: Page | Locator, label: string): Locator {
+  const starts = new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+  return scope.locator("dt").filter({ hasText: starts }).locator("xpath=following-sibling::dd[1]");
+}
+
+/** 주문 상세에서 상품 이름으로 항목 줄(OrderItemRow)을 찾는다. */
+export function itemRow(page: Page, productName: string): Locator {
+  return page.getByRole("link", { name: productName, exact: true }).locator("xpath=ancestor::div[contains(@class,'72px')][1]");
+}
