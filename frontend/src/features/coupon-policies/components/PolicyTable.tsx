@@ -11,7 +11,7 @@ const TH = "whitespace-nowrap bg-surface px-3.5 py-3 text-left text-xs font-medi
 const TD = "border-b border-border px-3.5 py-3 align-middle";
 
 /** 판매자·관리자 공용 쿠폰 정책 표. 종료 버튼은 진행 중(ACTIVE)인 정책에만 있다("기간 종료"여도 서버 상태가 ACTIVE 면 종료할 수 있다). */
-export function PolicyTable({ rows, onEnd, endingId }: { rows: CouponPolicyResult[]; onEnd: (policyId: number) => void; endingId: number | null }) {
+export function PolicyTable({ rows, onEnd, endingId, showType = false }: { rows: CouponPolicyResult[]; onEnd: (policyId: number) => void; endingId: number | null; showType?: boolean }) {
   const nowMs = useNow(false);
   return (
     <div className="overflow-x-auto">
@@ -19,6 +19,9 @@ export function PolicyTable({ rows, onEnd, endingId }: { rows: CouponPolicyResul
         <thead>
           <tr>
             <th scope="col" className={TH}>이름</th>
+            {showType && (
+              <th scope="col" className={TH}>종류</th>
+            )}
             <th scope="col" className={TH}>대상</th>
             <th scope="col" className={TH}>할인</th>
             <th scope="col" className={`${TH} text-right`}>최소 주문 금액</th>
@@ -37,6 +40,7 @@ export function PolicyTable({ rows, onEnd, endingId }: { rows: CouponPolicyResul
             return (
               <tr key={p.policyId}>
                 <td className={`${TD} font-medium`}>{p.name}</td>
+                {showType && <td className={TD}>{p.couponType === "CART" ? "장바구니 쿠폰" : "상품 쿠폰"}</td>}
                 <td className={TD}>
                   {p.targetType === "PRODUCT" ? (
                     <>
