@@ -23,6 +23,11 @@ export function AdminReturnDetailPage({ returnId }: { returnId: number }) {
   const r = q.data;
   const needs = r ? needsReturnPolling(r.status) : false;
   useEffect(() => setPolling(needs), [needs]);
+  // 안내는 그 상태인 동안만 보인다. 상태가 바뀌면 지워서, 나중에 그 상태로 돌아와도 낡은 안내가 다시 나타나지 않게 한다.
+  const status = r?.status;
+  useEffect(() => {
+    if (notice && status !== undefined && status !== notice.whileStatus) setNotice(null);
+  }, [notice, status]);
 
   if (q.isError && q.error instanceof ApiError && (q.error.code === "RETURN_NOT_FOUND" || q.error.status === 404)) notFound();
 

@@ -7,7 +7,7 @@ import type { ReturnRequestResponse } from "@/features/returns/api";
 import { RefundBreakdown } from "@/features/returns/components/RefundBreakdown";
 import { ReturnSteps } from "@/features/returns/components/ReturnSteps";
 import { refundRows } from "@/features/returns/return-actions";
-import { returnReasonLabel } from "@/features/returns/return-text";
+import { feeBearerLabel, returnReasonLabel } from "@/features/returns/return-text";
 import { formatDate } from "@/lib/datetime";
 import { joinDot } from "@/lib/join-dot";
 import { formatKrw } from "@/lib/money";
@@ -74,8 +74,8 @@ export function ReturnDetailView({ data: r, orderHref, actions, showSeller = fal
               <dt className="text-text-2">사유</dt>
               <dd>{returnReasonLabel(r.reason)}</dd>
               <dt className="text-text-2">부담 주체</dt>
-              <dd>{r.feeBearer === "BUYER" ? "구매자" : "판매자"}</dd>
-              {r.detail && (
+              <dd>{feeBearerLabel(r.feeBearer)}</dd>
+              {r.detail?.trim() && (
                 <>
                   <dt className="text-text-2">상세 내용</dt>
                   <dd className="whitespace-pre-wrap break-words">{r.detail}</dd>

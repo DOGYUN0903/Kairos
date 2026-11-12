@@ -1,17 +1,18 @@
 import type { ReturnRequestResponse } from "@/features/returns/api";
+import { RETURN_FILTER_LABEL } from "@/features/returns/return-text";
 import { parseId } from "@/lib/ids";
 import { parsePage } from "@/lib/page";
 
 export type AdminReturnStatus = ReturnRequestResponse["status"];
 
 export const ADMIN_RETURN_STATUSES: readonly { value: AdminReturnStatus; label: string }[] = [
-  { value: "REQUESTED", label: "요청" },
-  { value: "APPROVED", label: "승인 · 수거 대기" },
-  { value: "REFUNDING", label: "환불 확인 중" },
-  { value: "COMPLETED", label: "완료" },
-  { value: "REJECTED", label: "거절" },
-  { value: "WITHDRAWN", label: "철회" },
-  { value: "CANCELED_BY_ADMIN", label: "중단" },
+  { value: "REQUESTED", label: RETURN_FILTER_LABEL.REQUESTED },
+  { value: "APPROVED", label: RETURN_FILTER_LABEL.APPROVED },
+  { value: "REFUNDING", label: RETURN_FILTER_LABEL.REFUNDING },
+  { value: "COMPLETED", label: RETURN_FILTER_LABEL.COMPLETED },
+  { value: "REJECTED", label: RETURN_FILTER_LABEL.REJECTED },
+  { value: "WITHDRAWN", label: RETURN_FILTER_LABEL.WITHDRAWN },
+  { value: "CANCELED_BY_ADMIN", label: RETURN_FILTER_LABEL.CANCELED_BY_ADMIN },
 ];
 
 export type AdminReturnParams = { status?: AdminReturnStatus; sellerId?: number; memberId?: number; page: number };

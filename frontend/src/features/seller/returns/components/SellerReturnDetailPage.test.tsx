@@ -55,7 +55,7 @@ function mount() {
       <SellerReturnDetailPage returnId={5} />
     </QueryClientProvider>,
   );
-  return { invalidate };
+  return { invalidate, qc };
 }
 
 async function openReceive() {
@@ -111,6 +111,30 @@ describe("SellerReturnDetailPage", () => {
     expect(screen.getByText("결과를 확인하지 못했습니다. 아래 상태를 확인한 뒤 판단해 주세요. 자동으로 다시 시도하지 않습니다.")).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 100));
     expect(h.PATCH).toHaveBeenCalledTimes(1);
+  });
+
+  it("결과_미확인_안내는_상태가_APPROVED를_벗어나면_지워지고_돌아와도_다시_나타나지_않는다", async () => {
+    h.PATCH.mockRejectedValue(new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null));
+    let stage = "APPROVED";
+    h.GET.mockImplementation(async () => ok(ret({ status: stage as "APPROVED" })));
+    const { qc } = mount();
+    fireEvent.click(await openReceive());
+    const notice = "결과를 확인하지 못했습니다. 아래 상태를 확인한 뒤 판단해 주세요. 자동으로 다시 시도하지 않습니다.";
+    expect(await screen.findByText(notice)).toBeInTheDocument();
+    stage = "COMPLETED";
+    await qc.invalidateQueries({ queryKey: queryKeys.sellerReturns.detail(5) });
+    await waitFor(() => expect(screen.queryByText(notice)).not.toBeInTheDocument());
+    stage = "APPROVED";
+    await qc.invalidateQueries({ queryKey: queryKeys.sellerReturns.detail(5) });
+    await screen.findByRole("button", { name: "수거 확인" });
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+
+  it("상세_내용이_공백뿐이면_행을_보이지_않는다", async () => {
+    h.GET.mockResolvedValue(ok(ret({ detail: "   " })));
+    mount();
+    await screen.findByRole("button", { name: "수거 확인" });
+    expect(screen.queryByText("상세 내용")).not.toBeInTheDocument();
   });
 
   it("PG가_거절하면_승인_상태로_돌아갔다고_알린다", async () => {

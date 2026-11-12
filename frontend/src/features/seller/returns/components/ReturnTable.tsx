@@ -2,7 +2,7 @@ import Link from "next/link";
 import { StatusChip } from "@/components/common/StatusChip";
 import { OrderThumb } from "@/features/orders/components/OrderThumb";
 import type { ReturnRequestResponse } from "@/features/returns/api";
-import { returnReasonLabel } from "@/features/returns/return-text";
+import { feeBearerLabel, returnReasonLabel } from "@/features/returns/return-text";
 import { formatDate, formatMonthDay } from "@/lib/datetime";
 import { joinDot } from "@/lib/join-dot";
 
@@ -50,7 +50,7 @@ export function ReturnTable({ rows, detailHref, showSeller = false }: { rows: Re
                 </div>
               </td>
               <td className={`${TD} whitespace-nowrap`}>{returnReasonLabel(r.reason)}</td>
-              <td className={`${TD} whitespace-nowrap`}>{r.feeBearer === "BUYER" ? "구매자" : "판매자"}</td>
+              <td className={`${TD} whitespace-nowrap`}>{feeBearerLabel(r.feeBearer)}</td>
               <td className={TD}>
                 <StatusChip kind="return" status={r.status} />
               </td>

@@ -98,7 +98,7 @@ export function MyReturnDetailPage({ returnId }: { returnId: number }) {
             <dl className="grid grid-cols-[96px_1fr] gap-y-2 text-sm">
               <dt className="text-text-2">사유</dt>
               <dd>{returnReasonLabel(r.reason)}</dd>
-              {r.detail && (
+              {r.detail?.trim() && (
                 <>
                   <dt className="text-text-2">상세 내용</dt>
                   <dd className="whitespace-pre-wrap break-words">{r.detail}</dd>

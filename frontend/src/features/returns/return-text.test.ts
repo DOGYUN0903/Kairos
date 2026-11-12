@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidedByLabel, feeBearerNotice, needsReturnPolling, refundSummaryText, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
+import { decidedByLabel, feeBearerLabel, RETURN_FILTER_LABEL, feeBearerNotice, needsReturnPolling, refundSummaryText, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
 
 describe("return-text", () => {
   it("사유", () => {
@@ -36,5 +36,15 @@ describe("return-text", () => {
   it("재조회는_환불_확인_중일_때만", () => {
     expect(needsReturnPolling("REFUNDING")).toBe(true);
     for (const s of ["REQUESTED", "APPROVED", "COMPLETED", "REJECTED", "WITHDRAWN", "CANCELED_BY_ADMIN"]) expect(needsReturnPolling(s)).toBe(false);
+  });
+});
+
+describe("feeBearerLabel·RETURN_FILTER_LABEL", () => {
+  it("부담_주체_이름", () => {
+    expect(feeBearerLabel("BUYER")).toBe("구매자");
+    expect(feeBearerLabel("SELLER")).toBe("판매자");
+  });
+  it("필터_이름은_모든_상태를_덮는다", () => {
+    expect(Object.keys(RETURN_FILTER_LABEL).sort()).toEqual(["APPROVED", "CANCELED_BY_ADMIN", "COMPLETED", "REFUNDING", "REJECTED", "REQUESTED", "WITHDRAWN"]);
   });
 });

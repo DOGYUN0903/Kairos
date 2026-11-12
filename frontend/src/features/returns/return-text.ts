@@ -17,6 +17,19 @@ const STATUSES: Record<Status, string> = {
 export const returnReasonLabel = (r: Reason): string => REASONS[r];
 export const returnStatusLabel = (s: Status): string => STATUSES[s];
 
+/** 필터·탭에 쓰는 짧은 상태 이름(판매자·관리자 목록 공용). */
+export const RETURN_FILTER_LABEL: Record<Status, string> = {
+  REQUESTED: "요청",
+  APPROVED: "승인 · 수거 대기",
+  REFUNDING: "환불 확인 중",
+  COMPLETED: "완료",
+  REJECTED: "거절",
+  WITHDRAWN: "철회",
+  CANCELED_BY_ADMIN: "중단",
+};
+
+export const feeBearerLabel = (b: "BUYER" | "SELLER"): string => (b === "BUYER" ? "구매자" : "판매자");
+
 export function feeBearerNotice(b: "BUYER" | "SELLER"): string {
   return b === "BUYER" ? "반품 배송비는 구매자 부담입니다" : "판매자 부담이라 차감이 없습니다";
 }
