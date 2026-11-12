@@ -3,9 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { canPay, shouldRedirectToCart, unavailableDestination } from "@/features/checkout/checkout-guard";
+import { afterOrderHref, canPay, QuoteNotReadyError, shouldRedirectToCart, unavailableDestination } from "@/features/checkout/checkout-guard";
 import { useForm } from "react-hook-form";
 import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
@@ -58,13 +59,17 @@ export function CheckoutPage() {
   );
 }
 
+/** 만들어진 주문과 이동할 곳. 이동이 실패해도 잠긴 화면에서 다음 단계로 갈 수 있게 들고 있는다. */
+type CreatedOrder = { orderId: number; href: string; paid: boolean };
+
 function CheckoutResolve({ parsed }: { parsed: CheckoutParams }) {
   const router = useRouter();
   const cart = useCart();
   const resolved = useMemo(() => resolveCheckoutItems(parsed, cart.data), [parsed, cart.data]);
   const cartMode = parsed.mode === "cart";
   // 주문이 만들어지면 잠그고, 그 뒤 장바구니 재조회로 항목·화면이 바뀌거나 /cart 로 튕기지 않게 마지막 항목을 고정한다.
-  const [orderCreated, setOrderCreated] = useState(false);
+  const [created, setCreated] = useState<CreatedOrder | null>(null);
+  const orderCreated = created !== null;
   const lastItems = useRef<CheckoutItem[] | null>(null);
   if (resolved && !orderCreated) lastItems.current = resolved;
   const items = orderCreated ? lastItems.current : resolved;
@@ -76,13 +81,15 @@ function CheckoutResolve({ parsed }: { parsed: CheckoutParams }) {
 
   if (!orderCreated && cartMode && cart.isError) return <ErrorState error={cart.error} onRetry={() => void cart.refetch()} />;
   if (!items) return <PageSkeleton />;
-  return <CheckoutBody items={items} mode={parsed.mode} orderCreated={orderCreated} onOrderCreated={() => setOrderCreated(true)} />;
+  return <CheckoutBody items={items} mode={parsed.mode} created={created} onOrderCreated={setCreated} />;
 }
 
-function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: CheckoutItem[]; mode: CheckoutParams["mode"]; orderCreated: boolean; onOrderCreated: () => void }) {
+function CheckoutBody({ items, mode, created, onOrderCreated }: { items: CheckoutItem[]; mode: CheckoutParams["mode"]; created: CreatedOrder | null; onOrderCreated: (order: CreatedOrder) => void }) {
   const router = useRouter();
   const qc = useQueryClient();
-  const quote = useQuote(items, true);
+  const orderCreated = created !== null;
+  // 주문이 만들어진 뒤에는 견적을 다시 읽지 않는다(마지막 재고를 방금 샀다면 품절 오류가 돌아온다). 금액은 마지막 확정 견적을 그대로 보여준다.
+  const quote = useQuote(items, !orderCreated);
   const createOrder = useCreateOrder();
   const [priceChanged, setPriceChanged] = useState(false);
   const form = useForm<ShippingAddressInput, unknown, ShippingAddressValues>({
@@ -98,7 +105,6 @@ function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: Ch
     placeholder: quote.isPlaceholderData,
     errored: quote.isError,
     orderCreated,
-    submitting: false,
   });
   const shownRef = useRef({ shown, payable });
   shownRef.current = { shown, payable };
@@ -110,20 +116,25 @@ function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: Ch
   if (orderCreated) createdRef.current = true;
 
   useEffect(() => {
+    // 주문이 만들어진 뒤의 견적 오류가 결제 페이지 이동을 덮지 않게 한다.
+    if (orderCreated || createdRef.current) return;
     const e = quote.error;
     if (e instanceof ApiError && (e.code === "SKU_NOT_ORDERABLE" || e.code === "STOCK_SOLD_OUT")) {
       toast({ variant: "destructive", title: resolveError(e).message });
       leave();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 오류가 바뀔 때만
-  }, [quote.error]);
+  }, [quote.error, orderCreated]);
 
   const { onSubmit, submitting } = useIdempotentSubmit(
     form,
     async (values, key) => {
-      // 보낼 순간에 확정된 견적이 아니면(재조회 중·오류·이미 주문됨) 아무것도 하지 않는다.
+      // 이미 주문이 만들어졌으면 보낼 것이 없다(성공으로 끝낸다).
+      if (createdRef.current) return;
+      // 보낼 순간에 확정된 견적이 아니면(재조회 중·오류) 보내지 않되, 조용히 return 하지 않고 던진다:
+      // return 은 성공으로 보여 직전 시도(응답 없음)의 키가 버려지고 다음 제출이 두 번째 주문을 만든다.
       const { shown: q, payable: ok } = shownRef.current;
-      if (!q || !ok || createdRef.current) return;
+      if (!q || !ok) throw new QuoteNotReadyError();
       setPriceChanged(false);
       const res = await createOrder(
         {
@@ -136,11 +147,14 @@ function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: Ch
       );
       // 이동이 끝나기 전에 다시 눌러도 두 번째 주문이 만들어지지 않도록 영구히 잠근다.
       createdRef.current = true;
-      onOrderCreated();
-      router.replace(res.orderStatus === "PAID" ? `/my/orders/${res.orderId}/complete` : `/my/orders/${res.orderId}/pay?auto=1`);
+      const href = afterOrderHref(res.orderId, res.orderStatus);
+      onOrderCreated({ orderId: res.orderId, href, paid: res.orderStatus === "PAID" });
+      router.replace(href);
     },
     {
       onError: async (e) => {
+        // 요청을 보내지 않았다. 버튼이 다시 켜지면 같은 키로 다시 제출된다.
+        if (e instanceof QuoteNotReadyError) return;
         const code = e instanceof ApiError ? e.code : null;
         if (code === "ORDER_PRICE_CHANGED") {
           setPriceChanged(true);
@@ -174,6 +188,18 @@ function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: Ch
       className="grid grid-cols-[minmax(0,1fr)_360px] items-start gap-10"
     >
       <fieldset disabled={submitting || orderCreated} className="flex min-w-0 flex-col gap-6">
+        {created && (
+          // 이동이 실패해도(네트워크·청크 로드 오류) 잠긴 주문서에서 다음 단계로 갈 수 있어야 한다. fieldset 은 링크를 막지 않는다.
+          <div className="notice" role="status">
+            <span>
+              주문이 접수되었습니다. 화면이 넘어가지 않으면{" "}
+              <Link className="font-medium text-navy underline underline-offset-2" href={created.href}>
+                {created.paid ? "주문 완료 보기" : "결제 페이지로 이동"}
+              </Link>
+              를 눌러 주세요.
+            </span>
+          </div>
+        )}
         {priceChanged && (
           <div className="notice notice-warn" role="alert">
             <CircleAlert className="h-4 w-4 flex-none" aria-hidden />
@@ -183,7 +209,7 @@ function CheckoutBody({ items, mode, orderCreated, onOrderCreated }: { items: Ch
           </div>
         )}
         {form.formState.errors.root?.server && <FormNotice message={form.formState.errors.root.server.message} />}
-        {quote.isError && (
+        {quote.isError && !orderCreated && (
           <p role="alert" className="text-[13px] text-danger">
             {resolveError(quote.error).message || "금액을 계산하지 못했습니다."}{" "}
             <button type="button" className="underline underline-offset-2" onClick={() => void quote.refetch()}>

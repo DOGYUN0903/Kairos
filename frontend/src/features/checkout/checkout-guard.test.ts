@@ -1,7 +1,9 @@
+import { ApiError } from "@/api/client";
+import { isAnswered } from "@/api/idempotency";
 import { describe, expect, it } from "vitest";
-import { canPay, shouldRedirectToCart, unavailableDestination } from "@/features/checkout/checkout-guard";
+import { afterOrderHref, canPay, QuoteNotReadyError, shouldRedirectToCart, unavailableDestination } from "@/features/checkout/checkout-guard";
 
-const ready = { hasQuote: true, fetching: false, placeholder: false, errored: false, orderCreated: false, submitting: false };
+const ready = { hasQuote: true, fetching: false, placeholder: false, errored: false, orderCreated: false };
 
 describe("canPay", () => {
   it("견적이_확정되면_결제할_수_있다", () => {
@@ -14,10 +16,25 @@ describe("canPay", () => {
     expect(canPay({ ...ready, fetching: true })).toBe(false);
     expect(canPay({ ...ready, placeholder: true })).toBe(false);
   });
-  it("견적이_없거나_오류이거나_제출_중이면_결제할_수_없다", () => {
+  it("견적이_없거나_오류이면_결제할_수_없다", () => {
     expect(canPay({ ...ready, hasQuote: false })).toBe(false);
     expect(canPay({ ...ready, errored: true })).toBe(false);
-    expect(canPay({ ...ready, submitting: true })).toBe(false);
+  });
+});
+
+describe("QuoteNotReadyError", () => {
+  it("견적_미확정_오류는_서버가_답한_실패가_아니라서_멱등_키를_유지한다", () => {
+    const e = new QuoteNotReadyError();
+    expect(e).toBeInstanceOf(Error);
+    expect(e).not.toBeInstanceOf(ApiError);
+    expect(isAnswered(e)).toBe(false);
+  });
+});
+
+describe("afterOrderHref", () => {
+  it("결제_대기_주문은_결제_페이지로_이미_결제된_주문은_완료_화면으로_간다", () => {
+    expect(afterOrderHref(7, "PENDING_PAYMENT")).toBe("/my/orders/7/pay?auto=1");
+    expect(afterOrderHref(7, "PAID")).toBe("/my/orders/7/complete");
   });
 });
 

@@ -67,6 +67,28 @@ describe("useIdempotentSubmit", () => {
     expect(new Set(keysOf(submit)).size).toBe(1);
   });
 
+  it("네트워크_오류_뒤_submit이_일반_오류를_던져도_다음_제출은_같은_키를_쓴다", async () => {
+    // 주문서: 시도1 이 응답 없이 끝난 뒤(서버에 주문이 생겼을 수 있다) 시도2 가 요청을 보내지 않고 끝나도 키가 버려지면 안 된다.
+    const sent: string[] = [];
+    let attempt = 0;
+    const submit = vi.fn(async (_v: V, key: string) => {
+      attempt += 1;
+      if (attempt === 1) {
+        sent.push(key);
+        throw new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null);
+      }
+      if (attempt === 2) throw new Error("견적이 확정되지 않았습니다");
+      sent.push(key);
+    });
+    const { result } = setup(submit, () => {});
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.onSubmit());
+    expect(submit).toHaveBeenCalledTimes(3);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toBe(sent[0]);
+  });
+
   it("처리_중_409_뒤_다시_보내면_같은_키를_쓴다", async () => {
     const submit = vi.fn(async () => {
       throw new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "x", null);
