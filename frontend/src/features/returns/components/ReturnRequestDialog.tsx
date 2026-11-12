@@ -84,7 +84,7 @@ function ReturnRequestBody({ orderId, item, onClose }: { orderId: number; item: 
 
   return (
     <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
-      <DialogContent className="max-w-[520px]">
+      <DialogContent className="max-w-[520px] grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
           <DialogTitle>반품 요청</DialogTitle>
           <DialogDescription className="sr-only">반품할 상품과 사유를 확인하고 환불 예정 금액을 봅니다.</DialogDescription>

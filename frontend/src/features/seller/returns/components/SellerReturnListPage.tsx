@@ -88,7 +88,7 @@ export function SellerReturnListPage() {
         ) : (
           <>
             <ReturnTable rows={rows} detailHref={detailHref} />
-            <div className="flex items-center justify-between px-3.5 pb-4">
+            <div className="flex items-center justify-between px-3.5 pb-4 pt-3">
               <span className="text-xs text-text-2">
                 {data.totalElements}건 중 {data.page * SELLER_RETURN_PAGE_SIZE + 1}–{data.page * SELLER_RETURN_PAGE_SIZE + rows.length}
               </span>

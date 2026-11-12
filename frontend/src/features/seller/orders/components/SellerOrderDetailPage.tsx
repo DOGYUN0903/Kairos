@@ -166,11 +166,11 @@ function Detail({ so }: { so: SellerOrderDetail }) {
                           </div>
                         </div>
                       </td>
-                      <td className={`${TD} text-right ${canceled ? "opacity-55" : ""}`}>
+                      <td className={`${TD} whitespace-nowrap text-right ${canceled ? "opacity-55" : ""}`}>
                         <Money value={unitPrice(item.salePrice, item.extraPrice)} />
                       </td>
                       <td className={`${TD} text-right tabular-nums ${canceled ? "opacity-55" : ""}`}>{item.quantity}</td>
-                      <td className={`${TD} text-right font-bold ${canceled ? "opacity-55" : ""}`}>
+                      <td className={`${TD} whitespace-nowrap text-right font-bold ${canceled ? "opacity-55" : ""}`}>
                         <Money value={item.lineAmount} />
                       </td>
                       <td className={TD}>

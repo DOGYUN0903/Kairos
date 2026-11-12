@@ -9,7 +9,7 @@ import { joinDot } from "@/lib/join-dot";
 /** 반품 내역 카드. 전체가 반품 상세 링크다. */
 export function ReturnCard({ r }: { r: ReturnRequestResponse }) {
   return (
-    <Link href={`/my/returns/${r.returnId}`} className="grid grid-cols-[72px_minmax(0,1fr)_auto_auto] items-center gap-5 rounded-lg border border-border p-4 hover:bg-surface">
+    <Link href={`/my/returns/${r.returnId}`} className="grid grid-cols-[72px_minmax(0,1fr)_160px_150px] items-center gap-5 rounded-lg border border-border p-4 hover:bg-surface">
       <OrderThumb url={r.thumbnailUrl} size={72} />
       <div className="min-w-0">
         <div className="text-xs text-text-2">{r.sellerName}</div>
@@ -26,7 +26,7 @@ export function ReturnCard({ r }: { r: ReturnRequestResponse }) {
           <span className="tabular-nums">{formatDate(r.requestedAt)}</span>
         </span>
       </div>
-      <div className="flex min-w-[120px] flex-col items-end gap-1.5">
+      <div className="flex flex-col items-end gap-1.5">
         <StatusChip kind="return" status={r.status} />
         <span className="text-xs text-text-2">{refundSummaryText(r)}</span>
       </div>

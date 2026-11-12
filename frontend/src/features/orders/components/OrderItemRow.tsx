@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export function OrderItemRow({ item, action, note }: { item: OrderItemResult; action?: ReactNode; note?: ReactNode }) {
   const canceled = item.status === "CANCELED";
   return (
-    <div className="grid grid-cols-[72px_minmax(0,2fr)_minmax(96px,1fr)_96px_88px] items-center gap-3 border-b border-border px-5 py-4 last:border-b-0">
+    <div data-testid="order-item-row" className="grid grid-cols-[72px_minmax(0,2fr)_minmax(96px,1fr)_96px_88px] items-center gap-3 border-b border-border px-5 py-4 last:border-b-0">
       <OrderThumb url={item.thumbnailUrl} size={72} className={cn(canceled && "opacity-50")} />
       <div className={cn("min-w-0", canceled && "opacity-50")}>
         <div className="truncate text-xs text-text-2">{item.brandName}</div>

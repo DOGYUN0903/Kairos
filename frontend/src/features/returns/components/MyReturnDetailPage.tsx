@@ -18,6 +18,12 @@ import { canWithdraw, refundRows } from "@/features/returns/return-actions";
 import { needsReturnPolling, returnReasonLabel } from "@/features/returns/return-text";
 import { joinDot } from "@/lib/join-dot";
 
+const NO_REFUND: Record<string, string> = {
+  REJECTED: "거절된 반품이라 환불이 없습니다.",
+  WITHDRAWN: "철회된 반품이라 환불이 없습니다.",
+  CANCELED_BY_ADMIN: "중단된 반품이라 환불이 없습니다.",
+};
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-lg border border-border">
@@ -116,6 +122,8 @@ export function MyReturnDetailPage({ returnId }: { returnId: number }) {
           <Section title="환불 내역">
             {r.status === "COMPLETED" || r.status === "REFUNDING" ? (
               <RefundBreakdown rows={refundRows(r, "환불 금액")} title="환불 금액" />
+            ) : NO_REFUND[r.status] ? (
+              <p className="text-sm text-text-2">{NO_REFUND[r.status]}</p>
             ) : (
               <p className="text-sm text-text-2">환불 금액은 판매자가 상품을 받은 뒤 확정됩니다.</p>
             )}

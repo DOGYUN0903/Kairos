@@ -93,8 +93,12 @@ export function AdminSettlementDetailPage({ settlementId }: { settlementId: numb
                 <div className="border-b border-border px-5 py-4 text-[15px] font-bold">정산 정보</div>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-5 text-sm">
                   <dt className="text-text-2">판매자</dt>
-                  <dd>
-                    {d.sellerName} · <StatusChip kind="seller" status={d.sellerStatus} />
+                  <dd className="break-keep">
+                    {d.sellerName}
+                    <span className="whitespace-nowrap">
+                      {" "}
+                      · <StatusChip kind="seller" status={d.sellerStatus} />
+                    </span>
                   </dd>
                   <dt className="text-text-2">정산 기간</dt>
                   <dd className="tabular-nums">{d.periodStart} ~ {periodLastDay(d.periodEnd)}</dd>
