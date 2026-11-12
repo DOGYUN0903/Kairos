@@ -277,3 +277,111 @@ export async function uiLogin(page: Page, email: string, password: string, next?
 export function requireAdmin(): string | null {
   return DEMO_PASSWORD ? null : "KAIROS_DEMO_PASSWORD 가 없어 데모 관리자로 로그인할 수 없습니다(local,demo 백엔드 + 같은 비밀번호 필요).";
 }
+
+/** ---- F3 혜택·후기 준비 단계(API 직접 호출) ---- */
+
+const SAMPLE_IMAGE_PATH = join(__dirname, "../assets/sample.webp");
+
+/** 한국 시간 기준 LocalDateTime 문자열(초 단위). 정책 발급 기간에 쓴다. */
+export function kstLocal(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "medium" }).format(d);
+  return parts.replace(" ", "T");
+}
+
+export type CouponPolicyBody = {
+  name: string;
+  couponType: "PRODUCT" | "CART";
+  targetType: "ALL_PRODUCTS" | "SELLER" | "PRODUCT" | "NONE";
+  targetProductId?: number;
+  discountType: "FIXED" | "RATE";
+  /** 정액이면 원, 정률이면 bp(10% = 1000). */
+  discountValue: number;
+  maxDiscount?: number;
+  minOrderAmount?: number;
+  totalQuantity?: number;
+  validityDays?: number;
+};
+
+function withPeriod(body: CouponPolicyBody) {
+  return { validFrom: kstLocal(-1), validUntil: kstLocal(30), ...body };
+}
+
+export async function createSellerCouponPolicy(request: APIRequestContext, sellerToken: string, body: CouponPolicyBody): Promise<number> {
+  return (await api.post<{ policyId: number }>(request, "/api/v1/seller/coupons/policies", sellerToken, withPeriod(body))).policyId;
+}
+
+export async function createAdminCouponPolicy(request: APIRequestContext, adminTok: string, body: CouponPolicyBody): Promise<number> {
+  return (await api.post<{ policyId: number }>(request, "/api/v1/admin/coupons/policies", adminTok, withPeriod(body))).policyId;
+}
+
+/** 관리자 정책 종료. 전 상품 대상 쿠폰이 다른 spec 의 상품 상세에 남지 않게 spec 이 끝나면 부른다. */
+export async function endAdminCouponPolicy(request: APIRequestContext, adminTok: string, policyId: number) {
+  await api.patch(request, `/api/v1/admin/coupons/policies/${policyId}/end`, adminTok);
+}
+
+export async function claimCoupon(request: APIRequestContext, buyerToken: string, policyId: number): Promise<number> {
+  return (await api.post<{ couponId: number }>(request, `/api/v1/coupons/policies/${policyId}/claim`, buyerToken)).couponId;
+}
+
+/** 장바구니에 담고 cartItemId 를 돌려준다. */
+export async function addCartItem(request: APIRequestContext, buyerToken: string, skuId: number, quantity: number): Promise<number> {
+  await api.post(request, "/api/v1/cart/items", buyerToken, { skuId, quantity });
+  const cart = await api.get<{ items: { cartItemId: number; skuId: number }[] }>(request, "/api/v1/cart", buyerToken);
+  const item = cart.items.find((i) => i.skuId === skuId);
+  if (!item) throw new Error(`장바구니에 sku ${skuId} 가 없습니다`);
+  return item.cartItemId;
+}
+
+type OrderItemRef = { orderItemId: number; productId: number };
+type SellerOrderRef = { sellerOrderId: number; sellerId: number; items: OrderItemRef[] };
+
+export async function orderDetail(request: APIRequestContext, buyerToken: string, orderId: number) {
+  return api.get<{ sellerOrders: SellerOrderRef[] }>(request, `/api/v1/orders/${orderId}`, buyerToken);
+}
+
+/** 판매자의 판매자 주문에서 첫 항목의 orderItemId. */
+export async function firstOrderItemId(request: APIRequestContext, buyerToken: string, orderId: number): Promise<number> {
+  const so = (await orderDetail(request, buyerToken, orderId)).sellerOrders[0];
+  const item = so?.items[0];
+  if (!item) throw new Error("주문 항목이 없습니다");
+  return item.orderItemId;
+}
+
+/** 발송 → 배송 완료(판매자). 그 판매자의 주문만 처리한다. */
+export async function shipAndDeliver(request: APIRequestContext, sellerToken: string, buyerToken: string, order: { orderId: number }) {
+  const sid = await sellerId(request, sellerToken);
+  const so = (await orderDetail(request, buyerToken, order.orderId)).sellerOrders.find((x) => x.sellerId === sid);
+  if (!so) throw new Error("이 판매자의 판매자 주문이 없습니다");
+  await api.patch(request, `/api/v1/seller/orders/${so.sellerOrderId}/ship`, sellerToken, { carrierCode: "04", trackingNumber: "1234567890" });
+  await api.patch(request, `/api/v1/seller/orders/${so.sellerOrderId}/deliver`, sellerToken);
+  return so.sellerOrderId;
+}
+
+/** 발송 → 배송 완료 → 구매 확정(구매자). */
+export async function shipDeliverConfirm(request: APIRequestContext, sellerToken: string, buyerToken: string, order: { orderId: number }) {
+  const sellerOrderId = await shipAndDeliver(request, sellerToken, buyerToken, order);
+  await api.patch(request, `/api/v1/orders/${order.orderId}/seller-orders/${sellerOrderId}/confirm`, buyerToken);
+  return sellerOrderId;
+}
+
+/** e2e/assets 의 이미지를 올리고 fileId 를 돌려준다. */
+export async function uploadTestImage(request: APIRequestContext, token: string): Promise<number> {
+  return uploadImage(request, token, SAMPLE_IMAGE_PATH);
+}
+
+/** 구매 확정된 항목에 후기를 쓴다. 사진 포함이면 500P, 아니면 100P. */
+export async function writeReview(
+  request: APIRequestContext,
+  buyerToken: string,
+  orderId: number,
+  orderItemId: number,
+  { withPhoto, rating = 5, content = "E2E 후기 본문입니다. 만족합니다." }: { withPhoto: boolean; rating?: number; content?: string },
+): Promise<{ reviewId: number; rewardPoints: number }> {
+  const imageFileIds = withPhoto ? [await uploadTestImage(request, buyerToken)] : [];
+  return api.post(request, `/api/v1/orders/${orderId}/items/${orderItemId}/reviews`, buyerToken, { rating, content, imageFileIds });
+}
+
+export async function getPointBalance(request: APIRequestContext, buyerToken: string): Promise<number> {
+  return (await api.get<{ balance: number }>(request, "/api/v1/points/me", buyerToken)).balance;
+}
