@@ -19,11 +19,11 @@ class DemoController(
     private val settlementSeeder: DemoSettlementSeeder,
 ) {
 
-    /** 부족한 데모 데이터만 채운다(멱등, 삭제 없음). 지난주 정산 시연 묶음이 없으면 그것도 만든다(응답 숫자에는 넣지 않는다). */
+    /** 부족한 데모 데이터만 채운다(멱등, 삭제 없음). 지난주 정산 시연 묶음이 없으면 그것도 만든다(응답 숫자에는 넣지 않고, 실패해도 기본 시드 결과로 200 을 돌려준다). */
     @PostMapping("/reseed")
     fun reseed(): ResponseEntity<ApiResponse<DemoReseedResult>> {
         val result = demoSeeder.seed()
-        settlementSeeder.seedLastWeek()
+        settlementSeeder.seedLastWeekQuietly()
         return ApiResponse.ok(result)
     }
 }

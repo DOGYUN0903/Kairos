@@ -41,7 +41,11 @@ class DemoSettlementSeederTest : CommerceTestSupport() {
     @Autowired
     private lateinit var shiftClock: DemoShiftClock
 
-    private val lastMonday: LocalDate = lastMondayKst()
+    @Autowired
+    private lateinit var context: org.springframework.context.ApplicationContext
+
+    /** 시더와 같은 방식으로 주입된 시계에서 구한다. */
+    private val lastMonday: LocalDate get() = lastMondayOf(LocalDate.now(shiftClock))
 
     /** 상위 cleanUp 이 카탈로그·주문을 지우므로 시연 상품을 다시 채운다(회원은 남는다). */
     @BeforeTest
@@ -57,9 +61,6 @@ class DemoSettlementSeederTest : CommerceTestSupport() {
 
         assertEquals(setOf(70_500L, 13_500L, -3_000L), lineAmounts(settlement).toSet())
         assertEquals(3, settlement.get("lines").size())
-        println("관측한 정산: sales=${settlement.get("salesAmount")} sellerCoupon=${settlement.get("sellerCouponDiscount")} commission=${settlement.get("commissionAmount")} " +
-            "shippingOwed=${settlement.get("shippingFeeOwed")} returnFee=${settlement.get("returnFeeBorne")} total=${settlement.get("totalAmount")} payable=${settlement.get("payableAmount")} " +
-            "lines=${lineAmounts(settlement)}")
         assertEquals(95_000L, settlement.get("salesAmount").asLong())
         assertEquals(5_000L, settlement.get("sellerCouponDiscount").asLong())
         assertEquals(9_000L, settlement.get("commissionAmount").asLong())
@@ -86,20 +87,27 @@ class DemoSettlementSeederTest : CommerceTestSupport() {
 
         assertEquals(3, next.sellerOrders)
         assertEquals(6, sellerOrderCount())
+        // 옮긴 시계에서의 "지난주" = 실제 이번 주. 새 주문 3건의 확정 시각이 그 안에 있다.
+        val from = lastMonday.plusWeeks(1).atStartOfDay()
+        val to = lastMonday.plusWeeks(2).atStartOfDay()
+        val inShiftedWeek = jdbcTemplate.queryForList("select confirmed_at from seller_order", Timestamp::class.java)
+            .map { it!!.toLocalDateTime() }.count { !it.isBefore(from) && it.isBefore(to) }
+        assertEquals(3, inShiftedWeek)
     }
 
     @Test
-    fun 중간에_멈춘_묶음은_다음_실행에서_다시_만든다() {
+    fun 중간에_멈춘_묶음은_다음_실행에서_다시_만들고_남은_주문이_정산에_한_줄_더_들어간다() {
         settlementSeeder.seedLastWeek()
-        // 판매자 주문 1건만 지난주에 확정된 상태(나머지 둘은 앞선 주로 밀려 완성 판정에서 빠진다)를 흉내 낸다.
+        // 판매자 주문 1건(A)만 지난주에 확정된 상태(나머지 둘은 앞선 주로 밀려 완성 판정과 정산에서 빠진다)를 흉내 낸다.
         val keep = jdbcTemplate.queryForObject("select min(id) from seller_order", Long::class.java)!!
         jdbcTemplate.update("update seller_order set confirmed_at = confirmed_at - interval 14 day where id <> ?", keep)
 
         assertEquals(3, settlementSeeder.seedLastWeek().sellerOrders)
 
+        // 알려진 동작을 고정한다: 남은 A 가 새 묶음과 함께 들어가 표준 81,000원이 아니라 151,500원이 된다.
         val settlement = generateAndReadSellerSettlement()
-        val amounts = lineAmounts(settlement)
-        assertTrue(amounts.containsAll(listOf(70_500L, 13_500L, -3_000L)), "새 묶음의 세 라인: $amounts")
+        assertEquals(listOf(-3_000L, 13_500L, 70_500L, 70_500L), lineAmounts(settlement).sorted())
+        assertEquals(151_500L, settlement.get("totalAmount").asLong())
     }
 
     @Test
@@ -139,6 +147,38 @@ class DemoSettlementSeederTest : CommerceTestSupport() {
         assertEquals(25, onSaleTotal(seller))
     }
 
+    @Test
+    fun 준비가_안_됐으면_예외_없이_건너뛴다() {
+        val seller = demoLogin("seller@kairos.demo")
+        val productId = jdbcTemplate.queryForObject("select id from product where name like '정산 시연 상품 A-1%'", Long::class.java)!!
+        post("/api/v1/seller/products/$productId/end", seller).andExpect { status { isOk() } }
+
+        assertEquals(0, settlementSeeder.seedLastWeek().sellerOrders)
+
+        assertEquals(0, orderCount())
+    }
+
+    @Test
+    fun 시더가_실패해도_reseed는_200과_평소_본문을_돌려준다() {
+        // 재고를 0으로 만들어 주문 생성이 실패하게 한다(시더가 예외를 던지는 자연스러운 경로).
+        jdbcTemplate.update("update sku set stock = 0")
+        val admin = demoLogin("admin@kairos.demo")
+
+        val data = json(post("/api/v1/demo/reseed", admin).andExpect { status { isOk() } }).get("data")
+
+        for (field in listOf("members", "sellers", "brands", "categories", "products", "pendingReviews")) {
+            assertTrue(data.has(field), field)
+        }
+        assertEquals(0, orderCount())
+    }
+
+    @Test
+    fun demo_프로필이면_Clock_빈은_DemoShiftClock_하나다() {
+        val clocks = context.getBeansOfType(java.time.Clock::class.java)
+        assertEquals(1, clocks.size, "Clock 빈: ${clocks.keys}")
+        assertTrue(clocks.values.single() is DemoShiftClock)
+    }
+
     private fun generateAndReadSellerSettlement(): JsonNode {
         generationService.generate(lastMonday)
         val seller = demoLogin("seller@kairos.demo")
@@ -170,8 +210,11 @@ class DemoSettlementSeederTest : CommerceTestSupport() {
     }
 
     companion object {
-        private fun lastMondayKst(): LocalDate =
-            LocalDate.now(ZoneId.of("Asia/Seoul")).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1)
+        private fun lastMondayOf(today: LocalDate): LocalDate =
+            today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1)
+
+        /** 컨텍스트가 뜨기 전이라 주입된 시계를 쓸 수 없어 같은 KST 기준으로 구한다(인스턴스의 [lastMonday] 와 같은 값이어야 한다). */
+        private fun lastMondayKst(): LocalDate = lastMondayOf(LocalDate.now(ZoneId.of("Asia/Seoul")))
 
         @JvmStatic
         @DynamicPropertySource

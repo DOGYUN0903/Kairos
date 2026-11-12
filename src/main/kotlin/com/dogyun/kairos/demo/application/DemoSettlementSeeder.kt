@@ -4,6 +4,7 @@ import com.dogyun.kairos.benefit.application.CouponPolicyService
 import com.dogyun.kairos.benefit.application.CouponService
 import com.dogyun.kairos.benefit.application.CreateCouponPolicyCommand
 import com.dogyun.kairos.catalog.application.ProductQueryService
+import com.dogyun.kairos.catalog.application.SellerProductSummary
 import com.dogyun.kairos.common.security.SellerPrincipal
 import com.dogyun.kairos.member.application.MemberQueryService
 import com.dogyun.kairos.order.application.ConfirmPaymentCommand
@@ -20,6 +21,7 @@ import com.dogyun.kairos.order.application.RequestReturnCommand
 import com.dogyun.kairos.order.application.ShippingAddressCommand
 import com.dogyun.kairos.seller.application.SellerQueryService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import java.time.DayOfWeek
@@ -49,7 +51,11 @@ data class SeedResult(val sellerOrders: Int)
  * 멱등: **완성된 묶음** 기준이다. 지난주 안에 `confirmedAt` 이 있는 시연 구매자의 데모 판매자 주문이 3건 이상이면 건너뛴다.
  * `created_at`(JPA 감사 시각)은 실제 시각이라 판정에 쓰지 않는다. 중간에 멈춰 3건에 못 미친 묶음은 다음 실행(기동·`POST /demo/reseed`)에서
  * 새 묶음 3건으로 다시 만든다(멈춘 쪽에서 확정까지 간 주문이 있으면 정산에 한 줄 더 들어갈 수 있다 — 데모 데이터라 받아들인다).
- * 쿠폰 정책은 한 회원이 정책당 한 장만 받을 수 있으므로 주마다(실행마다) 새로 만든다(이름·유효기간이 그 주 월요일 기준).
+ * 쿠폰 정책은 한 회원이 정책당 한 장만 받을 수 있으므로 묶음을 새로 만드는 실행마다 정책을 새로 만든다(이름·유효기간이 그 주 월요일 기준).
+ * 이미 완성된 묶음이 있어 건너뛰는 실행은 정책도 만들지 않는다.
+ *
+ * 실제 PG 로는 만들지 않는다: `kairos.pg.provider` 가 mock 이 아니면(속성이 없으면 mock) 경고만 남기고 아무것도 만들지 않는다(가짜 paymentKey 를 실 PG 에 보내지 않기 위해).
+ * 데모 판매자·브랜드·시연 상품이 준비되지 않았을 때도 예외 대신 경고하고 건너뛴다. 기동·reseed 가 함께 쓰는 진입점은 [seedLastWeekQuietly] 다.
  *
  * 스케줄러와의 경합: demo 에서는 스케줄 작업이 켜져 있고 그 스레드는 실제 시각을 본다. 만드는 중인 지난주 주문(결제 대기, 배송 완료·반품 요청 직후)을
  * 만료·자동 확정·반품 자동 승인 작업이 밀리초 단위의 창에서 건드릴 수 있다. 그러면 이 시더의 다음 단계가 실패할 수 있고,
@@ -71,13 +77,30 @@ class DemoSettlementSeeder(
     private val orderShippingService: OrderShippingService,
     private val orderReturnService: OrderReturnService,
     private val orderQueryService: OrderQueryService,
+    @Value("\${kairos.pg.provider:mock}") private val pgProvider: String,
 ) {
+
+    /** [seedLastWeek] 를 부르되 실패는 잡아 경고만 남긴다(기동·`POST /demo/reseed` 가 함께 쓴다). 실패해도 0건으로 돌아온다. */
+    fun seedLastWeekQuietly(): SeedResult = try {
+        seedLastWeek()
+    } catch (e: Exception) {
+        log.warn(e) { "정산 시연 데이터 시드에 실패했지만 계속합니다. 다음 기동이나 POST /demo/reseed 에서 다시 만듭니다" }
+        SeedResult(0)
+    }
 
     @Synchronized
     fun seedLastWeek(): SeedResult {
-        val buyerId = requireNotNull(memberQueryService.findIdByEmail(DemoAccounts.SETTLEMENT_BUYER)) { "정산 시연 구매자가 없습니다(DemoSeeder 를 먼저 실행)" }
-        val sellerMemberId = requireNotNull(memberQueryService.findIdByEmail(DemoAccounts.SELLER)) { "데모 판매자가 없습니다" }
-        val seller = requireNotNull(sellerQueryService.findSnapshotByMemberId(sellerMemberId)) { "데모 판매자 정보가 없습니다" }
+        if (!pgProvider.equals("mock", ignoreCase = true)) {
+            log.warn { "PG 가 mock 이 아니어서(kairos.pg.provider=$pgProvider) 정산 시연 데이터를 만들지 않습니다" }
+            return SeedResult(0)
+        }
+        val buyerId = memberQueryService.findIdByEmail(DemoAccounts.SETTLEMENT_BUYER)
+        val sellerMemberId = memberQueryService.findIdByEmail(DemoAccounts.SELLER)
+        val seller = sellerMemberId?.let { sellerQueryService.findSnapshotByMemberId(it) }
+        if (buyerId == null || seller == null || !seller.canManage) {
+            log.warn { "정산 시연 구매자 또는 승인된 데모 판매자가 없어 정산 시연 데이터를 건너뜁니다" }
+            return SeedResult(0)
+        }
         val sellerPrincipal = SellerPrincipal(seller.sellerId, seller.memberId, seller.canManage, seller.canView)
 
         // 오늘은 주입된 시계로 읽는다(시더를 이 스레드에서 옮긴 시계 아래에서 부르면 그 시각 기준의 "지난주").
@@ -86,16 +109,23 @@ class DemoSettlementSeeder(
         val weekStart = lastMonday.atStartOfDay()
         val weekEnd = lastMonday.plusWeeks(1).atStartOfDay()
 
-        if (confirmedInWeek(buyerId, seller.sellerId, weekStart, weekEnd) >= BUNDLE_SIZE) {
+        val existing = confirmedInWeek(buyerId, seller.sellerId, weekStart, weekEnd)
+        if (existing >= BUNDLE_SIZE) {
             log.info { "지난주($lastMonday) 정산 시연 묶음이 이미 있어 건너뜁니다" }
             return SeedResult(0)
         }
+        if (existing > 0) {
+            log.warn { "지난주($lastMonday)에 확정된 시연 주문이 ${existing}건뿐인 미완성 묶음입니다. 새 묶음을 더 만들므로 지난주 정산 합계가 표준 81,000원과 달라집니다" }
+        }
 
-        val skus = DEMO_SETTLEMENT_PRODUCTS.map { spec -> stockedOf(sellerPrincipal, spec.name) }
-        val run = Run(buyerId, seller.sellerId, lastMonday)
-        run.seed(skus)
-        log.info { "지난주($lastMonday) 정산 시연 판매자 주문 $BUNDLE_SIZE 건을 만들었습니다" }
-        return SeedResult(BUNDLE_SIZE)
+        val stocked = stockedProducts(sellerPrincipal)
+        if (stocked == null) {
+            log.warn { "정산 시연 상품이 준비되지 않아 정산 시연 데이터를 건너뜁니다(DemoSeeder 를 먼저 실행)" }
+            return SeedResult(0)
+        }
+        val created = Run(buyerId, seller.sellerId, lastMonday).seed(stocked)
+        log.info { "지난주($lastMonday) 정산 시연 판매자 주문 ${created}건을 만들었습니다" }
+        return SeedResult(created)
     }
 
     private fun confirmedInWeek(buyerId: Long, sellerId: Long, from: LocalDateTime, to: LocalDateTime): Int {
@@ -107,11 +137,24 @@ class DemoSettlementSeeder(
         return count
     }
 
-    private fun stockedOf(seller: SellerPrincipal, productName: String): Stocked {
-        val summary = productQueryService.listMine(seller, null, 0, PRODUCT_PAGE).content
-            .firstOrNull { it.brandName == SETTLEMENT_DEMO_BRAND && it.name == productName && it.status == "ON_SALE" }
-            ?: error("정산 시연 상품이 없습니다: $productName(DemoSeeder 를 먼저 실행)")
-        return Stocked(summary.productId, productQueryService.getMine(seller, summary.productId).skus.first().skuId)
+    /** 시연 상품 5종을 [DEMO_SETTLEMENT_PRODUCTS] 순서대로 찾는다. 하나라도 없으면 null. 판매자 상품을 끝까지 넘겨 가며 찾는다. */
+    private fun stockedProducts(seller: SellerPrincipal): List<Stocked>? {
+        val onSale = listAllMine(seller).filter { it.brandName == SETTLEMENT_DEMO_BRAND && it.status == "ON_SALE" }.associateBy { it.name }
+        return DEMO_SETTLEMENT_PRODUCTS.map { spec ->
+            val summary = onSale[spec.name] ?: return null
+            val sku = productQueryService.getMine(seller, summary.productId).skus.firstOrNull() ?: return null
+            Stocked(summary.productId, sku.skuId)
+        }
+    }
+
+    private fun listAllMine(seller: SellerPrincipal): List<SellerProductSummary> {
+        val all = mutableListOf<SellerProductSummary>()
+        var page = 0
+        do {
+            val result = productQueryService.listMine(seller, null, page++, PRODUCT_PAGE)
+            all += result.content
+        } while (result.hasNext)
+        return all
     }
 
     /** 한 번의 시더 실행. 단계마다 시각을 10분씩 앞으로 옮긴다. */
@@ -125,8 +168,9 @@ class DemoSettlementSeeder(
             return clock.withShift(Duration.between(Instant.now(), target), block)
         }
 
-        fun seed(products: List<Stocked>) {
-                        val (sku50, sku30a, sku20, sku15, sku30c) = products.map { it.skuId }
+        /** 주문 A·B·C 를 만들고 만든 판매자 주문 수를 돌려준다. */
+        fun seed(products: List<Stocked>): Int {
+            val (sku50, sku30a, sku20, sku15, sku30c) = products.map { it.skuId }
             val couponId = step {
                 val policyId = couponPolicyService.createBySeller(sellerId, couponPolicy(products[0].productId))
                 couponService.claim(buyerId, policyId).couponId
@@ -148,6 +192,7 @@ class DemoSettlementSeeder(
             confirm(b)
             val cReturn = requestDefectiveReturn(c, sku30c)
             completeReturn(cReturn)
+            return listOf(a, b, c).size
         }
 
         private fun placeAndPay(items: List<Pair<Long, Int>>, coupons: List<ProductCouponCommand> = emptyList()): Placed {
