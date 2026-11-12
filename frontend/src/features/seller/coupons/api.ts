@@ -12,7 +12,7 @@ export type SellerPolicyPage = Omit<components["schemas"]["PageResponse"], "cont
 export type SellerProductPage = Omit<components["schemas"]["PageResponse"], "content"> & { content: SellerProductSummary[] };
 
 export const POLICY_PAGE_SIZE = 20;
-const PICKER_SIZE = 100;
+export const PICKER_SIZE = 100;
 
 export function useSellerPolicies(page: number) {
   const query = { page, size: POLICY_PAGE_SIZE };

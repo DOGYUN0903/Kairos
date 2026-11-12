@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Heart, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/auth/useAuth";
 import { useCartCount } from "@/features/cart/api";
 
@@ -67,7 +68,7 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
               )}
               {status === "authenticated" && (
                 <>
-                  <Link className={`${utilLink} flex-col gap-0.5 text-[11px]`} href="/my/likes">
+                  <Link className={cn(utilLink, "flex-col gap-0.5 text-[11px]")} href="/my/likes">
                     <Heart className="h-5 w-5" aria-hidden />
                     좋아요
                   </Link>

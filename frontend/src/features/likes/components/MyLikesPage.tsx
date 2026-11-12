@@ -40,7 +40,7 @@ function LikedCard({ product }: { product: LikedProduct }) {
         <Money value={product.salePrice} className="mt-1.5 block text-[15px] font-bold" />
       </div>
       <div className="absolute right-2 top-2">
-        <LikeButton productId={product.productId} liked />
+        <LikeButton productId={product.productId} liked tone="navy" label={`${product.name} 좋아요 취소`} />
       </div>
     </li>
   );
@@ -57,7 +57,7 @@ export function MyLikesPage() {
 
   return (
     <div>
-      <MyPageHead title="좋아요" aside={<span className="text-xs text-text-3">판매가만 보입니다</span>} />
+      <MyPageHead title="좋아요" />
       {q.isError && !data ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : !data ? (

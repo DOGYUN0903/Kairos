@@ -54,7 +54,7 @@ describe("ReviewFormDialog", () => {
 
     resolveUpload({ fileId: 11, url: "https://img/11.png" });
     await waitFor(() => expect(screen.getByRole("button", { name: "후기 등록" })).toBeEnabled());
-    expect(screen.getByRole("button", { name: "사진 삭제" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "사진 1 삭제" })).toBeInTheDocument();
   });
 
   it("이미_작성한_후기면_창을_닫고_주문_상세를_다시_읽는다", async () => {

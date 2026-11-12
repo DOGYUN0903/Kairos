@@ -3,7 +3,7 @@
 import { useFormContext } from "react-hook-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PolicyFormInput } from "@/features/coupon-policies/schema";
-import { useOnSaleProductsForPicker } from "@/features/seller/coupons/api";
+import { PICKER_SIZE, useOnSaleProductsForPicker } from "@/features/seller/coupons/api";
 
 /** "상품 하나" 쿠폰의 대상 상품 선택 상자(판매 중인 내 상품). PolicyFormDialog 의 폼 컨텍스트 안에서만 쓴다. */
 export function ProductPicker() {
@@ -38,6 +38,7 @@ export function ProductPicker() {
           ))}
         </select>
       )}
+      {(q.data?.totalElements ?? 0) > PICKER_SIZE && <p className="hint">판매 중인 상품이 많아 최근 100개만 표시합니다.</p>}
       {error ? (
         <span id="pf-product-err" role="alert" className="field-error">
           {error}

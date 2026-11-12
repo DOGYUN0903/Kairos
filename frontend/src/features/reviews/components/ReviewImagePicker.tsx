@@ -75,7 +75,7 @@ export function ReviewImagePicker({ value, onChange, onBusyChange, disabled }: {
             <img src={img.url} alt={`후기 사진 ${i + 1}`} className="h-full w-full object-cover" />
             <button
               type="button"
-              aria-label="사진 삭제"
+              aria-label={`사진 ${i + 1} 삭제`}
               disabled={disabled}
               onClick={() => onChange(value.filter((v) => v.fileId !== img.fileId))}
               className="absolute right-1 top-1 grid h-[22px] w-[22px] place-items-center rounded-full bg-navy/75 text-white"
