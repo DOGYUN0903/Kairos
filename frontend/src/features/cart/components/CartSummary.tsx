@@ -57,12 +57,14 @@ export function CartSummary({ selectedIds, quote, stale, error, onRetry }: Props
           </div>
         ))}
       </dl>
-      <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4 font-bold">
-        <span>결제 예정 금액</span>
-        <strong className="text-2xl tracking-tight">
-          {calculating ? <Pending className="w-24" /> : <Money value={shown?.totalAmount ?? 0} />}
-        </strong>
-      </div>
+      <dl className="mt-4 flex items-baseline justify-between border-t border-border pt-4 font-bold">
+        <dt>결제 예정 금액</dt>
+        <dd>
+          <strong className="text-2xl tracking-tight">
+            {calculating ? <Pending className="w-24" /> : <Money value={shown?.totalAmount ?? 0} />}
+          </strong>
+        </dd>
+      </dl>
 
       {calculating && (
         <div aria-hidden className="mt-4 h-[44px] rounded bg-surface" />

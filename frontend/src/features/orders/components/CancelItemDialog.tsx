@@ -58,12 +58,15 @@ function RefundPreview({ preview }: { preview: ReturnType<typeof useCancelPrevie
             </div>
           ))}
         </dl>
-        <div className="mt-3 flex items-baseline justify-between border-t border-border pt-3 font-bold">
-          <span>환불 예정 금액</span>
-          <strong className="text-xl tracking-tight">
-            <Money value={preview.data.refundAmount} />
-          </strong>
-        </div>
+        {/* 라벨과 값을 dt/dd 로 묶어 둔다(보조 기술과 E2E 가 값을 라벨로 찾는다). */}
+        <dl className="mt-3 flex items-baseline justify-between border-t border-border pt-3 font-bold">
+          <dt>환불 예정 금액</dt>
+          <dd>
+            <strong className="text-xl tracking-tight">
+              <Money value={preview.data.refundAmount} />
+            </strong>
+          </dd>
+        </dl>
       </div>
       {preview.data.shippingFeeDeducted > 0 && <p className="-mt-2 text-[13px] text-text-2">무료배송 기준 금액 아래로 내려가 배송비가 차감됩니다.</p>}
     </>

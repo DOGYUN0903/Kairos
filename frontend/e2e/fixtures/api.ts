@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 /** 백엔드를 직접 부른다(Bearer). 화면이 검증 대상이 아닌 준비·정리 단계에만 쓴다. */
 export const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8080";
@@ -213,6 +213,15 @@ export async function changeSalePrice(request: APIRequestContext, sellerToken: s
 }
 
 /** 주문서의 배송지 칸을 직접 입력으로 채운다. */
+/**
+ * 라벨(dt) 바로 다음의 값(dd). 금액은 이 값 노드에 toHaveText(글자 전체 일치)로 단언한다.
+ * 부모 요소에 toContainText("27,000원") 을 쓰면 127,000원도 통과한다.
+ */
+export function valueOf(scope: Page | Locator, label: string): Locator {
+  const exact = new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
+  return scope.locator("dt").filter({ hasText: exact }).locator("xpath=following-sibling::dd[1]");
+}
+
 export async function fillShippingAddress(page: Page) {
   await page.getByLabel(/^수령인/).fill("홍길동");
   await page.getByLabel(/^연락처/).fill("010-1234-5678");

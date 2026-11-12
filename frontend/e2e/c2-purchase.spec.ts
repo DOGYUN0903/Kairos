@@ -11,6 +11,7 @@ import {
   requireAdmin,
   uiLogin,
   uniq,
+  valueOf,
 } from "./fixtures/api";
 
 test.skip(() => requireAdmin() !== null, requireAdmin() ?? "");
@@ -43,10 +44,12 @@ test("장바구니 두 판매자 묶음을 한 번에 주문하고 결제·발�
     await page.goto("/cart");
     await expect(page.getByRole("region", { name: /상품$/ })).toHaveCount(2);
     const summary = page.getByRole("complementary", { name: "결제 예정 금액" });
-    await expect(summary.getByText("46,000원")).toBeVisible();
-    await expect(summary.getByText("3,000원")).toHaveCount(2);
-    await expect(summary.getByText("10,000원")).toBeVisible();
-    await expect(summary.getByText("더 담으면 무료배송")).toBeVisible();
+    // 금액은 글자 전체로 단언한다("3,000원" 부분 일치는 13,000원·33,000원도 통과한다).
+    await expect(valueOf(summary, "상품 금액")).toHaveText("40,000원");
+    await expect(valueOf(summary, "배송비")).toHaveText("6,000원");
+    await expect(summary.getByText("3,000원", { exact: true })).toHaveCount(2);
+    await expect(valueOf(summary, "결제 예정 금액")).toHaveText("46,000원");
+    await expect(summary.getByText("더 담으면 무료배송")).toHaveText("10,000원 더 담으면 무료배송");
     await summary.getByRole("link", { name: /주문하기/ }).click();
   });
 

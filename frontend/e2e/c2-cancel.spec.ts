@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { adminToken, asUser, createSellerWithProduct, createUser, placePaidOrderApi, requireAdmin, uiLogin, uniq } from "./fixtures/api";
+import { adminToken, asUser, createSellerWithProduct, createUser, placePaidOrderApi, requireAdmin, uiLogin, uniq, valueOf } from "./fixtures/api";
 
 test.skip(() => requireAdmin() !== null, requireAdmin() ?? "");
 
@@ -27,31 +27,34 @@ test("구매자가 항목을 하나씩 취소하면 배송비 차감 안내와 �
   await page.goto(`/my/orders/${order.orderId}`);
 
   const summary = page.getByRole("region", { name: "결제 요약" });
-  await expect(summary.getByText("60,000원").first()).toBeVisible();
+  // 금액은 값 노드의 글자 전체로 단언한다(− 는 U+2212).
+  await expect(valueOf(summary, "상품 금액")).toHaveText("60,000원");
+  await expect(valueOf(summary, "결제 금액")).toHaveText("60,000원");
 
   await test.step("C 항목 취소: 배송비 3,000원 차감, 환불 27,000원", async () => {
     const card = page.getByRole("region", { name: /E2E 판매자C .* 주문/ });
     await card.getByRole("button", { name: "취소", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "주문 항목 취소" });
-    await expect(dialog.getByText("배송비 차감", { exact: true }).locator("..")).toContainText("3,000원");
-    await expect(dialog.getByText("환불 예정 금액", { exact: true }).locator("..")).toContainText("27,000원");
+    await expect(valueOf(dialog, "항목 금액")).toHaveText("30,000원");
+    await expect(valueOf(dialog, "배송비 차감")).toHaveText("−3,000원");
+    await expect(valueOf(dialog, "환불 예정 금액")).toHaveText("27,000원");
     await dialog.getByLabel(/취소 사유/).fill("단순 변심");
     await dialog.getByRole("button", { name: "취소하기" }).click();
     await expect(dialog).toBeHidden();
     await expect(card.getByText("취소", { exact: true })).toBeVisible();
-    await expect(summary.getByText("환불 금액", { exact: true }).locator("..")).toContainText("27,000원");
+    await expect(valueOf(summary, "환불 금액")).toHaveText("−27,000원");
   });
 
   await test.step("B 항목 취소: 차감분이 돌아와 환불 33,000원, 주문 취소, 환불 합계 60,000원", async () => {
     const card = page.getByRole("region", { name: /E2E 판매자B .* 주문/ });
     await card.getByRole("button", { name: "취소", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "주문 항목 취소" });
-    await expect(dialog.getByText("환불 예정 금액", { exact: true }).locator("..")).toContainText("33,000원");
+    await expect(valueOf(dialog, "환불 예정 금액")).toHaveText("33,000원");
     await dialog.getByLabel(/취소 사유/).fill("단순 변심");
     await dialog.getByRole("button", { name: "취소하기" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("heading", { name: "취소", exact: true })).toBeVisible();
-    await expect(summary.getByText("환불 금액", { exact: true }).locator("..")).toContainText("60,000원");
+    await expect(valueOf(summary, "환불 금액")).toHaveText("−60,000원");
   });
   void run;
 });
@@ -75,8 +78,8 @@ test("판매자가 배송 전 항목을 취소하면 배송비 차감 없이 전
   await loginBuyer(page, buyer.email, buyer.password);
   await page.goto(`/my/orders/${order.orderId}`);
   const summary = page.getByRole("region", { name: "결제 요약" });
-  await expect(summary.getByText("환불 금액", { exact: true }).locator("..")).toContainText("30,000원");
+  await expect(valueOf(summary, "환불 금액")).toHaveText("−30,000원");
   await expect(summary.getByText("무료배송 기준 미달로 차감된 배송비")).toHaveCount(0);
   const card = page.getByRole("region", { name: /E2E 판매자B .* 주문/ });
-  await expect(card.getByText("환불 30,000원")).toBeVisible();
+  await expect(card.getByText(/^환불 /)).toHaveText("환불 30,000원");
 });
