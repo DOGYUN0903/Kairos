@@ -2815,6 +2815,11 @@ export interface components {
             /** @description 답글 내용(공백 불가, 최대 500자) */
             content: string;
         };
+        ReviewImage: {
+            /** Format: int64 */
+            fileId: number;
+            url: string;
+        };
         ReviewResult: {
             /** Format: int64 */
             reviewId: number;
@@ -2826,6 +2831,8 @@ export interface components {
             rating: number;
             content: string;
             imageUrls: string[];
+            /** @description `imageUrls` 와 같은 순서. 수정 시 `fileId` 를 `imageFileIds` 로 그대로 보내면 사진이 유지된다. */
+            images: components["schemas"]["ReviewImage"][];
             /** @description 마스킹한 작성자 이름(예 `김**`) */
             writerName: string;
             replyContent?: string | null;
@@ -3754,6 +3761,8 @@ export interface components {
             status: "ACTIVE" | "ENDED";
             /** @description 내가 이미 받았는지(관리자·판매자 목록에서는 항상 false) */
             claimed: boolean;
+            /** @description `targetType=PRODUCT` 일 때 대상 상품 이름. 다른 대상 유형이거나 상품이 삭제됐으면 null */
+            targetProductName?: string | null;
         };
         CouponResult: {
             /** Format: int64 */

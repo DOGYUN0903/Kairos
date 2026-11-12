@@ -4,6 +4,8 @@ import java.time.LocalDateTime
 
 data class WriteReviewResult(val reviewId: Long, val rewardPoints: Long)
 
+data class ReviewImageResult(val fileId: Long, val url: String)
+
 data class ReviewResult(
     val reviewId: Long,
     val orderItemId: Long,
@@ -12,6 +14,7 @@ data class ReviewResult(
     val rating: Int,
     val content: String,
     val imageUrls: List<String>,
+    val images: List<ReviewImageResult>,
     val writerName: String,
     val replyContent: String?,
     val repliedAt: LocalDateTime?,

@@ -21,6 +21,8 @@ data class CouponPolicyResult(
     val validUntil: LocalDateTime,
     val status: String,
     val claimed: Boolean,
+    /** `targetType=PRODUCT` 인 정책의 대상 상품 이름. 상품이 삭제됐으면 null. */
+    val targetProductName: String?,
 )
 
 data class CouponResult(
@@ -41,7 +43,7 @@ data class CouponResult(
 
 data class ClaimedCoupon(val couponId: Long, val expiresAt: LocalDateTime)
 
-internal fun CouponPolicy.toResult(claimed: Boolean) = CouponPolicyResult(
+internal fun CouponPolicy.toResult(claimed: Boolean, targetProductName: String? = null) = CouponPolicyResult(
     policyId = requireNotNull(id),
     name = name,
     issuerType = issuerType.name,
@@ -59,6 +61,7 @@ internal fun CouponPolicy.toResult(claimed: Boolean) = CouponPolicyResult(
     validUntil = validUntil,
     status = status.name,
     claimed = claimed,
+    targetProductName = targetProductName,
 )
 
 /** 주문에 쓸 쿠폰의 할인 조건(정책 값). 금액은 원, 정률은 bp. */

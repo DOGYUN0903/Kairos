@@ -5785,9 +5785,18 @@ components:
           type: string
           maxLength: 500
           description: 답글 내용(공백 불가, 최대 500자)
+    ReviewImage:
+      type: object
+      required: [fileId, url]
+      properties:
+        fileId:
+          type: integer
+          format: int64
+        url:
+          type: string
     ReviewResult:
       type: object
-      required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, writerName, rewardPoints, createdAt, modifiedAt]
+      required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, images, writerName, rewardPoints, createdAt, modifiedAt]
       properties:
         reviewId:
           type: integer
@@ -5808,6 +5817,11 @@ components:
           type: array
           items:
             type: string
+        images:
+          type: array
+          description: "`imageUrls` 와 같은 순서. 수정 시 `fileId` 를 `imageFileIds` 로 그대로 보내면 사진이 유지된다."
+          items:
+            $ref: '#/components/schemas/ReviewImage'
         writerName:
           type: string
           description: 마스킹한 작성자 이름(예 `김**`)
@@ -7239,6 +7253,9 @@ components:
         claimed:
           type: boolean
           description: 내가 이미 받았는지(관리자·판매자 목록에서는 항상 false)
+        targetProductName:
+          type: [string, 'null']
+          description: "`targetType=PRODUCT` 일 때 대상 상품 이름. 다른 대상 유형이거나 상품이 삭제됐으면 null"
     CouponResult:
       type: object
       required: [couponId, policyId, name, couponType, discountType, discountValue, status, issuedAt, expiresAt]

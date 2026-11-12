@@ -134,6 +134,34 @@ class CouponApiTest : CommerceTestSupport() {
         postIdem("/api/v1/coupons/policies/$platform/claim", user, null).expectCode(409, "COUPON_POLICY_ENDED")
     }
 
+    private fun names(content: JsonNode): Map<Long, String?> =
+        (0 until content.size()).associate {
+            content.get(it).get("policyId").asLong() to content.get(it).get("targetProductName").takeIf { n -> n != null && !n.isNull }?.asString()
+        }
+
+    @Test
+    fun 상품_하나_대상_정책에는_대상_상품_이름이_있다() {
+        val shop = shop()
+        val admin = adminCouponPolicy(couponPolicyBody(targetType = "PRODUCT", targetProductId = shop.productId))
+        val seller = sellerCouponPolicy(shop.sellerToken, couponPolicyBody(targetType = "PRODUCT", targetProductId = shop.productId))
+        val user = newUserToken()
+
+        assertEquals("티셔츠", names(content("/api/v1/coupons/policies?productId=${shop.productId}", user))[seller])
+        assertEquals("티셔츠", names(content("/api/v1/seller/coupons/policies", shop.sellerToken))[seller])
+        assertEquals("티셔츠", names(content("/api/v1/admin/coupons/policies", adminToken()))[admin])
+    }
+
+    @Test
+    fun 다른_대상_유형은_targetProductName이_null이다() {
+        val shop = shop()
+        val sellerWide = sellerCouponPolicy(shop.sellerToken, couponPolicyBody(targetType = "SELLER"))
+        val all = adminCouponPolicy(couponPolicyBody())
+
+        val listed = content("/api/v1/seller/coupons/policies", shop.sellerToken)
+        assertEquals(mapOf(sellerWide to null), names(listed))
+        assertEquals(mapOf(all to null), names(content("/api/v1/admin/coupons/policies", adminToken())))
+    }
+
     private fun approvedOtherSellerToken(): String = newUserToken().also { approvedSeller(it) }
 
     @Test

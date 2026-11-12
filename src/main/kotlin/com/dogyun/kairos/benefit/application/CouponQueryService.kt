@@ -24,8 +24,9 @@ class CouponQueryService(
         val ref = productId?.let { productReader.findProduct(it) ?: throw DomainException(ErrorCode.PRODUCT_NOT_FOUND) }
         val result = policyRepository.findClaimable(ref?.productId, ref?.sellerId, LocalDateTime.now(clock), checkedPage(page), checkedSize(size))
         val claimed = couponRepository.findClaimedPolicyIds(memberId, result.content.mapNotNull { it.id })
+        val names = productReader.policyProductNames(result.content)
         return PageResult(
-            result.content.map { it.toResult(it.id in claimed) },
+            result.content.map { it.toResult(it.id in claimed, it.targetProductId?.let(names::get)) },
             result.page, result.size, result.totalElements, result.totalPages, result.hasNext,
         )
     }

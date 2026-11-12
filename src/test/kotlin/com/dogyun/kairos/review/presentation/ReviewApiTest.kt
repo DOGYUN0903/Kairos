@@ -237,4 +237,57 @@ class ReviewApiTest : CommerceTestSupport() {
         assertEquals("김**", review.get("writerName").asString())
         assertEquals("티셔츠", review.get("productName").asString())
     }
+
+    @Test
+    fun 후기_응답에_이미지_파일_ID가_순서대로_있다() {
+        val shop = shop()
+        val user = newUserToken()
+        val item = confirmedItems(user, shop).single()
+        val (a, b) = listOf(uploadImage(user), uploadImage(user))
+        writeReview(user, item.orderId, item.orderItemId, imageFileIds = listOf(a, b))
+
+        val review = productReviews(shop.productId).get(0)
+
+        val images = review.get("images")
+        assertEquals(listOf(a, b), (0 until images.size()).map { images.get(it).get("fileId").asLong() })
+        val urls = (0 until images.size()).map { images.get(it).get("url").asString() }
+        assertEquals(urls, (0 until review.get("imageUrls").size()).map { review.get("imageUrls").get(it).asString() })
+        assertEquals(2, urls.size)
+    }
+
+    @Test
+    fun 사진_없는_후기의_images는_빈_배열이다() {
+        val shop = shop()
+        val user = newUserToken()
+        val item = confirmedItems(user, shop).single()
+        writeReview(user, item.orderId, item.orderItemId)
+
+        val review = productReviews(shop.productId).get(0)
+
+        assertEquals(true, review.get("images").isArray)
+        assertEquals(0, review.get("images").size())
+    }
+
+    @Test
+    fun 받은_fileId로_수정하면_사진이_유지된다() {
+        val shop = shop()
+        val user = newUserToken()
+        val item = confirmedItems(user, shop).single()
+        val (a, b) = listOf(uploadImage(user), uploadImage(user))
+        val reviewId = writeReview(user, item.orderId, item.orderItemId, imageFileIds = listOf(a, b))
+        fun mine() = json(get("/api/v1/reviews/me", user).andExpect { status { isOk() } }).get("data").get("content").get(0)
+        val before = mine().get("images")
+        val ids = (0 until before.size()).map { before.get(it).get("fileId").asLong() }
+
+        patch("/api/v1/reviews/$reviewId", user, mapOf("rating" to 4, "content" to "사진을 그대로 둔 열 글자 이상 본문", "imageFileIds" to ids))
+            .andExpect { status { isOk() } }
+
+        val after = mine().get("images")
+        assertEquals(ids, (0 until after.size()).map { after.get(it).get("fileId").asLong() })
+        assertEquals(listOf(a, b), ids)
+        assertEquals(
+            (0 until before.size()).map { before.get(it).get("url").asString() },
+            (0 until after.size()).map { after.get(it).get("url").asString() },
+        )
+    }
 }
