@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCategories, useProduct, type ProductDetail } from "@/features/catalog/api";
 import { findCategoryPath } from "@/features/catalog/category-path";
 import { AddToCartButtons } from "@/features/cart/components/AddToCartButtons";
+import { ProductCouponSection } from "@/features/coupons/components/ProductCouponSection";
 import { LikeButton } from "@/features/catalog/components/LikeButton";
 import { OptionSelector } from "@/features/catalog/components/OptionSelector";
 import { ProductGallery } from "@/features/catalog/components/ProductGallery";
@@ -98,6 +99,8 @@ function PurchasePanel({ product }: { product: ProductDetail }) {
           <Money value={product.salePrice} className="text-2xl font-bold" />
         </div>
       </div>
+
+      <ProductCouponSection productId={product.productId} />
 
       {product.soldOut && (
         <p role="status" className="notice notice-warn mt-4">
