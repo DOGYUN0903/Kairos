@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { percentToBp, amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, formatPoints, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
+import { percentToBp, amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, formatPoints, lineTotal, mod, unitPrice, parseWon, signedAmount, formatSignedKrw, formatKrwMinus } from "@/lib/money";
 
 describe("money", () => {
   it("formatPoints는_17700을_17_700P로_만든다", () => {
@@ -91,5 +91,30 @@ describe("ratingFillPercent", () => {
     expect(ratingFillPercent(7)).toBe(100);
     expect(ratingFillPercent(-1)).toBe(0);
     expect(ratingFillPercent(Number.NaN)).toBe(0);
+  });
+});
+
+describe("F4 부호 표기", () => {
+  it("signedAmount는_SUBTRACT면_음수", () => {
+    expect(signedAmount("SUBTRACT", 10000)).toBe(-10000);
+    expect(signedAmount("ADD", 10000)).toBe(10000);
+  });
+  it("signedAmount는_양의_안전_정수가_아니면_던진다", () => {
+    for (const bad of [0, -5, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => signedAmount("ADD", bad)).toThrow();
+      expect(() => signedAmount("SUBTRACT", bad)).toThrow();
+    }
+  });
+  it("formatSignedKrw", () => {
+    expect(formatSignedKrw(3000)).toBe("+3,000원");
+    expect(formatSignedKrw(-3000)).toBe("\u22123,000원");
+    expect(formatSignedKrw(0)).toBe("0원");
+    expect(formatSignedKrw(-0)).toBe("0원");
+  });
+  it("formatKrwMinus", () => {
+    expect(formatKrwMinus(70500)).toBe("70,500원");
+    expect(formatKrwMinus(-3000)).toBe("\u22123,000원");
+    expect(formatKrwMinus(0)).toBe("0원");
+    expect(formatKrwMinus(-0)).toBe("0원");
   });
 });

@@ -21,10 +21,11 @@ const fullNav = (shipBadge: number | undefined): NavItem[] => [
   { href: "/seller", label: "대시보드" },
   { href: "/seller/products", label: "상품 관리" },
   { href: "/seller/orders", label: "주문 관리", ...(shipBadge ? { badge: shipBadge } : {}) },
+  { href: "/seller/returns", label: "반품 관리" },
   { href: "/seller/brands", label: "브랜드" },
   { href: "/seller/coupons", label: "쿠폰 관리" },
   { href: "/seller/reviews", label: "후기 관리" },
-  { href: "/seller/settlements", label: "정산", disabled: true, soonLabel: "준비 중" },
+  { href: "/seller/settlements", label: "정산" },
 ];
 // 미신청·심사 중·반려에서는 시안대로 "대시보드"만 보인다.
 const LIMITED_NAV: NavItem[] = [{ href: "/seller", label: "대시보드" }];

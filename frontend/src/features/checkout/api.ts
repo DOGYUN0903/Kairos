@@ -46,7 +46,8 @@ export function useCreateOrder() {
     void qc.invalidateQueries({ queryKey: queryKeys.orders.root });
     // 쿠폰은 사용 처리되고 포인트는 차감된다. 장바구니는 서버가 비웠을 수 있고, 캐시된 견적은 쓴 쿠폰을 아직 쓸 수 있다고 보일 수 있다.
     void qc.invalidateQueries({ queryKey: queryKeys.cart });
-    void qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes });
+    // 견적은 낡은 것으로만 표시한다: 화면에 붙어 있는 견적 조회가 지금 다시 요청하면 이미 끝난 장바구니로 409 를 받는다(견적은 staleTime 0 이라 주문서를 다시 열면 새로 받는다).
+    void qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes, refetchType: "none" });
     void qc.invalidateQueries({ queryKey: queryKeys.coupons.mineRoot });
     void qc.invalidateQueries({ queryKey: queryKeys.points.root });
     return res;

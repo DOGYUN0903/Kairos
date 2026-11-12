@@ -6,6 +6,8 @@ export function sellerTitleOf(pathname: string): string {
   if (pathname.startsWith("/seller/brands")) return "브랜드";
   if (pathname.startsWith("/seller/coupons")) return "쿠폰 관리";
   if (pathname.startsWith("/seller/reviews")) return "후기 관리";
+  if (pathname.startsWith("/seller/returns")) return "반품 관리";
+  if (pathname.startsWith("/seller/settlements")) return "정산";
   return "대시보드";
 }
 
@@ -13,5 +15,8 @@ export function sellerTitleOf(pathname: string): string {
 export function adminTitleOf(pathname: string): string | undefined {
   if (pathname.startsWith("/admin/coupons")) return "쿠폰 관리";
   if (pathname.startsWith("/admin/members/points")) return "회원 포인트";
+  if (pathname.startsWith("/admin/returns")) return "반품";
+  if (pathname.startsWith("/admin/settlements/adjustments")) return "정산 조정";
+  if (pathname.startsWith("/admin/settlements")) return "정산";
   return undefined;
 }

@@ -96,3 +96,27 @@ export function ratingFillPercent(rating: number): number {
   const tenths = Math.round(Math.min(Math.max(rating, 0), 5) * 10);
   return floorDiv(tenths * 100, 50);
 }
+
+/** 조정·차감 금액에 부호를 붙인다(양의 안전 정수만). SUBTRACT 면 음수. */
+export function signedAmount(kind: "ADD" | "SUBTRACT", amount: number): number {
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error(`금액은 양의 안전 정수여야 합니다: ${amount}`);
+  return kind === "SUBTRACT" ? -amount : amount;
+}
+
+const MINUS = "\u2212";
+
+/** 부호 표기: 3000 → "+3,000원", -3000 → "−3,000원"(U+2212), 0 → "0원". */
+export function formatSignedKrw(n: number): string {
+  const v = assertSafeInt(n);
+  if (Number.isNaN(v)) return "금액 오류";
+  if (v === 0) return "0원";
+  return v > 0 ? `+${krw.format(v)}원` : `${MINUS}${krw.format(-v)}원`;
+}
+
+/** 정산 표용: 양수·0 은 formatKrw 그대로, 음수는 U+2212 로 "−3,000원". */
+export function formatKrwMinus(n: number): string {
+  const v = assertSafeInt(n);
+  if (Number.isNaN(v)) return "금액 오류";
+  if (v === 0) return "0원";
+  return v > 0 ? formatKrw(v) : `${MINUS}${krw.format(-v)}원`;
+}

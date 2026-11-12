@@ -89,5 +89,32 @@ export const queryKeys = {
     lists: ["adminCoupons", "list"] as const,
     list: (params?: Params) => ["adminCoupons", "list", params ?? {}] as const,
   },
+  returns: {
+    root: ["returns"] as const,
+    mine: (params?: Params) => ["returns", "mine", params ?? {}] as const,
+    detail: (id: number) => ["returns", "detail", id] as const,
+    preview: (orderId: number, itemId: number, reason: string) => ["returns", "preview", orderId, itemId, reason] as const,
+  },
+  sellerReturns: {
+    lists: ["sellerReturns", "list"] as const,
+    list: (params?: Params) => ["sellerReturns", "list", params ?? {}] as const,
+    detail: (id: number) => ["sellerReturns", "detail", id] as const,
+  },
+  adminReturns: {
+    lists: ["adminReturns", "list"] as const,
+    list: (params?: Params) => ["adminReturns", "list", params ?? {}] as const,
+    detail: (id: number) => ["adminReturns", "detail", id] as const,
+  },
+  sellerSettlements: {
+    lists: ["sellerSettlements", "list"] as const,
+    list: (params?: Params) => ["sellerSettlements", "list", params ?? {}] as const,
+    detail: (id: number) => ["sellerSettlements", "detail", id] as const,
+  },
+  adminSettlements: {
+    lists: ["adminSettlements", "list"] as const,
+    list: (params?: Params) => ["adminSettlements", "list", params ?? {}] as const,
+    detail: (id: number) => ["adminSettlements", "detail", id] as const,
+  },
+  adminAdjustments: (sellerId: number) => ["adminAdjustments", sellerId] as const,
   adminMemberPoints: (memberId: number, params?: Params) => ["adminMemberPoints", memberId, params ?? {}] as const,
 } as const;
