@@ -13,11 +13,14 @@ import { OrderItemRow } from "@/features/orders/components/OrderItemRow";
 export function SellerOrderCard({
   sellerOrder,
   renderItemAction,
+  renderItemNote,
   shipAction,
   footer,
 }: {
   sellerOrder: SellerOrderResult;
   renderItemAction?: (item: OrderItemResult) => ReactNode;
+  /** 항목 상태 칩 아래 보조 문구(구매자 주문 상세의 후기 상태 등). */
+  renderItemNote?: (item: OrderItemResult) => ReactNode;
   shipAction?: ReactNode;
   footer?: ReactNode;
 }) {
@@ -51,7 +54,7 @@ export function SellerOrderCard({
         </div>
       )}
       {sellerOrder.items.map((item) => (
-        <OrderItemRow key={item.orderItemId} item={item} action={renderItemAction?.(item)} />
+        <OrderItemRow key={item.orderItemId} item={item} action={renderItemAction?.(item)} note={renderItemNote?.(item)} />
       ))}
       <div className="flex items-center justify-end gap-5 border-t border-border px-5 py-3.5 text-[13px] text-text-2">
         <span>

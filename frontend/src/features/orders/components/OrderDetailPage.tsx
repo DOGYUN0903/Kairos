@@ -14,6 +14,7 @@ import { ConfirmPurchaseButton } from "@/features/orders/components/ConfirmPurch
 import { OrderStatusHeader } from "@/features/orders/components/OrderStatusHeader";
 import { PaymentSummaryCard } from "@/features/orders/components/PaymentSummaryCard";
 import { SellerOrderCard } from "@/features/orders/components/SellerOrderCard";
+import { OrderItemReviewAction, OrderItemReviewNote } from "@/features/reviews/components/OrderItemReviewAction";
 import { ShippingAddressCard } from "@/features/orders/components/ShippingAddressCard";
 import { expiredRecheckInterval, isPastExpiry, shouldRefetchAtExpiry } from "@/features/orders/expiry";
 import { secondsUntilKst } from "@/lib/datetime";
@@ -85,8 +86,11 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTarget(item)}>
                         취소
                       </button>
-                    ) : null
+                    ) : (
+                      <OrderItemReviewAction orderId={orderId} item={item} />
+                    )
                   }
+                  renderItemNote={(item) => <OrderItemReviewNote item={item} />}
                 />
               ))}
             </div>

@@ -86,3 +86,13 @@ export function percentToBp(percent: number): number {
   }
   return percent * 100;
 }
+
+/**
+ * 평균 별점(0~5, 서버 값 소수 한 자리)을 별 채움 너비 %(0~100 정수)로. 4.6 → 92.
+ * 소수 한 자리로 반올림해 10배 한 값 × 2(= 100 ÷ 5 ÷ 0.1 → 정수) 이므로 나눗셈 없이 곱셈으로 끝난다.
+ */
+export function ratingFillPercent(rating: number): number {
+  if (!Number.isFinite(rating)) return 0;
+  const tenths = Math.round(Math.min(Math.max(rating, 0), 5) * 10);
+  return floorDiv(tenths * 100, 50);
+}
