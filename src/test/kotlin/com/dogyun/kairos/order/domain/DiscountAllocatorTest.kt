@@ -263,4 +263,18 @@ class DiscountAllocatorTest {
         assertEquals(false, noSeller.appliesTo(productId = 1021, sellerId = 2))
         assertEquals(false, noProduct.appliesTo(productId = 1021, sellerId = 2))
     }
+
+    @Test
+    fun 잔액이_최소_사용_잔액_미만이면_요청_포인트가_잔액보다_커도_POINT_EXCEEDS_LIMIT() {
+        // 잔액 부족(POINT_INSUFFICIENT)보다 최소 잔액 미달이 먼저 판정된다.
+        assertCode(ErrorCode.POINT_EXCEEDS_LIMIT) { DiscountAllocator.allocate(listOf(b1), emptyMap(), null, 5_000, 999, policy) }
+    }
+
+    @Test
+    fun 쿠폰_적용_후_금액이_0이면_요청_포인트가_잔액보다_커도_POINT_EXCEEDS_LIMIT() {
+        val full = productCoupon(1, CouponIssuer.PLATFORM, CouponDiscountType.FIXED, 30_000)
+        assertCode(ErrorCode.POINT_EXCEEDS_LIMIT) {
+            DiscountAllocator.allocate(listOf(b1), mapOf(21L to full), null, 5_000, 2_000, policy)
+        }
+    }
 }
