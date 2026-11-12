@@ -2,6 +2,7 @@ package com.dogyun.kairos.order.application
 
 import com.dogyun.kairos.common.application.InlineTransactionRunner
 import com.dogyun.kairos.order.domain.Order
+import com.dogyun.kairos.order.domain.PointUsePolicy
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -24,12 +25,13 @@ class ReturnQueryServiceTest {
     private val sellerReader = FakeSellerReader()
     private val stockManager = FakeStockManager()
     private val paymentGateway = FakePaymentGateway()
+    private val benefitApplier = FakeBenefitApplier()
     private val pointEarner = FakePointEarner()
     private val paymentService = OrderPaymentService(
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), tx, clock,
     )
     private val orderService = OrderService(
-        orderRepository, productReader, sellerReader, stockManager, paymentGateway, FakeBenefitApplier(), paymentService, properties, tx, clock, Random(7),
+        orderRepository, productReader, sellerReader, stockManager, paymentGateway, benefitApplier, paymentService, properties, tx, clock, Random(7),
     )
     private val shippingService = OrderShippingService(orderRepository, tx, clock, pointEarner)
     private val returnService = OrderReturnService(
@@ -50,10 +52,11 @@ class ReturnQueryServiceTest {
         }
     }
 
-    private fun deliveredOrder(skuId: Long): Order {
-        val placed = orderService.place(memberId, PlaceOrderCommand(listOf(OrderItemCommand(skuId, 1)), 33_000, address))
-        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, 33_000, 33_000, emptyList()))
-        paymentService.confirm(memberId, ConfirmPaymentCommand(placed.orderNo, "pay-${placed.orderId}", 33_000))
+    private fun deliveredOrder(skuId: Long, points: Long = 0): Order {
+        val total = 33_000 - points
+        val placed = orderService.place(memberId, PlaceOrderCommand(listOf(OrderItemCommand(skuId, 1)), total, address, pointsToUse = points))
+        paymentGateway.nextConfirm = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.DONE, total, total, emptyList()))
+        paymentService.confirm(memberId, ConfirmPaymentCommand(placed.orderNo, "pay-${placed.orderId}", total))
         val order = orderRepository.findById(placed.orderId)!!
         order.sellerOrders.forEach {
             shippingService.ship(it.sellerId, it.id!!, "04", "T-${it.id}")
@@ -62,8 +65,8 @@ class ReturnQueryServiceTest {
         return orderRepository.findById(placed.orderId)!!
     }
 
-    private fun requestReturn(skuId: Long): ReturnRequestResult {
-        val order = deliveredOrder(skuId)
+    private fun requestReturn(skuId: Long, points: Long = 0): ReturnRequestResult {
+        val order = deliveredOrder(skuId, points)
         return returnService.request(memberId, order.id!!, order.allItems.first().id!!, RequestReturnCommand("CHANGE_OF_MIND", null))
     }
 
@@ -113,5 +116,83 @@ class ReturnQueryServiceTest {
         assertEquals(3, page.content.size)
         assertEquals(setOf("http://files/1.png", "http://files/2.png", "http://files/3.png"), page.content.map { it.thumbnailUrl }.toSet())
         assertEquals(1, productReader.thumbnailCalls)
+    }
+
+    private fun assertDisplay(r: ReturnRequestResult, requested: ReturnRequestResult) {
+        assertEquals(requested.orderNo, r.orderNo)
+        assertEquals(requested.sellerName, r.sellerName)
+        assertEquals("판매자1", r.sellerName)
+        assertEquals(requested.paidAmount, r.paidAmount)
+        assertEquals("http://files/1.png", r.thumbnailUrl)
+        assertEquals(requested.optionDisplayName, r.optionDisplayName)
+    }
+
+    @Test
+    fun paidAmount는_포인트를_뺀_현금_결제_몫이다() {
+        benefitApplier.balance = 10_000
+        benefitApplier.policy = PointUsePolicy(minUsableBalance = 0, useUnit = 10, maxUseRateBp = 10_000)
+        val requested = requestReturn(1L, points = 10_000)
+        val item = orderRepository.findById(requested.orderId)!!.allItems.first()
+
+        assertEquals(30_000, item.lineAmount)
+        assertEquals(20_000, requested.paidAmount)
+        assertEquals(20_000, service.getMine(memberId, requested.returnId).paidAmount)
+        assertEquals(20_000, service.listForAdmin(null, null, null, 0, 20).content.single().paidAmount)
+    }
+
+    @Test
+    fun 상태를_바꾸는_응답에도_표시용_필드가_있고_자동_승인_시각은_null이다() {
+        val requested = requestReturn(1L)
+        val withdrawn = returnService.withdraw(memberId, requested.returnId)
+        assertDisplay(withdrawn, requested)
+        assertNull(withdrawn.autoApproveAt)
+
+        val second = requestReturn(2L)
+        val approved = returnService.approveBySeller(1L, second.returnId)
+        assertEquals(second.orderNo, approved.orderNo)
+        assertEquals(second.sellerName, approved.sellerName)
+        assertEquals(second.paidAmount, approved.paidAmount)
+        assertEquals("http://files/2.png", approved.thumbnailUrl)
+        assertNull(approved.autoApproveAt)
+
+        paymentGateway.nextCancel = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.PARTIAL_CANCELED, 33_000, 6_000, listOf(PgCancelInfo(27_000, "사유"))))
+        val received = returnService.receiveBySeller(1L, second.returnId)
+        assertEquals(second.orderNo, received.orderNo)
+        assertEquals(second.sellerName, received.sellerName)
+        assertEquals(second.paidAmount, received.paidAmount)
+        assertEquals("http://files/2.png", received.thumbnailUrl)
+        assertNull(received.autoApproveAt)
+
+        val third = requestReturn(3L)
+        val rejected = returnService.rejectBySeller(1L, third.returnId, "사유")
+        assertEquals(third.orderNo, rejected.orderNo)
+        assertEquals("판매자1", rejected.sellerName)
+        assertEquals(third.paidAmount, rejected.paidAmount)
+        assertEquals("http://files/3.png", rejected.thumbnailUrl)
+        assertNull(rejected.autoApproveAt)
+
+        val byAdmin = returnService.approveByAdmin(third.returnId)
+        assertEquals(third.orderNo, byAdmin.orderNo)
+        assertEquals("판매자1", byAdmin.sellerName)
+        assertEquals(third.paidAmount, byAdmin.paidAmount)
+        assertEquals("http://files/3.png", byAdmin.thumbnailUrl)
+    }
+
+    @Test
+    fun 철회_뒤_재요청하면_자동_승인_시각은_새_요청_시각에_3일을_더한_값이다() {
+        val order = deliveredOrder(1L)
+        val itemId = order.allItems.first().id!!
+        val first = returnService.request(memberId, order.id!!, itemId, RequestReturnCommand("CHANGE_OF_MIND", null))
+        assertNull(returnService.withdraw(memberId, first.returnId).autoApproveAt)
+        assertNull(service.getMine(memberId, first.returnId).autoApproveAt)
+
+        val later = now.plusDays(1)
+        val again = OrderReturnService(
+            orderRepository, productReader, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, properties, tx,
+            Clock.fixed(later.atZone(zone).toInstant(), zone),
+        ).request(memberId, order.id!!, itemId, RequestReturnCommand("CHANGE_OF_MIND", null))
+
+        assertEquals(later, again.requestedAt)
+        assertEquals(later.plusDays(3), again.autoApproveAt)
     }
 }

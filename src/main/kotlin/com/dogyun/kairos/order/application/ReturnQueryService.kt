@@ -74,6 +74,7 @@ class ReturnQueryService(
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val found = orderRepository.findReturnPage(memberId, sellerId, status, page, size)
         val orders = mutableMapOf<Long, Order>()
+        // 반품이 있는데 주문이 없으면 데이터 불일치이므로 목록 전체가 실패한다(조용히 빈 값으로 숨기지 않는다)
         found.content.forEach { r -> orders.getOrPut(r.orderId) { requireNotNull(orderRepository.findById(r.orderId)) } }
         val productIds = found.content.map { orders.getValue(it.orderId).findItem(it.orderItemId).productId }.toSet()
         // 한 페이지의 이미지는 한 번에 조회한다(N+1 금지)
