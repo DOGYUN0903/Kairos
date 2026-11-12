@@ -195,4 +195,46 @@ class ReturnQueryServiceTest {
         assertEquals(later, again.requestedAt)
         assertEquals(later.plusDays(3), again.autoApproveAt)
     }
+
+    @Test
+    fun 반품_응답에_구매자가_적은_상세_내용이_있다() {
+        val order = deliveredOrder(1L)
+        val text = "박스가 찢어져 왔어요.\n두 번째 줄"
+        val requested = returnService.request(memberId, order.id!!, order.allItems.first().id!!, RequestReturnCommand("DEFECTIVE", text))
+
+        assertEquals(text, requested.detail)
+        assertEquals(text, service.getMine(memberId, requested.returnId).detail)
+        assertEquals(text, service.getForSeller(1L, requested.returnId).detail)
+        assertEquals(text, service.listForSeller(1L, null, 0, 20).content.single().detail)
+        assertEquals(text, service.listMine(memberId, 0, 20).content.single().detail)
+        assertEquals(text, service.getForAdmin(requested.returnId).detail)
+        assertEquals(text, returnService.approveBySeller(1L, requested.returnId).detail)
+    }
+
+    @Test
+    fun 상세_내용_없이_요청하면_detail은_null이다() {
+        val requested = requestReturn(1L)
+
+        assertNull(requested.detail)
+        assertNull(service.getMine(memberId, requested.returnId).detail)
+        assertNull(service.getForSeller(1L, requested.returnId).detail)
+        assertNull(service.getForAdmin(requested.returnId).detail)
+    }
+
+    @Test
+    fun 철회_뒤_다른_상세_내용으로_다시_요청하면_새_내용이_보인다() {
+        val order = deliveredOrder(1L)
+        val itemId = order.allItems.first().id!!
+        val first = returnService.request(memberId, order.id!!, itemId, RequestReturnCommand("CHANGE_OF_MIND", "처음 내용"))
+        assertEquals("처음 내용", first.detail)
+        returnService.withdraw(memberId, first.returnId)
+
+        val again = returnService.request(memberId, order.id!!, itemId, RequestReturnCommand("DEFECTIVE", "새 내용"))
+
+        assertEquals(first.returnId, again.returnId)
+        assertEquals("새 내용", again.detail)
+        assertEquals("새 내용", service.getMine(memberId, first.returnId).detail)
+        assertEquals("새 내용", service.getForSeller(1L, first.returnId).detail)
+        assertEquals("새 내용", service.getForAdmin(first.returnId).detail)
+    }
 }

@@ -3531,6 +3531,8 @@ export interface components {
              * @description REQUESTED 일 때만 requestedAt + 자동 승인 기간(kairos.order.return-auto-approve-after), 그 밖에는 null
              */
             autoApproveAt: string | null;
+            /** @description 구매자가 반품 요청 때 적은 상세 내용(최대 500자). 없으면 null */
+            detail: string | null;
         };
         ReturnPreview: {
             /** Format: int64 */

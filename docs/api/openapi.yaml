@@ -6801,7 +6801,7 @@ components:
           nullable: true
     ReturnRequestResponse:
       type: object
-      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt, thumbnailUrl, optionDisplayName, orderNo, sellerName, paidAmount, autoApproveAt]
+      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt, thumbnailUrl, optionDisplayName, orderNo, sellerName, paidAmount, autoApproveAt, detail]
       properties:
         returnId:
           type: integer
@@ -6895,6 +6895,10 @@ components:
           format: date-time
           nullable: true
           description: REQUESTED 일 때만 requestedAt + 자동 승인 기간(kairos.order.return-auto-approve-after), 그 밖에는 null
+        detail:
+          type: string
+          nullable: true
+          description: 구매자가 반품 요청 때 적은 상세 내용(최대 500자). 없으면 null
     ReturnPreview:
       type: object
       required: [orderItemId, reason, feeBearer, paidAmount, returnFee, outboundFeeRecovered, shippingFeeRefund, refundAmount, pointsRefund, productCouponReturnable]

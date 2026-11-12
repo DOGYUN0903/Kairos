@@ -220,7 +220,7 @@ internal fun ReturnRequest.toResult(order: Order, sellerOrder: SellerOrder, item
     sellerBorneFee = sellerBorneFee, refundAmount = refundAmount, pointsRefund = pointsRefund, rejectReason = rejectReason,
     requestedAt = requestedAt, decidedAt = decidedAt, decidedBy = decidedBy?.name, receivedAt = receivedAt, completedAt = completedAt,
     thumbnailUrl = thumbnailUrl, optionDisplayName = item.optionDisplayName, orderNo = order.orderNo, sellerName = sellerOrder.sellerName,
-    paidAmount = item.paidAmount, autoApproveAt = if (status == ReturnStatus.REQUESTED) requestedAt.plus(autoApproveAfter) else null,
+    paidAmount = item.paidAmount, autoApproveAt = if (status == ReturnStatus.REQUESTED) requestedAt.plus(autoApproveAfter) else null, detail = detail,
 )
 
 internal fun ReturnRequest.toSummary() =

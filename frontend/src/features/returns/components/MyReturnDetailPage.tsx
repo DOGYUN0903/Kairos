@@ -98,6 +98,12 @@ export function MyReturnDetailPage({ returnId }: { returnId: number }) {
             <dl className="grid grid-cols-[96px_1fr] gap-y-2 text-sm">
               <dt className="text-text-2">사유</dt>
               <dd>{returnReasonLabel(r.reason)}</dd>
+              {r.detail && (
+                <>
+                  <dt className="text-text-2">상세 내용</dt>
+                  <dd className="whitespace-pre-wrap break-words">{r.detail}</dd>
+                </>
+              )}
             </dl>
             {r.status === "REJECTED" && r.rejectReason && (
               <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">

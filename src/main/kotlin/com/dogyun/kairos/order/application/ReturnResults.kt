@@ -37,6 +37,8 @@ data class ReturnRequestResult(
     val paidAmount: Long,
     /** `REQUESTED` 일 때만 `requestedAt + 자동 승인 기간`, 그 밖에는 null */
     val autoApproveAt: LocalDateTime?,
+    /** 구매자가 반품 요청 때 적은 상세 내용(최대 500자). 없으면 null */
+    val detail: String?,
 )
 
 /** 주문 상세 항목에 붙는 반품 요약. */
