@@ -62,18 +62,23 @@ export function useInvalidateOrders(orderId: number) {
   return () => Promise.all([qc.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) }), qc.invalidateQueries({ queryKey: queryKeys.orders.list() })]);
 }
 
-/** 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 응답이 오면(성공이든 거절이든 서버가 답했다면) 호출 쪽이 무효화한다. */
+/**
+ * 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다).
+ * 무효화는 여기 한 곳에서 한다: 성공이든 실패든(서버가 답했거나 결과를 모르거나) 주문 상세와 목록을 다시 읽게 한다.
+ */
 export function useCancelItem(orderId: number) {
   const invalidate = useInvalidateOrders(orderId);
   return async (orderItemId: number, reason: string, key: string): Promise<CancelItemResponse> => {
-    const res = unwrap<CancelItemResponse>(
-      await api.POST("/api/v1/orders/{orderId}/items/{orderItemId}/cancel", {
-        params: { path: { orderId, orderItemId }, header: { [IDEMPOTENCY_HEADER]: key } },
-        body: { reason },
-      }),
-    );
-    void invalidate();
-    return res;
+    try {
+      return unwrap<CancelItemResponse>(
+        await api.POST("/api/v1/orders/{orderId}/items/{orderItemId}/cancel", {
+          params: { path: { orderId, orderItemId }, header: { [IDEMPOTENCY_HEADER]: key } },
+          body: { reason },
+        }),
+      );
+    } finally {
+      void invalidate();
+    }
   };
 }
 

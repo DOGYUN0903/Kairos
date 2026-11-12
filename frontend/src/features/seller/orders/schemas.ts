@@ -13,9 +13,3 @@ export const shipSchema = z.object({
     .max(TRACKING_MAX, `송장번호는 ${TRACKING_MAX}자 이하로 입력해 주세요.`),
 });
 export type ShipValues = z.infer<typeof shipSchema>;
-
-export const SELLER_CANCEL_REASON_MAX = 500;
-export const sellerCancelSchema = z.object({
-  reason: z.string().trim().min(1, "취소 사유를 입력해 주세요.").max(SELLER_CANCEL_REASON_MAX, `취소 사유는 ${SELLER_CANCEL_REASON_MAX}자 이하로 입력해 주세요.`),
-});
-export type SellerCancelValues = z.infer<typeof sellerCancelSchema>;

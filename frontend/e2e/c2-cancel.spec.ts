@@ -64,10 +64,10 @@ test("판매자가 배송 전 항목을 취소하면 배송비 차감 없이 전
     await s.getByRole("tab", { name: /발송 대기/ }).click();
     await s.getByRole("table").getByRole("link").first().click();
     await s.getByRole("button", { name: "항목 취소" }).click();
-    const dialog = s.getByRole("dialog", { name: "항목 취소" });
+    const dialog = s.getByRole("dialog", { name: "주문 항목 취소" });
     await expect(dialog.getByText("배송비 차감 없이 환불됩니다")).toBeVisible();
     await dialog.getByLabel(/취소 사유/).fill("재고 부족");
-    await dialog.getByRole("button", { name: "항목 취소" }).click();
+    await dialog.getByRole("button", { name: "취소하기" }).click();
     await expect(dialog).toBeHidden();
     await expect(s.getByText("판매자 취소")).toBeVisible();
   });

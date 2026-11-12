@@ -94,22 +94,22 @@ export function useDeliver(id: number) {
   };
 }
 
-/** 판매자 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). */
+/**
+ * 판매자 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다).
+ * 무효화는 여기 한 곳에서 한다: 성공이든 실패든(서버가 답했거나 결과를 모르거나) 상세·목록·건수를 다시 읽게 한다.
+ */
 export function useSellerCancelItem(id: number) {
   const invalidate = useInvalidateSellerOrders(id);
   return async (orderItemId: number, reason: string, key: string): Promise<CancelItemResponse> => {
     try {
-      const res = unwrap<CancelItemResponse>(
+      return unwrap<CancelItemResponse>(
         await api.POST("/api/v1/seller/orders/{sellerOrderId}/items/{orderItemId}/cancel", {
           params: { path: { sellerOrderId: id, orderItemId }, header: { [IDEMPOTENCY_HEADER]: key } },
           body: { reason },
         }),
       );
+    } finally {
       void invalidate();
-      return res;
-    } catch (e) {
-      void invalidate();
-      throw e;
     }
   };
 }

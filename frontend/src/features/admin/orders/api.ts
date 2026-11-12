@@ -39,7 +39,10 @@ export function useAdminOrder(orderId: number, opts?: { refetchInterval?: number
   });
 }
 
-/** 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 서버가 답했다면(성공·거절) 상세와 목록을 무효화한다. */
+/**
+ * 관리자 항목 취소. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다).
+ * 무효화는 여기 한 곳에서 한다: 성공이든 실패든(서버가 답했거나 결과를 모르거나) 상세와 목록을 다시 읽게 한다.
+ */
 export function useAdminCancelItem(orderId: number) {
   const qc = useQueryClient();
   const invalidate = () =>
@@ -49,17 +52,14 @@ export function useAdminCancelItem(orderId: number) {
     ]);
   return async (orderItemId: number, reason: string, key: string): Promise<CancelItemResponse> => {
     try {
-      const res = unwrap<CancelItemResponse>(
+      return unwrap<CancelItemResponse>(
         await api.POST("/api/v1/admin/orders/{orderId}/items/{orderItemId}/cancel", {
           params: { path: { orderId, orderItemId }, header: { [IDEMPOTENCY_HEADER]: key } },
           body: { reason },
         }),
       );
+    } finally {
       void invalidate();
-      return res;
-    } catch (e) {
-      void invalidate();
-      throw e;
     }
   };
 }
