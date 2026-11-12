@@ -5,6 +5,7 @@ import com.dogyun.kairos.common.domain.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class ReturnRefundCalculatorTest {
 
@@ -203,5 +204,146 @@ class ReturnRefundCalculatorTest {
         assertEquals(3_000, plan.shippingFeeRefund)
         assertEquals(13_000, plan.refundAmount)
         assertEquals(3_000, plan.sellerBorneFee)
+    }
+
+    // ---- 미리보기: 반품 행이 없는 ORDERED 항목에 대해 금액만 계산한다 ----
+
+    private fun Order.preview(itemId: Long, reason: ReturnReason, fees: ReturnFeePolicy = RETURN_FEES) =
+        ReturnRefundCalculator.preview(this, itemId, reason, fees)
+
+    private fun orderD(): Pair<Order, Long> {
+        val d1 = line(4, 50_000, skuId = 41)
+        val allocation = DiscountAllocator.allocate(
+            lines = listOf(d1),
+            productCoupons = mapOf(
+                41L to CouponTerms(7, CouponKind.PRODUCT, CouponIssuer.SELLER, CouponTarget.ALL_PRODUCTS, null, null, CouponDiscountType.FIXED, 5_000, null, null),
+            ),
+            cartCoupon = CouponTerms(8, CouponKind.CART, CouponIssuer.PLATFORM, CouponTarget.ALL_PRODUCTS, null, null, CouponDiscountType.FIXED, 4_000, null, null),
+            pointsToUse = 3_000, pointBalance = 10_000,
+            policy = PointUsePolicy(minUsableBalance = 1_000, useUnit = 10, maxUseRateBp = 3_000),
+        )
+        val o = withIds(newOrderWith(allocation, d1)).also { it.markPaid(NOW) }.deliverAll()
+        return o to o.itemIdOf(4)
+    }
+
+    @Test
+    fun 미리보기_무료배송_주문의_변심_반품은_반품비와_발송비를_빼서_14000원이다() {
+        val o = deliveredOrder(line(1, 40_000, skuId = 11), line(1, 20_000, skuId = 12))
+
+        val plan = o.preview(o.itemIdOf(1, 1), ReturnReason.CHANGE_OF_MIND)
+
+        assertEquals(20_000, plan.paidAmount)
+        assertEquals(3_000, plan.returnFee)
+        assertEquals(3_000, plan.outboundFeeRecovered)
+        assertEquals(0, plan.shippingFeeRefund)
+        assertEquals(14_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 미리보기_발송비를_이미_회수한_주문의_변심_반품은_반품비만_뺀다() {
+        val o = deliveredOrder(line(1, 40_000, skuId = 11), line(1, 20_000, skuId = 12))
+        o.withReturn(o.itemIdOf(1, 1), ReturnReason.CHANGE_OF_MIND, ReturnStatus.COMPLETED)
+
+        val plan = o.preview(o.itemIdOf(1, 0), ReturnReason.CHANGE_OF_MIND)
+
+        assertEquals(3_000, plan.returnFee)
+        assertEquals(0, plan.outboundFeeRecovered)
+        assertEquals(37_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 미리보기_불량_반품은_차감이_없고_구매자_배송비를_돌려준다() {
+        val o = deliveredOrder(line(2, 30_000))
+
+        val plan = o.preview(o.itemIdOf(2), ReturnReason.DEFECTIVE)
+
+        assertEquals(0, plan.returnFee)
+        assertEquals(3_000, plan.shippingFeeRefund)
+        assertEquals(3_000, plan.sellerBorneFee)
+        assertEquals(33_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 미리보기_취소_차감_뒤_변심_반품은_반품비만_뺀다() {
+        val o = paidOrder(line(2, 30_000), line(3, 30_000))
+        o.cancel(o.itemIdOf(3))
+        o.deliverAll()
+
+        val plan = o.preview(o.itemIdOf(2), ReturnReason.CHANGE_OF_MIND)
+
+        assertEquals(3_000, plan.returnFee)
+        assertEquals(0, plan.outboundFeeRecovered)
+        assertEquals(27_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 미리보기_포인트와_쿠폰이_있는_항목() {
+        val (o, id) = orderD()
+
+        val plan = o.preview(id, ReturnReason.DEFECTIVE)
+
+        assertEquals(38_000, plan.paidAmount)
+        assertEquals(3_000, plan.pointsRefund)
+        assertNotNull(plan.productCouponReturn)
+        assertEquals(38_000, plan.refundAmount)
+    }
+
+    private fun assertPreviewMatchesPlan(reason: ReturnReason, setup: () -> Pair<Order, Long>) {
+        val (o, id) = setup()
+        val previewed = o.preview(id, reason)
+        o.withReturn(id, reason)
+        assertEquals(o.plan(id), previewed)
+    }
+
+    @Test
+    fun 미리보기와_실제_계산은_같은_결과다() {
+        assertPreviewMatchesPlan(ReturnReason.CHANGE_OF_MIND) {
+            val o = deliveredOrder(line(1, 40_000, skuId = 11), line(1, 20_000, skuId = 12))
+            o to o.itemIdOf(1, 1)
+        }
+        assertPreviewMatchesPlan(ReturnReason.CHANGE_OF_MIND) {
+            val o = deliveredOrder(line(1, 40_000, skuId = 11), line(1, 20_000, skuId = 12))
+            o.withReturn(o.itemIdOf(1, 1), ReturnReason.CHANGE_OF_MIND, ReturnStatus.COMPLETED)
+            o to o.itemIdOf(1, 0)
+        }
+        assertPreviewMatchesPlan(ReturnReason.DEFECTIVE) {
+            val o = deliveredOrder(line(2, 30_000))
+            o to o.itemIdOf(2)
+        }
+        assertPreviewMatchesPlan(ReturnReason.CHANGE_OF_MIND) {
+            val o = paidOrder(line(2, 30_000), line(3, 30_000))
+            o.cancel(o.itemIdOf(3))
+            o.deliverAll()
+            o to o.itemIdOf(2)
+        }
+        assertPreviewMatchesPlan(ReturnReason.DEFECTIVE) { orderD() }
+    }
+
+    @Test
+    fun 미리보기는_다른_항목이_환불_진행_중이어도_계산한다() {
+        val o = paidOrder(line(1, 30_000), line(2, 30_000))
+        val so1 = o.sellerOrders.first { it.sellerId == 1L }.id!!
+        o.ship(so1, "04", "T1", NOW)
+        o.deliver(so1, NOW)
+        val a = o.itemIdOf(1)
+        val b = o.itemIdOf(2)
+        o.requestCancel(b, CancelActor.BUYER, "사유", o.planCancel(b, CancelActor.BUYER, POLICY))
+        val previewed = o.preview(a, ReturnReason.CHANGE_OF_MIND)
+        o.withReturn(a, ReturnReason.CHANGE_OF_MIND)
+
+        assertEquals(27_000, previewed.refundAmount)
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { o.plan(a) }
+    }
+
+    @Test
+    fun 현금_결제_몫이_반품비보다_작으면_미리보기_환불은_0원이다() {
+        val o = deliveredOrder(line(1, 50_000, skuId = 11), line(1, 2_000, skuId = 12))
+
+        val plan = o.preview(o.itemIdOf(1, 1), ReturnReason.CHANGE_OF_MIND)
+
+        assertEquals(2_000, plan.paidAmount)
+        assertEquals(2_000, plan.returnFee)
+        assertEquals(0, plan.outboundFeeRecovered)
+        assertEquals(0, plan.refundAmount)
     }
 }

@@ -41,10 +41,22 @@ object ReturnRefundCalculator {
         ) {
             throw DomainException(ErrorCode.RETURN_INVALID_STATE_TRANSITION)
         }
+        return compute(order, sellerOrder, item, request.reason, fees)
+    }
 
+    /**
+     * 반품 요청 전의 예상 환불. 상태 검사 없이 금액만 계산한다(자격은 [Order.checkReturnRequestable] 이 호출 전에 판정).
+     * [plan] 과 같은 계산 본체를 쓴다.
+     */
+    fun preview(order: Order, itemId: Long, reason: ReturnReason, fees: ReturnFeePolicy): ReturnRefundPlan {
+        val item = order.findItem(itemId)
+        return compute(order, order.sellerOrderOf(itemId), item, reason, fees)
+    }
+
+    private fun compute(order: Order, sellerOrder: SellerOrder, item: OrderItem, reason: ReturnReason, fees: ReturnFeePolicy): ReturnRefundPlan {
         val paid = item.paidAmount
         val sellerOrderEmptied = sellerOrder.items.none { it.id != item.id && it.status.isRemaining }
-        val plan = when (request.reason) {
+        val plan = when (reason) {
             ReturnReason.CHANGE_OF_MIND -> {
                 // 구매자 부담 반품비는 현금 환불에서만 뺀다. 회수 구간을 먼저, 남는 범위에서 발송 구간을 받는다.
                 val returnFee = minOf(fees.returnFee, paid)
