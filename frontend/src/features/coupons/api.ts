@@ -30,8 +30,9 @@ export function useClaimablePolicies(productId: number | undefined, enabled: boo
   });
 }
 
-export function useMyCoupons(params: { status: CouponStatus; page: number }) {
-  const query = { status: params.status, page: params.page, size: MY_COUPON_PAGE_SIZE };
+/** size 를 줄이면 개수(totalElements)만 읽는 데 쓸 수 있다. */
+export function useMyCoupons(params: { status: CouponStatus; page: number; size?: number }) {
+  const query = { status: params.status, page: params.page, size: params.size ?? MY_COUPON_PAGE_SIZE };
   return useQuery({
     queryKey: queryKeys.coupons.mine(query),
     queryFn: async () => unwrap<CouponPage>(await api.GET("/api/v1/coupons/me", { params: { query } })),

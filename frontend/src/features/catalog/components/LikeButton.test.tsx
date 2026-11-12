@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "@/lib/query-keys";
 import { LikeButton } from "./LikeButton";
 
 const put = vi.fn();
@@ -17,12 +18,12 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 
-function setup(liked: boolean | null) {
+function setup(liked: boolean | null, likeCount: number | null = 1204) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: 0 } } });
   const spy = vi.spyOn(qc, "invalidateQueries");
   render(
     <QueryClientProvider client={qc}>
-      <LikeButton productId={7} liked={liked} likeCount={1204} />
+      <LikeButton productId={7} liked={liked} {...(likeCount !== null ? { likeCount } : {})} />
     </QueryClientProvider>,
   );
   return spy;
@@ -43,6 +44,13 @@ describe("LikeButton", () => {
     expect(btn).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("likeCount가_없으면_숫자를_그리지_않는다", () => {
+    setup(true, null);
+    const btn = screen.getByRole("button", { name: "좋아요" });
+    expect(btn).not.toHaveAccessibleDescription();
+    expect(btn).not.toHaveTextContent(/\d/);
+  });
+
   it("liked가_null이면_선택되지_않은_상태", () => {
     setup(null);
     expect(screen.getByRole("button", { name: "좋아요" })).toHaveAttribute("aria-pressed", "false");
@@ -54,7 +62,8 @@ describe("LikeButton", () => {
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
     expect(del).not.toHaveBeenCalled();
     expect(put.mock.calls[0]?.[1]).toEqual({ params: { path: { productId: 7 } } });
-    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(3));
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.likes.root });
   });
 
   it("이미_좋아요했으면_DELETE를_보낸다", async () => {

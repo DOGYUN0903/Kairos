@@ -80,6 +80,7 @@ export function useToggleLike(productId: number) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.catalog.product(productId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.catalog.productsRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.likes.root }),
       ]);
     },
     onError: (e) => {
