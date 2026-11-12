@@ -12,7 +12,7 @@ import { AdminReturnActions } from "@/features/admin/returns/components/AdminRet
 import { usePollingWindow } from "@/features/orders/polling";
 import { needsReturnPolling } from "@/features/returns/return-text";
 import { ReturnDetailView } from "@/features/seller/returns/components/ReturnDetailView";
-import type { ReturnNotice } from "@/features/seller/returns/components/SellerReturnActions";
+import type { ReturnNotice } from "@/features/returns/useReceiveReturn";
 
 /** 관리자 반품 상세. 환불 확인 중인 동안만 3초 간격으로 다시 읽는다(최대 2분, 그 뒤에는 새로고침 안내). */
 export function AdminReturnDetailPage({ returnId }: { returnId: number }) {

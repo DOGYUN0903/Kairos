@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -8,16 +8,13 @@ import { useAdminReturnActions } from "@/features/admin/returns/api";
 import { adminReturnActions } from "@/features/admin/returns/params";
 import { OrderThumb } from "@/features/orders/components/OrderThumb";
 import type { ReturnRequestResponse } from "@/features/returns/api";
+import { useReceiveReturn, type ReturnNotice } from "@/features/returns/useReceiveReturn";
 import { ReceiveDialog } from "@/features/seller/returns/components/ReceiveDialog";
-import { RECEIVE_REJECTED, RECEIVE_UNKNOWN, type ReturnNotice } from "@/features/seller/returns/components/SellerReturnActions";
-import { receiveOutcome } from "@/features/seller/returns/receive-outcome";
 import { toast } from "@/hooks/use-toast";
 import { joinDot } from "@/lib/join-dot";
-import { formatKrw } from "@/lib/money";
 
 export const NOT_ELIGIBLE = "이미 구매 확정된 주문이라 승인할 수 없습니다. 정산 조정으로 처리해 주세요";
 export const CANCEL_CONFIRM = "구매자 요청으로 반품을 중단합니다. 상품은 주문 상태로 돌아가며, 구매자는 이 상품을 다시 반품 요청할 수 없습니다";
-const RECEIVE_UNKNOWN_NOTICE = "결과를 확인하지 못했습니다. 아래 상태를 확인한 뒤 판단해 주세요. 자동으로 다시 시도하지 않습니다.";
 
 /**
  * 관리자 처리 영역: 승인(REQUESTED·REJECTED), 대신 수거 확인·중단(APPROVED).
@@ -27,39 +24,12 @@ const RECEIVE_UNKNOWN_NOTICE = "결과를 확인하지 못했습니다. 아래 �
 export function AdminReturnActions({ data: r, onNotice }: { data: ReturnRequestResponse; onNotice: (n: ReturnNotice | null) => void }) {
   const { approve, receive, cancel } = useAdminReturnActions(r.returnId);
   const [dialog, setDialog] = useState<"approve" | "receive" | "cancel" | null>(null);
-  const [busy, setBusy] = useState(false);
-  // sent(환불 접수, 아직 APPROVED 가 아닌 상태를 못 봄) → moved(APPROVED 가 아닌 상태를 봄) → 다시 APPROVED 면(PG 거절을 대사가 되돌림) 잠금을 풀고 거절 안내.
-  const [lock, setLock] = useState<"none" | "sent" | "moved">("none");
-  const inFlight = useRef(false);
-
-  useEffect(() => {
-    if (lock === "sent" && r.status !== "APPROVED") setLock("moved");
-    else if (lock === "moved" && r.status === "APPROVED") {
-      setLock("none");
-      onNotice({ tone: "warn", text: RECEIVE_REJECTED, whileStatus: "APPROVED" });
-    }
-  }, [lock, r.status, onNotice]);
+  // 서버 메시지를 그대로 보인다. 상세는 api 훅이 이미 다시 읽는다.
+  const onFailure = (e: unknown) => toast({ title: resolveError(e).message, variant: "destructive" });
+  const { busy, locked, guarded, confirmReceive: runReceive } = useReceiveReturn({ status: r.status, receive, onNotice, onError: onFailure });
 
   const actions = adminReturnActions(r.status);
   if (actions.length === 0) return r.status === "REFUNDING" ? null : <p className="text-sm text-text-2">처리할 수 있는 작업이 없습니다.</p>;
-
-  const guarded = async (fn: () => Promise<void>) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    try {
-      await fn();
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  };
-
-  const onFailure = (e: unknown) => {
-    // 상세는 api 훅이 이미 다시 읽는다.
-    const title = e instanceof ApiError && e.code === "RETURN_NOT_ELIGIBLE" ? NOT_ELIGIBLE : resolveError(e).message;
-    toast({ title, variant: "destructive" });
-  };
 
   const confirmApprove = () =>
     guarded(async () => {
@@ -68,7 +38,9 @@ export function AdminReturnActions({ data: r, onNotice }: { data: ReturnRequestR
         await approve();
         toast({ title: "반품을 승인했습니다" });
       } catch (e) {
-        onFailure(e);
+        // 구매 확정된 주문의 승인 거부는 승인에만 의미가 있는 안내다. 수거 확인·중단은 서버 메시지를 그대로 보인다.
+        if (e instanceof ApiError && e.code === "RETURN_NOT_ELIGIBLE") toast({ title: NOT_ELIGIBLE, variant: "destructive" });
+        else onFailure(e);
       }
       setDialog(null);
     });
@@ -85,39 +57,7 @@ export function AdminReturnActions({ data: r, onNotice }: { data: ReturnRequestR
       setDialog(null);
     });
 
-  const confirmReceive = () =>
-    guarded(async () => {
-      onNotice(null);
-      let outcome;
-      try {
-        const res = await receive();
-        outcome = receiveOutcome({ ok: true, status: res.status, refundAmount: res.refundAmount });
-      } catch (e) {
-        outcome = receiveOutcome({ ok: false, error: e });
-        if (outcome.kind === "error") onFailure(e);
-      }
-      switch (outcome.kind) {
-        case "completed":
-          setLock("sent");
-          toast({ title: `환불을 완료했습니다. 환불 금액 ${formatKrw(outcome.refundAmount)}` });
-          break;
-        case "refunding":
-          setLock("sent");
-          toast({ title: "환불을 확인하고 있습니다" });
-          break;
-        case "rejected":
-          toast({ title: RECEIVE_REJECTED, variant: "destructive" });
-          onNotice({ tone: "warn", text: RECEIVE_REJECTED, whileStatus: "APPROVED" });
-          break;
-        case "unknown":
-          toast({ title: RECEIVE_UNKNOWN, variant: "destructive" });
-          onNotice({ tone: "warn", text: RECEIVE_UNKNOWN_NOTICE, whileStatus: "APPROVED" });
-          break;
-        case "error":
-          break;
-      }
-      setDialog(null);
-    });
+  const confirmReceive = () => runReceive(() => setDialog(null));
 
   return (
     <div>
@@ -132,10 +72,10 @@ export function AdminReturnActions({ data: r, onNotice }: { data: ReturnRequestR
       {actions.includes("receive") && (
         <>
           <div className="flex gap-2">
-            <button type="button" className="btn btn-primary" disabled={lock !== "none" || busy} onClick={() => setDialog("receive")}>
+            <button type="button" className="btn btn-primary" disabled={locked || busy} onClick={() => setDialog("receive")}>
               대신 수거 확인
             </button>
-            <button type="button" className="btn btn-danger" disabled={lock !== "none" || busy} onClick={() => setDialog("cancel")}>
+            <button type="button" className="btn btn-danger" disabled={locked || busy} onClick={() => setDialog("cancel")}>
               중단
             </button>
           </div>

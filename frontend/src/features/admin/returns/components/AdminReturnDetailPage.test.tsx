@@ -171,6 +171,37 @@ describe("AdminReturnDetailPage", () => {
     );
   });
 
+  it("수거_확인에서_RETURN_NOT_ELIGIBLE이면_서버_메시지를_그대로_보인다", async () => {
+    h.PATCH.mockRejectedValue(new ApiError(409, "RETURN_NOT_ELIGIBLE", "서버 메시지", null));
+    mount();
+    fireEvent.click(await openReceive());
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "서버 메시지", variant: "destructive" }));
+    expect(h.toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.stringContaining("구매 확정된 주문") }));
+  });
+
+  it("중단에서_RETURN_NOT_ELIGIBLE이면_서버_메시지를_그대로_보인다", async () => {
+    h.PATCH.mockRejectedValue(new ApiError(409, "RETURN_NOT_ELIGIBLE", "서버 메시지", null));
+    mount();
+    await userEvent.click(await screen.findByRole("button", { name: "중단" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "중단" }));
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "서버 메시지", variant: "destructive" }));
+  });
+
+  it("중단_확인을_연타해도_요청은_한_번만_나간다", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    h.PATCH.mockReturnValue(new Promise((r) => (resolve = r)));
+    mount();
+    await userEvent.click(await screen.findByRole("button", { name: "중단" }));
+    const confirm = within(await screen.findByRole("dialog")).getByRole("button", { name: "중단" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(h.PATCH).toHaveBeenCalledTimes(1);
+    resolve(ok(ret({ status: "CANCELED_BY_ADMIN" })));
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "반품을 중단했습니다" }));
+    expect(h.PATCH).toHaveBeenCalledTimes(1);
+  });
+
   it("중단은_확인_문구를_보이고_확인하면_cancel을_한_번_보낸다", async () => {
     h.PATCH.mockResolvedValue(ok(ret({ status: "CANCELED_BY_ADMIN" })));
     mount();

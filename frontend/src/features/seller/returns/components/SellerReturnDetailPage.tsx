@@ -11,7 +11,8 @@ import { usePollingWindow } from "@/features/orders/polling";
 import { needsReturnPolling } from "@/features/returns/return-text";
 import { useSellerReturn } from "@/features/seller/returns/api";
 import { ReturnDetailView } from "@/features/seller/returns/components/ReturnDetailView";
-import { SellerReturnActions, type ReturnNotice } from "@/features/seller/returns/components/SellerReturnActions";
+import type { ReturnNotice } from "@/features/returns/useReceiveReturn";
+import { SellerReturnActions } from "@/features/seller/returns/components/SellerReturnActions";
 
 /** 판매자 반품 상세. 환불 확인 중인 동안만 3초 간격으로 다시 읽는다(최대 2분, 그 뒤에는 새로고침 안내). */
 export function SellerReturnDetailPage({ returnId }: { returnId: number }) {

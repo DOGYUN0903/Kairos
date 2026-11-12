@@ -153,6 +153,22 @@ describe("SellerReturnDetailPage", () => {
     });
   });
 
+  it("승인을_처리하는_동안_승인·거절_버튼은_잠긴다", async () => {
+    h.GET.mockResolvedValue(ok(ret({ status: "REQUESTED" })));
+    let resolve: (v: unknown) => void = () => {};
+    h.PATCH.mockReturnValue(new Promise((r) => (resolve = r)));
+    mount();
+    const approveTrigger = await screen.findByRole("button", { name: "승인" });
+    const rejectTrigger = screen.getByRole("button", { name: "거절" });
+    await userEvent.click(approveTrigger);
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "승인" }));
+    await waitFor(() => expect(approveTrigger).toBeDisabled());
+    expect(rejectTrigger).toBeDisabled();
+    expect(h.PATCH).toHaveBeenCalledTimes(1);
+    resolve(ok(ret({ status: "APPROVED" })));
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "반품을 승인했습니다" }));
+  });
+
   it("거절은_사유가_비어_있으면_보내지_않는다", async () => {
     h.GET.mockResolvedValue(ok(ret({ status: "REQUESTED" })));
     h.PATCH.mockResolvedValue(ok(ret({ status: "REJECTED", rejectReason: "x" })));
