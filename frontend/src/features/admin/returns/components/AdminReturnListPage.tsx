@@ -129,9 +129,10 @@ export function AdminReturnListPage() {
 
       <section className="card" aria-labelledby="ar-h">
         <h2 id="ar-h" className="border-b border-border px-5 py-4 text-[15px] font-bold">
-          반품 {data && !q.isPlaceholderData && !q.isError ? `(${data.totalElements})` : ""}
+          반품 {data && !q.isPlaceholderData ? `(${data.totalElements})` : ""}
         </h2>
-        {q.isError ? (
+        {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
+        {q.isError && !data ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : !data || q.isPlaceholderData ? (
           <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3 p-5">

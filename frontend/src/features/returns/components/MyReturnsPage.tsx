@@ -22,9 +22,10 @@ export function MyReturnsPage() {
   return (
     <div>
       <MyPageHead title="반품 내역" />
-      {q.isError ? (
+      {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
+      {q.isError && !data ? (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-      ) : !data ? (
+      ) : !data || q.isPlaceholderData ? (
         <PageSkeleton />
       ) : data.content.length === 0 ? (
         data.totalPages > 0 && page > 0 ? (

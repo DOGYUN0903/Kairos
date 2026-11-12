@@ -68,7 +68,8 @@ export function SellerReturnListPage() {
       </div>
 
       <div className="card" role="tabpanel" aria-label="반품 목록">
-        {q.isError ? (
+        {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
+        {q.isError && !data ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : !data || q.isPlaceholderData ? (
           <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3 p-5">
