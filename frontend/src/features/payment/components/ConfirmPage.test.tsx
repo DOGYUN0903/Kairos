@@ -1,7 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import { ConfirmPage } from "@/features/payment/components/ConfirmPage";
 
@@ -62,6 +62,10 @@ describe("ConfirmPage", () => {
     sessionStorage.clear();
     h.status = "authenticated";
     h.search = `oid=42&orderId=${ORDER_NO}&paymentKey=mock-a&amount=48000`;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    focusManager.setFocused(undefined);
   });
 
   it("승인_요청은_마운트당_한_번만_나간다", async () => {
@@ -128,8 +132,11 @@ describe("ConfirmPage", () => {
     mount();
 
     expect(await screen.findByText(/결제가 거절되어 주문이 취소되었습니다/)).toBeInTheDocument();
-    expect(screen.getByText(/담아 둔 상품은 장바구니에 그대로 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText("결제가 거절되어 주문이 취소되었습니다. 재고와 장바구니는 그대로입니다")).toBeInTheDocument();
+    // 바로 구매로 온 주문은 장바구니에 상품이 없다. 장바구니에 담겨 있다고 말하지 않는다.
+    expect(document.body.textContent).not.toMatch(/담아 둔 상품/);
     expect(screen.getByRole("link", { name: "장바구니로" })).toHaveAttribute("href", "/cart");
+    expect(screen.getByRole("link", { name: "주문 내역" })).toHaveAttribute("href", "/my/orders");
     expect(h.replace).not.toHaveBeenCalled();
   });
 
@@ -140,11 +147,70 @@ describe("ConfirmPage", () => {
     await waitFor(() => expect(h.replace).toHaveBeenCalledWith("/my/orders/42/complete"));
   });
 
-  it("확인_중에_주문이_취소되면_거절_안내로_바뀐다", async () => {
+  it("확인_중_주문이_취소되면_결제가_완료되지_않았다고_안내한다", async () => {
     h.POST.mockRejectedValue(new ApiError(409, "PAYMENT_IN_PROGRESS", "진행 중", null));
     h.GET.mockResolvedValue({ data: { data: { ...pendingOrder().data.data, status: "CANCELED", payment: { amount: 48000, refundedAmount: 0, status: "FAILED" } } } });
     mount();
-    expect(await screen.findByText(/결제가 거절되어 주문이 취소되었습니다/)).toBeInTheDocument();
+    expect(await screen.findByText("결제가 완료되지 않아 주문이 취소되었습니다")).toBeInTheDocument();
+    // 기한 만료·응답 유실로 취소된 주문은 PG 가 거절한 것이 아니다.
+    expect(document.body.textContent).not.toMatch(/거절/);
+    expect(screen.getByRole("link", { name: "장바구니로" })).toHaveAttribute("href", "/cart");
+    expect(screen.getByRole("link", { name: "주문 내역" })).toHaveAttribute("href", "/my/orders");
+    expect(h.replace).not.toHaveBeenCalled();
+  });
+
+  it("확인_중_주문_조회가_404면_바로_주문_내역_안내를_보인다", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    h.POST.mockRejectedValue(new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null));
+    h.GET.mockRejectedValue(new ApiError(404, "ORDER_NOT_FOUND", "주문을 찾을 수 없습니다", null));
+    mount();
+
+    expect(await screen.findByText(/주문 내역에서 결과를 확인해 주세요/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "주문 내역" })).toHaveAttribute("href", "/my/orders");
+    expect(screen.queryByRole("link", { name: "주문 상세" })).not.toBeInTheDocument();
+    const calls = h.GET.mock.calls.length;
+    // 남의 주문·없는 주문은 다시 읽어도 같다. 조회를 멈춘다(2분이 지나도 깨진 주문 상세 링크를 주지 않는다).
+    await act(() => vi.advanceTimersByTimeAsync(130_000));
+    expect(h.GET).toHaveBeenCalledTimes(calls);
+    expect(screen.queryByRole("link", { name: "주문 상세" })).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/완료|실패|거절|취소/);
+  });
+
+  it("2분이_지나면_마지막으로_한_번_더_조회한_뒤_안내한다", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // 탭이 숨겨지면 주기 조회가 멈추고 2분 타이머만 흐른다.
+    focusManager.setFocused(false);
+    h.POST.mockRejectedValue(new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null));
+    h.GET.mockResolvedValue(pendingOrder());
+    mount();
+
+    expect(await screen.findByText("결제 확인 중")).toBeInTheDocument();
+    await waitFor(() => expect(h.GET).toHaveBeenCalledTimes(1));
+    await act(() => vi.advanceTimersByTimeAsync(119_000));
+    expect(h.GET).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/아직 결제 결과를 확인하지 못했습니다/)).not.toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    await waitFor(() => expect(h.GET).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/아직 결제 결과를 확인하지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/주문 내역에서 결과를 확인해 주세요/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "주문 상세" })).toHaveAttribute("href", "/my/orders/42");
+    expect(h.GET).toHaveBeenCalledTimes(2);
+    expect(h.replace).not.toHaveBeenCalled();
+  });
+
+  it("2분이_지난_뒤의_마지막_조회에서_결제_완료면_완료_화면으로_간다", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    focusManager.setFocused(false);
+    h.POST.mockRejectedValue(new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null));
+    h.GET.mockResolvedValueOnce(pendingOrder());
+    h.GET.mockResolvedValue({ data: { data: { ...pendingOrder().data.data, status: "PAID", payment: { amount: 48000, refundedAmount: 0, status: "APPROVED" } } } });
+    mount();
+
+    await waitFor(() => expect(h.GET).toHaveBeenCalledTimes(1));
+    await act(() => vi.advanceTimersByTimeAsync(121_000));
+    await waitFor(() => expect(h.replace).toHaveBeenCalledWith("/my/orders/42/complete"));
+    expect(screen.queryByText(/아직 결제 결과를 확인하지 못했습니다/)).not.toBeInTheDocument();
   });
 
   it("조회한_주문의_주문번호가_다르면_그_주문의_상태를_믿지_않는다", async () => {

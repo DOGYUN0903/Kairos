@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ApiError } from "@/api/client";
 import { useAuth } from "@/auth/useAuth";
 import { useOrder } from "@/features/orders/api";
 import { usePollingWindow } from "@/features/orders/polling";
@@ -101,17 +102,40 @@ function Body({ params, view }: { params: ReturnType<typeof parseConfirmParams>;
   );
 }
 
+/** 주문이 취소된 뒤의 다음 단계. 장바구니 주문이면 상품이 장바구니에 남아 있고, 바로 구매면 주문 내역에서 확인한다. */
+function CanceledActions() {
+  return (
+    <PanelActions>
+      <Link className="btn btn-ghost" href={ORDERS}>
+        주문 내역
+      </Link>
+      <Link className="btn btn-primary" href="/cart">
+        장바구니로
+      </Link>
+    </PanelActions>
+  );
+}
+
+/** PG 가 결제를 거절했다(402 PAYMENT_REJECTED). 서버가 주문을 취소하고 재고를 되돌렸다. */
 function Rejected() {
   return (
     <div role="alert">
       <StatusPanel title="결제 거절" tone="muted">
-        <PanelDesc>결제가 거절되어 주문이 취소되었습니다. 담아 둔 상품은 장바구니에 그대로 있습니다.</PanelDesc>
+        <PanelDesc>결제가 거절되어 주문이 취소되었습니다. 재고와 장바구니는 그대로입니다</PanelDesc>
       </StatusPanel>
-      <PanelActions>
-        <Link className="btn btn-primary" href="/cart">
-          장바구니로
-        </Link>
-      </PanelActions>
+      <CanceledActions />
+    </div>
+  );
+}
+
+/** 확인 중이던 주문이 취소됐다. 결제 기한 만료·응답 유실 뒤 정리일 수도 있어 "거절"이라고 말하지 않는다. */
+function CanceledWhilePending() {
+  return (
+    <div role="alert">
+      <StatusPanel title="결제 미완료" tone="muted">
+        <PanelDesc>결제가 완료되지 않아 주문이 취소되었습니다</PanelDesc>
+      </StatusPanel>
+      <CanceledActions />
     </div>
   );
 }
@@ -123,7 +147,7 @@ function Pending({ orderId, orderNo }: { orderId: number | null; orderNo: string
   return <PendingPoll orderId={orderId} orderNo={orderNo} />;
 }
 
-/** 숫자 주문 ID 를 모르면 주문을 조회할 수 없다. 결과는 주문 내역에서 확인하게 한다. */
+/** 주문을 조회할 수 없다(숫자 주문 ID 를 모르거나, 그 ID 로는 이 주문을 읽을 수 없다). 결과는 주문 내역에서 확인하게 한다. */
 function PendingUnknownOrder() {
   return (
     <div role="status" aria-live="polite">
@@ -139,7 +163,11 @@ function PendingUnknownOrder() {
   );
 }
 
-/** 주문을 3초마다 다시 읽어(최대 2분) 승인되면 완료 화면으로, 취소되면 거절 안내로 바꾼다. */
+/**
+ * 주문을 3초마다 다시 읽어(최대 2분) 승인되면 완료 화면으로, 취소되면 취소 안내로 바꾼다.
+ * - 조회가 4xx 면(남의 주문·없는 oid) 다시 읽어도 같으므로 바로 멈추고 주문 내역으로 안내한다.
+ * - 탭이 숨겨지면 주기 조회가 멈추고 2분 타이머만 흐른다. 그래서 2분이 끝나는 순간 한 번 더 읽고, 그 결과로 화면을 정한다.
+ */
 function PendingPoll({ orderId, orderNo }: { orderId: number; orderNo: string }) {
   const router = useRouter();
   const qc = useQueryClient();
@@ -150,12 +178,13 @@ function PendingPoll({ orderId, orderNo }: { orderId: number; orderNo: string })
   // oid 는 주소에서 온 값이다. 승인을 요청한 주문번호와 같은 주문일 때만 그 상태를 믿는다.
   const data = order.data;
   const mismatch = data !== undefined && data.orderNo !== orderNo;
+  const unreadable = order.error instanceof ApiError && order.error.status >= 400 && order.error.status < 500;
   const paid = data !== undefined && !mismatch && isPaid(data);
   const canceled = data !== undefined && !mismatch && data.status === "CANCELED";
 
   useEffect(() => {
-    if (mismatch || paid || canceled) setSettled(true);
-  }, [mismatch, paid, canceled]);
+    if (mismatch || unreadable || paid || canceled) setSettled(true);
+  }, [mismatch, unreadable, paid, canceled]);
 
   useEffect(() => {
     if (!paid) return;
@@ -164,9 +193,20 @@ function PendingPoll({ orderId, orderNo }: { orderId: number; orderNo: string })
     router.replace(`${ORDERS}/${orderId}/complete`);
   }, [paid, orderId, qc, router]);
 
-  if (mismatch) return <PendingUnknownOrder />;
-  if (canceled) return <Rejected />;
-  if (poll.expired) {
+  // 2분이 끝나면 마지막으로 한 번 더 읽는다. 끝나기 전에는 만료 안내를 띄우지 않는다.
+  const [lastChecked, setLastChecked] = useState(false);
+  const lastCheckFired = useRef(false);
+  const refetch = order.refetch;
+  useEffect(() => {
+    if (!poll.expired || lastCheckFired.current) return;
+    lastCheckFired.current = true;
+    // cleanup 에서 취소하지 않는다(StrictMode 의 이중 effect 에서 ref 가드와 겹치면 결과가 버려진다).
+    void refetch().finally(() => setLastChecked(true));
+  }, [poll.expired, refetch]);
+
+  if (mismatch || unreadable) return <PendingUnknownOrder />;
+  if (canceled) return <CanceledWhilePending />;
+  if (!paid && lastChecked) {
     return (
       <div role="status" aria-live="polite">
         <StatusPanel title="결제 확인 중">
