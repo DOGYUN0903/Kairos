@@ -39,3 +39,17 @@ data class ReturnRequestSummary(
     val returnFee: Long,
     val requestedAt: LocalDateTime,
 )
+
+/** 반품 요청 전 예상 환불. 수거 확인 때 실제 환불과 같은 계산이지만 그 사이 주문 상태가 바뀌면 달라질 수 있다. */
+data class ReturnPreviewResult(
+    val orderItemId: Long,
+    val reason: String,
+    val feeBearer: String,
+    val paidAmount: Long,
+    val returnFee: Long,
+    val outboundFeeRecovered: Long,
+    val shippingFeeRefund: Long,
+    val refundAmount: Long,
+    val pointsRefund: Long,
+    val productCouponReturnable: Boolean,
+)

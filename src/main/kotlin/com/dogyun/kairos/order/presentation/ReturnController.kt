@@ -34,6 +34,17 @@ class ReturnController(
     ): ResponseEntity<ApiResponse<ReturnRequestResult>> =
         ApiResponse.created(orderReturnService.request(loginMember.id, orderId, orderItemId, request.toCommand()))
 
+    /** 상태를 바꾸지 않는 읽기라 `Idempotency-Key` 가 없다. 사유는 반품 요청과 같은 변환을 거치도록 문자열로 받는다. */
+    @GetMapping("/api/v1/orders/{orderId}/items/{orderItemId}/return-preview")
+    fun preview(
+        @AuthenticationPrincipal loginMember: LoginMember,
+        @PathVariable orderId: Long,
+        @PathVariable orderItemId: Long,
+        @RequestParam reason: String,
+    ): ResponseEntity<ApiResponse<ReturnPreviewResponse>> = ApiResponse.ok(
+        ReturnPreviewResponse.from(returnQueryService.previewReturn(loginMember.id, orderId, orderItemId, reason)),
+    )
+
     @GetMapping("/api/v1/returns/me")
     fun listMine(
         @AuthenticationPrincipal loginMember: LoginMember,

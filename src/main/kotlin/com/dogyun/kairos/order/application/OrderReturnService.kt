@@ -40,7 +40,7 @@ class OrderReturnService(
     }
 
     fun request(memberId: Long, orderId: Long, orderItemId: Long, cmd: RequestReturnCommand): ReturnRequestResult {
-        val reason = ReturnReason.entries.firstOrNull { it.name == cmd.reason } ?: throw DomainException(ErrorCode.RETURN_INVALID)
+        val reason = parseReturnReason(cmd.reason)
         return tx.run {
             val order = orderRepository.findByIdForUpdate(orderId)?.takeIf { it.memberId == memberId }
                 ?: throw DomainException(ErrorCode.ORDER_NOT_FOUND)
