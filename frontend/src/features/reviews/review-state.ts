@@ -1,4 +1,5 @@
 import type { OrderItemReview } from "@/features/reviews/api";
+import { formatPoints } from "@/lib/money";
 
 export type ReviewAction =
   | { kind: "none" }
@@ -25,5 +26,5 @@ export function reviewAction(review: OrderItemReview | null | undefined): Review
 
 /** 작성 성공 토스트. 포인트는 서버 값 그대로다. */
 export function rewardNotice(rewardPoints: number): string {
-  return rewardPoints > 0 ? `후기를 등록했습니다. ${rewardPoints}P가 적립되었습니다.` : "후기를 등록했습니다.";
+  return rewardPoints > 0 ? `후기를 등록했습니다. ${formatPoints(rewardPoints)}가 적립되었습니다.` : "후기를 등록했습니다.";
 }

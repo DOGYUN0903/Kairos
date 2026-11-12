@@ -12,13 +12,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PolicyFormDialog } from "@/features/coupon-policies/components/PolicyFormDialog";
 import { PolicyTable } from "@/features/coupon-policies/components/PolicyTable";
 import type { CouponPolicyResult } from "@/features/coupon-policies/policy-status";
+import { POLICY_IMMUTABLE_NOTICE } from "@/features/coupon-policies/notices";
 import { POLICY_PAGE_SIZE, useCreateSellerPolicy, useEndSellerPolicy, useSellerPolicies } from "@/features/seller/coupons/api";
 import { ProductPicker } from "@/features/seller/coupons/components/ProductPicker";
 import { toast } from "@/hooks/use-toast";
 import { parsePage } from "@/lib/page";
 
 export const SELLER_POLICY_NOTICE = [
-  "등록한 쿠폰은 수정할 수 없습니다. 잘못 등록했으면 종료하고 새로 등록해 주세요. 종료해도 이미 받은 고객은 사용할 수 있습니다.",
+  POLICY_IMMUTABLE_NOTICE,
   "판매자 쿠폰 할인은 판매자가 부담합니다(정산 금액에서 차감).",
 ];
 

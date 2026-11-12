@@ -89,7 +89,7 @@ export function percentToBp(percent: number): number {
 
 /**
  * 평균 별점(0~5, 서버 값 소수 한 자리)을 별 채움 너비 %(0~100 정수)로. 4.6 → 92.
- * 소수 한 자리로 반올림해 10배 한 값 × 2(= 100 ÷ 5 ÷ 0.1 → 정수) 이므로 나눗셈 없이 곱셈으로 끝난다.
+ * 소수 한 자리로 반올림해 10배 한 값(tenths, 0~50)을 `floorDiv(tenths * 100, 50)`(= tenths × 2)으로 퍼센트로 바꾼다. 4.6 → 46 → 92.
  */
 export function ratingFillPercent(rating: number): number {
   if (!Number.isFinite(rating)) return 0;

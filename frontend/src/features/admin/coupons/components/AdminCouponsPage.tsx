@@ -13,11 +13,11 @@ import { PolicyFormDialog } from "@/features/coupon-policies/components/PolicyFo
 import { PolicyTable } from "@/features/coupon-policies/components/PolicyTable";
 import type { CouponPolicyResult } from "@/features/coupon-policies/policy-status";
 import { ADMIN_POLICY_PAGE_SIZE as POLICY_PAGE_SIZE, useAdminPolicies, useCreateAdminPolicy, useEndAdminPolicy } from "@/features/admin/coupons/api";
-import { SELLER_POLICY_NOTICE } from "@/features/seller/coupons/components/SellerCouponsPage";
+import { POLICY_IMMUTABLE_NOTICE } from "@/features/coupon-policies/notices";
 import { toast } from "@/hooks/use-toast";
 import { parsePage } from "@/lib/page";
 
-const ADMIN_POLICY_NOTICE = ["플랫폼 쿠폰 할인은 플랫폼이 부담합니다.", SELLER_POLICY_NOTICE[0] ?? ""];
+const ADMIN_POLICY_NOTICE = ["플랫폼 쿠폰 할인은 플랫폼이 부담합니다.", POLICY_IMMUTABLE_NOTICE];
 
 /** 관리자 플랫폼 쿠폰 관리. ?page= 가 진실이다. */
 export function AdminCouponsPage() {

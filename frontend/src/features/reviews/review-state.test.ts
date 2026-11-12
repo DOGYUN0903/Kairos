@@ -30,6 +30,7 @@ describe("reviewAction", () => {
 describe("rewardNotice", () => {
   it("적립_포인트를_서버_값으로_알린다", () => {
     expect(rewardNotice(500)).toBe("후기를 등록했습니다. 500P가 적립되었습니다.");
+    expect(rewardNotice(1500)).toBe("후기를 등록했습니다. 1,500P가 적립되었습니다.");
     expect(rewardNotice(100)).toBe("후기를 등록했습니다. 100P가 적립되었습니다.");
   });
   it("0이면_적립_문구_없이", () => {
