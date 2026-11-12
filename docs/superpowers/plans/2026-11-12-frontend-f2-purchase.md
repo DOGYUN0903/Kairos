@@ -329,7 +329,7 @@ app/admin/orders/page.tsx  admin/orders/[orderId]/page.tsx
   - `shippingAddressSchema`(zod): `receiverName` 1~50, `phone` 1~20 + `/^[0-9-]+$/`, `zipCode` 1~10, `address1` 1~200, `address2` 1~200, `memo` 0~200(빈 문자열은 제출 시 `undefined`)
   - `useCreateOrder()`: `(body: CreateOrderRequest, key: string) => Promise<CreateOrderResponse>`
   - `useRecentShippingAddress()`: `GET /orders?page=0&size=1` → 첫 주문의 `GET /orders/{id}` → `shippingAddress | null`(버튼을 누를 때 조회)
-  - `openPostcode(onComplete: (r: { zipCode: string; address1: string }) => void): Promise<void>` — 카카오 우편번호 스크립트(`https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js`)를 처음 호출 때 한 번만 불러 연다. 로드 실패 시 reject.
+  - `openPostcode(onComplete: (r: { zipCode: string; address1: string }) => void): Promise<void>` — 카카오 우편번호 스크립트(`https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js`)를 처음 호출 때 한 번만 불러 연다. 로드 실패 시 reject.
   - 주문 생성 뒤 이동: `orderStatus === "PAID"`면 `/my/orders/{id}/complete`, 아니면 `/my/orders/{id}/pay?auto=1` — `router.replace`
 
 - [ ] **Step 1: 실패하는 테스트 — `checkout-params.test.ts`** (Review Focus 4)

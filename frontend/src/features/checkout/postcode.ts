@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
+const SCRIPT_URL = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
 
 type PostcodeData = { zonecode: string; roadAddress: string; jibunAddress: string; address: string; userSelectedType?: string };
 type DaumWindow = Window & { daum?: { Postcode: new (opts: { oncomplete: (d: PostcodeData) => void }) => { open: () => void } } };
