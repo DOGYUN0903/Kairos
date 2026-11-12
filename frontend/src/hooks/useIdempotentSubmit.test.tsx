@@ -41,6 +41,7 @@ describe("useIdempotentSubmit", () => {
     const { result } = setup(submit, () => {});
     await act(() => result.current.onSubmit());
     await act(() => result.current.onSubmit());
+    expect(submit).toHaveBeenCalledTimes(2);
     expect(new Set(keysOf(submit)).size).toBe(1);
   });
 
@@ -62,11 +63,47 @@ describe("useIdempotentSubmit", () => {
     const { result } = setup(submit, () => {});
     await act(() => result.current.onSubmit());
     await act(() => result.current.onSubmit());
+    expect(submit).toHaveBeenCalledTimes(2);
     expect(new Set(keysOf(submit)).size).toBe(1);
   });
 
+  it("처리_중_409_뒤_다시_보내면_같은_키를_쓴다", async () => {
+    const submit = vi.fn(async () => {
+      throw new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "x", null);
+    });
+    const { result } = setup(submit, () => {});
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.onSubmit());
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(new Set(keysOf(submit)).size).toBe(1);
+  });
+
+  it("onError가_던져도_reject하지_않는다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const submit = vi.fn(async () => {
+      throw new ApiError(422, "INVALID_REQUEST", "x", null);
+    });
+    const { result } = setup(submit, () => {
+      throw new Error("handler");
+    });
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.retry());
+    expect(result.current.submitting).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it("답을_받은_뒤의_retry는_아무것도_보내지_않는다", async () => {
+    const submit = vi.fn(async () => {
+      throw new ApiError(422, "INVALID_REQUEST", "x", null);
+    });
+    const { result } = setup(submit, () => {});
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.retry());
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
   it("submit이_던지면_onError를_부르고_onSubmit은_reject하지_않는다", async () => {
-    const err = new ApiError(422, "INVALID_REQUEST", "x", null);
+    const err = new ApiError(503, "INTERNAL_ERROR", "x", null);
     const submit = vi.fn(async () => {
       throw err;
     });

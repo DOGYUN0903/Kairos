@@ -38,8 +38,33 @@ describe("useIdempotentAction", () => {
       const { result } = setup(action, () => {});
       await act(() => result.current.run({ id: 1 }));
       await act(() => result.current.run({ id: 1 }));
+      expect(action).toHaveBeenCalledTimes(2);
       expect(new Set(keysOf(action)).size).toBe(1);
     }
+  });
+
+  it("처리_중_409_뒤_다시_보내면_같은_키를_쓴다", async () => {
+    const action = vi.fn(async () => {
+      throw new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "x", null);
+    });
+    const { result } = setup(action, () => {});
+    await act(() => result.current.run({ id: 1 }));
+    await act(() => result.current.run({ id: 1 }));
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(new Set(keysOf(action)).size).toBe(1);
+  });
+
+  it("onError가_던져도_reject하지_않는다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const action = vi.fn(async () => {
+      throw new ApiError(422, "INVALID_REQUEST", "x", null);
+    });
+    const { result } = setup(action, async () => {
+      throw new Error("handler");
+    });
+    await act(() => result.current.run({ id: 1 }));
+    expect(result.current.pending).toBe(false);
+    vi.restoreAllMocks();
   });
 
   it("던지면_onError를_부르고_run은_reject하지_않는다", async () => {

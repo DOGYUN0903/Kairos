@@ -50,14 +50,19 @@ export function amountUntil(threshold: number, amount: number): number {
   return Math.max(assertSafeInt(threshold, "기준 금액") - assertSafeInt(amount), 0);
 }
 
+function positiveDivisor(d: number): number {
+  if (!Number.isSafeInteger(d) || d <= 0) throw new Error(`제수는 0보다 큰 안전한 정수여야 합니다: ${d}`);
+  return d;
+}
+
 /** 안전 정수 전용 내림 나눗셈(시간 계산 등 금액 밖에서도 ESLint 가 막는 `/` 대신 쓴다). */
 export function floorDiv(n: number, d: number): number {
-  return Math.floor(assertSafeInt(n, "피제수") / assertSafeInt(d, "제수"));
+  return Math.floor(assertSafeInt(n, "피제수") / positiveDivisor(d));
 }
 
 /** 안전 정수 전용 나머지(항상 0 이상 d 미만, d > 0). */
 export function mod(n: number, d: number): number {
   const nn = assertSafeInt(n, "피제수");
-  const dd = assertSafeInt(d, "제수");
+  const dd = positiveDivisor(d);
   return ((nn % dd) + dd) % dd;
 }

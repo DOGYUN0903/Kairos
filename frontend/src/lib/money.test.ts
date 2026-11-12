@@ -43,6 +43,13 @@ describe("amountUntil", () => {
     expect(amountUntil(50000, 50000)).toBe(0);
     expect(amountUntil(50000, 61000)).toBe(0);
   });
+});
+
+describe("floorDiv와 mod", () => {
+  it("0_이하_제수는_던진다", () => {
+    expect(() => floorDiv(10, 0)).toThrow();
+    expect(() => mod(10, -3)).toThrow();
+  });
   it("floorDiv와_mod는_음수에서도_내림_기준", () => {
     expect(floorDiv(754, 60)).toBe(12);
     expect(mod(754, 60)).toBe(34);

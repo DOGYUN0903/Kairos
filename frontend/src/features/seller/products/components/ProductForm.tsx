@@ -116,7 +116,7 @@ export function ProductForm({ mode, initial, leavingRef }: ProductFormProps) {
       if (initial) {
         if (mode === "change-request") await changeRequest.mutateAsync({ body: toChangeRequest(values), key });
         else await editContent.mutateAsync(toContentRequest(values));
-        form.reset(form.getValues()); // 이후 같은 값 재제출에는 새 키가 쓰이도록 dirty 기준을 갱신
+        form.reset(form.getValues()); // 제출한 값을 새 기준(dirty 아님)으로 삼는다. 키는 훅이 성공 시 알아서 버린다. 화면 동작을 그대로 두려고 유지
         toast({ title: mode === "change-request" ? "변경 요청이 접수됐습니다" : "검수 대기 상태로 다시 제출됐습니다" });
         leave();
         return;

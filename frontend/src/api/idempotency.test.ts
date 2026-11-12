@@ -14,6 +14,9 @@ describe("isAnswered", () => {
   it("서버가_4xx로_답한_오류는_true", () => {
     for (const status of [409, 402, 422]) expect(isAnswered(new ApiError(status, "INVALID_REQUEST", "x", null))).toBe(true);
   });
+  it("IDEMPOTENCY_IN_PROGRESS 409는 답으로 치지 않는다", () => {
+    expect(isAnswered(new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "x", null))).toBe(false);
+  });
   it("status_0과_5xx와_ApiError가_아닌_오류는_false", () => {
     expect(isAnswered(new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null))).toBe(false);
     expect(isAnswered(new ApiError(500, "INTERNAL_ERROR", "x", null))).toBe(false);
