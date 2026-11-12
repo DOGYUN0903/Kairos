@@ -66,6 +66,7 @@ class DemoSeeder(
         val counter = Counter()
         val adminId = ensureMember(DemoAccounts.ADMIN, "데모 관리자", admin = true, counter)
         ensureMember(DemoAccounts.BUYER, "데모 구매자", admin = false, counter)
+        ensureMember(DemoAccounts.SETTLEMENT_BUYER, "정산 시연 구매자", admin = false, counter)
         val sellerMemberId = ensureMember(DemoAccounts.SELLER, "데모 판매자", admin = false, counter)
         val pendingSellerMemberId = ensureMember(DemoAccounts.SELLER_PENDING, "입점 대기 판매자", admin = false, counter)
 
@@ -83,6 +84,8 @@ class DemoSeeder(
             log.warn { "데모 브랜드가 승인 상태가 아니어서 상품 시드를 건너뜁니다" }
             return counter.result()
         }
+        // 정산 시연 상품을 먼저 만든다(상품 id 가 작아 판매자 상품 목록에서 데모 상품보다 뒤에 나온다).
+        ensureSettlementProducts(seller, adminId, leafIds, counter)
         ensureProducts(seller, brand, leafIds, adminId, counter)
         return counter.result()
     }
@@ -150,6 +153,39 @@ class DemoSeeder(
             brand = brandService.listMine(seller).first { it.name == MAIN_BRAND }
         }
         return brand.takeIf { it.status == APPROVED }
+    }
+
+    /** 정산 시연 전용 브랜드와 상품 5종(판매 중)을 이름 기준으로 보충한다. 기존 "판매 중 20개" 계산에는 영향이 없다. */
+    private fun ensureSettlementProducts(
+        seller: SellerPrincipal,
+        adminId: Long,
+        leafIds: Map<Pair<String, String>, Long>,
+        counter: Counter,
+    ) {
+        var brand = brandService.listMine(seller).firstOrNull { it.name == SETTLEMENT_DEMO_BRAND }
+        if (brand == null) {
+            brandService.apply(seller, BrandApplicationCommand(SETTLEMENT_DEMO_BRAND, "KAIROS SETTLEMENT DEMO", null, "정산 시연 주문에 쓰는 데모 브랜드입니다."))
+            counter.brands++
+            brand = brandService.listMine(seller).first { it.name == SETTLEMENT_DEMO_BRAND }
+        }
+        if (brand.status == PENDING) {
+            brandAdminService.approve(brand.brandId, adminId)
+            brand = brandService.listMine(seller).first { it.name == SETTLEMENT_DEMO_BRAND }
+        }
+        if (brand.status != APPROVED) {
+            log.warn { "정산 시연 브랜드가 승인 상태가 아니어서 정산 시연 상품 시드를 건너뜁니다" }
+            return
+        }
+        val existing = listAllMine(seller).filter { it.brandName == SETTLEMENT_DEMO_BRAND && it.status == ON_SALE }.map { it.name }.toSet()
+        val missing = DEMO_SETTLEMENT_PRODUCTS.filter { it.name !in existing }
+        if (missing.isEmpty()) return
+        val images = uploadImages(seller.memberId)
+        missing.forEachIndexed { i, spec ->
+            val productId = register(seller, brand.brandId, spec, leafIds, images, i)
+            productAdminService.approve(productId, adminId)
+            fillStock(seller, productId, stock = SETTLEMENT_STOCK)
+            counter.products++
+        }
     }
 
     private fun ensureProducts(
@@ -255,6 +291,7 @@ class DemoSeeder(
         const val COMMISSION_RATE_BP = 1000
         const val PAGE_SIZE = 100
         const val IMAGE_COUNT = 4
+        const val SETTLEMENT_STOCK = 500
         const val MAIN_BRAND = "카이로스 데모"
         const val PENDING_BRAND = "KAIROS DEMO"
         const val PENDING = "PENDING"

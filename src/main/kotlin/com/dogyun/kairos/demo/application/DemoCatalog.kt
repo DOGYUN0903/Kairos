@@ -59,3 +59,27 @@ internal val DEMO_PENDING_PRODUCTS: List<DemoProduct> = listOf(
     DemoProduct("코튼 치노 팬츠", "적당한 핏의 데일리 치노 팬츠입니다.", "바지" to "슬랙스", 59000, 41300, listOf(colors("카키", "베이지"), SIZE_PANTS)),
     DemoProduct("레더 미니 크로스백", "소가죽으로 만든 미니 크로스백입니다.", "가방" to "토트백", 119000, 95200, listOf(colors("블랙", "탄"), SIZE_BAG)),
 )
+
+/** 정산 시연 전용 브랜드. 기존 "판매 중 20개" 보충 계산(데모 브랜드 기준)에 섞이지 않게 따로 둔다. */
+internal const val SETTLEMENT_DEMO_BRAND = "카이로스 정산 시연"
+
+/**
+ * 정산 시연 주문에 쓰는 상품 5종(판매가 = 정가). 순서가 곧 역할이다: 0 = 50,000(주문 A, 쿠폰 대상), 1 = 30,000(A), 2 = 20,000(B, 불량 반품),
+ * 3 = 15,000(B, 남김), 4 = 30,000(C, 전부 반품). 한 항목 옵션 하나뿐인 단순 상품이다.
+ */
+internal val DEMO_SETTLEMENT_PRODUCTS: List<DemoProduct> = listOf(
+    50_000L to "A-1",
+    30_000L to "A-2",
+    20_000L to "B-1",
+    15_000L to "B-2",
+    30_000L to "C-1",
+).map { (price, tag) ->
+    DemoProduct(
+        name = "정산 시연 상품 $tag (${"%,d".format(price)}원)",
+        description = "정산 시연 주문에 쓰는 상품입니다.",
+        category = "상의" to "반팔 티셔츠",
+        originalPrice = price,
+        salePrice = price,
+        options = listOf(DemoOption("구성", listOf("기본"))),
+    )
+}

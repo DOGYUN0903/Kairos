@@ -69,7 +69,8 @@ class DemoApiTest : CommerceTestSupport() {
 
         assertEquals(1, result.get("products").asInt())
         assertEquals(0, result.get("pendingReviews").asInt())
-        assertEquals(20, countMine(seller, "ON_SALE"))
+        // 데모 상품 20개 + 정산 시연 상품 5개(같은 판매자 소유, 별도 브랜드)
+        assertEquals(25, countMine(seller, "ON_SALE"))
     }
 
     @Test

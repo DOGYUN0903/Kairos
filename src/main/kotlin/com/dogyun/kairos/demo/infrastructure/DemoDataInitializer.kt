@@ -1,6 +1,7 @@
 package com.dogyun.kairos.demo.infrastructure
 
 import com.dogyun.kairos.demo.application.DemoSeeder
+import com.dogyun.kairos.demo.application.DemoSettlementSeeder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -14,11 +15,18 @@ private val log = KotlinLogging.logger {}
 @Profile("demo")
 class DemoDataInitializer(
     private val demoSeeder: DemoSeeder,
+    private val settlementSeeder: DemoSettlementSeeder,
     @Suppress("unused") private val guard: DemoProfileGuard,
 ) : ApplicationRunner {
 
     override fun run(args: ApplicationArguments) {
         val result = demoSeeder.seed()
         log.info { "데모 데이터 시드 완료(새로 만든 수): $result" }
+        // 정산 시연 묶음은 실패해도 기동을 막지 않는다(스케줄러 스레드와 겹치면 실패할 수 있다). 다음 기동·reseed 가 완성 판정으로 다시 만든다.
+        try {
+            log.info { "정산 시연 데이터 시드 완료: ${settlementSeeder.seedLastWeek()}" }
+        } catch (e: Exception) {
+            log.warn(e) { "정산 시연 데이터 시드에 실패했지만 기동은 계속합니다. 다음 기동이나 POST /demo/reseed 에서 다시 만듭니다" }
+        }
     }
 }
