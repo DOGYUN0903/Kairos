@@ -57,7 +57,7 @@ object DiscountAllocator {
             if (terms.kind != CouponKind.PRODUCT || !terms.appliesTo(line.productId, line.sellerId)) {
                 throw DomainException(ErrorCode.COUPON_NOT_APPLICABLE)
             }
-            if ((terms.minOrderAmount ?: 0) > amounts[i]) throw DomainException(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET)
+            if (!terms.meetsMinimum(amounts[i])) throw DomainException(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET)
             terms.discountFor(amounts[i])
         }
         val afterProduct = amounts.indices.map { amounts[it] - productDiscounts[it] }
@@ -69,7 +69,7 @@ object DiscountAllocator {
             if (cartCoupon.kind != CouponKind.CART) throw DomainException(ErrorCode.COUPON_NOT_APPLICABLE)
             val target = afterProduct.sum()
             if (target <= 0) throw DomainException(ErrorCode.COUPON_NOT_APPLICABLE)
-            if ((cartCoupon.minOrderAmount ?: 0) > target) throw DomainException(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET)
+            if (!cartCoupon.meetsMinimum(target)) throw DomainException(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET)
             cartDiscount = cartCoupon.discountFor(target)
             cartShares = distribute(cartDiscount, afterProduct)
         }

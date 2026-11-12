@@ -31,6 +31,9 @@ data class CouponTerms(
         CouponTarget.NONE -> false
     }
 
+    /** 최소 주문 금액 충족 여부(경계 포함). */
+    fun meetsMinimum(targetAmount: Long): Boolean = (minOrderAmount ?: 0) <= targetAmount
+
     /** [targetAmount] 에 대한 할인액. 대상 금액을 넘지 않는다. */
     fun discountFor(targetAmount: Long): Long {
         if (targetAmount <= 0) return 0
