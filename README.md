@@ -59,6 +59,7 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은
 - [x] C4. 반품과 정산
 - [x] F1. 프론트엔드 기반과 C1 화면
 - [x] F2. 구매 화면
+- [x] F3. 혜택·후기 화면 (PR 대기)
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
@@ -80,6 +81,8 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은
 - F1 구현 계획: `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md`
 - F2 스펙: `docs/superpowers/specs/2026-11-12-frontend-f2-purchase-design.md`
 - F2 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f2-purchase.md`
+- F3 스펙: `docs/superpowers/specs/2026-11-12-frontend-f3-benefits-design.md`
+- F3 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f3-benefits.md`
 - ADR 0005(C4 반품 환불과 정산 불변성): `docs/adr/0005-c4-return-refund-and-settlement-immutability.md`
 - ADR 0004(C3 혜택 트랜잭션과 락 순서): `docs/adr/0004-c3-benefit-transaction-and-lock-order.md`
 - ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`
