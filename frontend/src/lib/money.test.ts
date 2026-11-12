@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSafeInt, discountRate, formatBp, formatKrw, lineTotal, parseWon } from "@/lib/money";
+import { amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, lineTotal, mod, parseWon } from "@/lib/money";
 
 describe("money", () => {
   it("formatKrw는_27300을_27_300원으로_만든다", () => {
@@ -32,5 +32,21 @@ describe("money", () => {
     expect(formatBp(1000)).toBe("10%");
     expect(formatBp(1250)).toBe("12.5%");
     expect(formatBp(1205)).toBe("12.05%");
+  });
+});
+
+describe("amountUntil", () => {
+  it("기준까지_남은_금액", () => {
+    expect(amountUntil(50000, 42000)).toBe(8000);
+  });
+  it("기준과_같거나_넘으면_0", () => {
+    expect(amountUntil(50000, 50000)).toBe(0);
+    expect(amountUntil(50000, 61000)).toBe(0);
+  });
+  it("floorDiv와_mod는_음수에서도_내림_기준", () => {
+    expect(floorDiv(754, 60)).toBe(12);
+    expect(mod(754, 60)).toBe(34);
+    expect(floorDiv(-1, 60)).toBe(-1);
+    expect(mod(-1, 60)).toBe(59);
   });
 });

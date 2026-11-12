@@ -54,25 +54,28 @@ function BrandForm({ mode, brand, onOpenChange }: BrandDialogProps) {
   const { register, formState, control } = form;
   const { errors } = formState;
 
-  const { onSubmit, submitting } = useIdempotentSubmit(form, async (values, key) => {
-    try {
+  const { onSubmit, submitting } = useIdempotentSubmit(
+    form,
+    async (values, key) => {
       if (mode === "create") await create.mutateAsync({ values, key });
       else await update.mutateAsync({ values });
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
-        setBanner("판매자 상태 때문에 처리할 수 없습니다. 정지 중에는 브랜드를 신청할 수 없습니다.");
-        await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
-        onOpenChange(false);
-        return;
-      }
-      applyFormError(form, e);
-      return;
-    }
-    // 같은 값으로 다시 신청하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
-    form.reset();
-    toast({ title: mode === "create" ? "브랜드를 신청했습니다." : "브랜드를 다시 신청했습니다." });
-    onOpenChange(false);
-  });
+      // 같은 값으로 다시 신청하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
+      form.reset();
+      toast({ title: mode === "create" ? "브랜드를 신청했습니다." : "브랜드를 다시 신청했습니다." });
+      onOpenChange(false);
+    },
+    {
+      onError: async (e) => {
+        if (e instanceof ApiError && e.code === "SELLER_NOT_ACTIVE") {
+          setBanner("판매자 상태 때문에 처리할 수 없습니다. 정지 중에는 브랜드를 신청할 수 없습니다.");
+          await qc.invalidateQueries({ queryKey: queryKeys.seller.me });
+          onOpenChange(false);
+          return;
+        }
+        applyFormError(form, e);
+      },
+    },
+  );
 
   return (
     <form onSubmit={onSubmit} noValidate>

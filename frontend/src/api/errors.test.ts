@@ -24,4 +24,9 @@ describe("resolveError", () => {
       traceId: null,
     });
   });
+  it("주문_없음은_page_ORDER_INVALID는_form", () => {
+    expect(resolveError(new ApiError(404, "ORDER_NOT_FOUND", "x", null)).kind).toBe("page");
+    expect(resolveError(new ApiError(404, "SELLER_ORDER_NOT_FOUND", "x", null)).kind).toBe("page");
+    expect(resolveError(new ApiError(422, "ORDER_INVALID", "x", null)).kind).toBe("form");
+  });
 });

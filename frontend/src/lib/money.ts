@@ -44,3 +44,20 @@ export function formatBp(bp: number): string {
   if (rest === 0) return `${whole}%`;
   return `${whole}.${String(rest).padStart(2, "0").replace(/0$/, "")}%`;
 }
+
+/** threshold 까지 남은 금액. 이미 넘었으면 0. */
+export function amountUntil(threshold: number, amount: number): number {
+  return Math.max(assertSafeInt(threshold, "기준 금액") - assertSafeInt(amount), 0);
+}
+
+/** 안전 정수 전용 내림 나눗셈(시간 계산 등 금액 밖에서도 ESLint 가 막는 `/` 대신 쓴다). */
+export function floorDiv(n: number, d: number): number {
+  return Math.floor(assertSafeInt(n, "피제수") / assertSafeInt(d, "제수"));
+}
+
+/** 안전 정수 전용 나머지(항상 0 이상 d 미만, d > 0). */
+export function mod(n: number, d: number): number {
+  const nn = assertSafeInt(n, "피제수");
+  const dd = assertSafeInt(d, "제수");
+  return ((nn % dd) + dd) % dd;
+}

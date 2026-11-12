@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatDate, formatDateTime, toLocalDateTimeString } from "@/lib/datetime";
+import { formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString } from "@/lib/datetime";
 
 describe("datetime", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -17,5 +17,25 @@ describe("datetime", () => {
   it("소수_초가_붙은_DATETIME(6)_값도_표시한다", () => {
     expect(formatDateTime("2026-11-07T14:20:00.123456")).toBe("2026-11-07 14:20");
     expect(formatDateTime("2026-11-07T14:20")).toBe("2026-11-07 14:20");
+  });
+});
+
+describe("secondsUntilKst", () => {
+  const now = Date.parse("2026-11-12T10:00:00+09:00");
+  it("남은_초를_센다", () => {
+    expect(secondsUntilKst("2026-11-12T10:15:00", now)).toBe(900);
+  });
+  it("지난_시각은_0", () => {
+    expect(secondsUntilKst("2026-11-12T09:00:00", now)).toBe(0);
+  });
+  it("소수_초는_잘라낸다", () => {
+    expect(secondsUntilKst("2026-11-12T10:15:00.123456", now)).toBe(900);
+  });
+});
+
+describe("formatCountdown", () => {
+  it("MM:SS로_만든다", () => {
+    expect(formatCountdown(754)).toBe("12:34");
+    expect(formatCountdown(0)).toBe("00:00");
   });
 });
