@@ -41,6 +41,9 @@ const ret = (over: Partial<ReturnRequestResponse> = {}): ReturnRequestResponse =
     autoApproveAt: null,
     ...over,
   }) as ReturnRequestResponse;
+// 서버가 만드는 상태별 금액(REFUNDING 이후는 계산된 금액을 싣는다): 30,000원 불량, 구매자가 낸 배송비 3,000원.
+const refunding = { status: "REFUNDING", receivedAt: "2026-11-12T10:40:00", refundAmount: 33000, shippingFeeRefund: 3000, sellerBorneFee: 3000 } as const;
+const completed = { ...refunding, status: "COMPLETED", completedAt: "2026-11-12T10:41:00" } as const;
 const ok = (data: ReturnRequestResponse) => ({ data: { data } });
 
 function mount() {
@@ -77,7 +80,7 @@ describe("AdminReturnDetailPage", () => {
     fireEvent.click(confirm);
     expect(h.PATCH).toHaveBeenCalledTimes(1);
     expect(h.PATCH).toHaveBeenCalledWith("/api/v1/admin/returns/{returnId}/receive", { params: { path: { returnId: 5 } } });
-    resolve(ok(ret({ status: "COMPLETED", refundAmount: 33000 })));
+    resolve(ok(ret(completed)));
     await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "환불을 완료했습니다. 환불 금액 33,000원" }));
     expect(h.PATCH).toHaveBeenCalledTimes(1);
     // 상세가 아직 APPROVED 로 보여도 버튼은 잠긴다(다시 보내지 않는다).
@@ -85,9 +88,9 @@ describe("AdminReturnDetailPage", () => {
   });
 
   it("응답이_REFUNDING이면_환불_확인_중으로_보인다", async () => {
-    h.PATCH.mockResolvedValue(ok(ret({ status: "REFUNDING", receivedAt: "2026-11-12T10:40:00" })));
+    h.PATCH.mockResolvedValue(ok(ret(refunding)));
     mount();
-    h.GET.mockResolvedValue(ok(ret({ status: "REFUNDING", receivedAt: "2026-11-12T10:40:00" })));
+    h.GET.mockResolvedValue(ok(ret(refunding)));
     fireEvent.click(await openReceive());
     await waitFor(() => expect(h.toast).toHaveBeenCalledWith({ title: "환불을 확인하고 있습니다" }));
     expect(await screen.findByText("환불을 확인하고 있습니다. 3초마다 자동으로 새로 고칩니다.")).toBeInTheDocument();
@@ -124,7 +127,7 @@ describe("AdminReturnDetailPage", () => {
     h.GET.mockImplementation(async () => ok(ret({ status: stage })));
     h.PATCH.mockImplementation(async () => {
       stage = "REFUNDING";
-      return ok(ret({ status: "REFUNDING" }));
+      return ok(ret(refunding));
     });
     mount();
     fireEvent.click(await openReceive());

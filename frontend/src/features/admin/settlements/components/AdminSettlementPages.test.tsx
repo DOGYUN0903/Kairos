@@ -21,7 +21,7 @@ const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: fa
 const wrap = (ui: React.ReactElement, qc = newClient()) => render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 const page = (content: unknown[]) => ({ data: { data: { content, page: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0 } } });
 const summary = { settlementId: 7, sellerId: 12, sellerName: "판매자 C", sellerStatus: "SUSPENDED", periodStart: "2026-11-02", periodEnd: "2026-11-09", payoutDate: "2026-11-11", status: "CONFIRMED", totalAmount: 12500, payableAmount: 12500, lineCount: 1 };
-const detail = (over: object = {}) => ({ data: { data: { ...summary, salesAmount: 15000, sellerCouponDiscount: 0, commissionAmount: 1500, shippingFeeOwed: 0, returnFeeBorne: 1000, adjustmentAmount: 0, lines: [], adjustments: [], ...over } } });
+const detail = (over: object = {}) => ({ data: { data: { ...summary, salesAmount: 15000, sellerCouponDiscount: 0, commissionAmount: 1500, shippingFeeOwed: 0, returnFeeBorne: 1000, adjustmentAmount: 0, lineCount: 0, lines: [], adjustments: [], ...over } } });
 
 describe("관리자 정산 목록", () => {
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe("관리자 정산 상세", () => {
     expect(screen.queryByRole("button", { name: "지급 완료" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "이 판매자의 조정 보기" })).toHaveAttribute("href", "/admin/settlements/adjustments?sellerId=12");
     first.unmount();
-    h.GET.mockResolvedValue(detail({ status: "PAID" }));
+    h.GET.mockResolvedValue(detail({ status: "PAID", paidAt: "2026-11-11T10:00:00" }));
     wrap(<AdminSettlementDetailPage settlementId={7} />);
     await screen.findByRole("heading", { name: /정산 2026-11-02/ });
     expect(screen.queryByRole("button", { name: "정산 확정" })).not.toBeInTheDocument();

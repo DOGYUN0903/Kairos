@@ -48,7 +48,7 @@ describe("판매자 정산 화면", () => {
 
   it("상세는_라인_0개_조정만_있는_정산과_지급_메모", async () => {
     h.GET.mockResolvedValue({
-      data: { data: { ...summary, salesAmount: 0, sellerCouponDiscount: 0, commissionAmount: 0, shippingFeeOwed: 0, returnFeeBorne: 0, adjustmentAmount: -3000, paidAt: "2026-10-22T10:00:00", paidMemo: "이체 완료", lines: [], adjustments: [{ adjustmentId: 1, sellerId: 1, type: "CARRY_OVER", amount: -3000, reason: "이월" }] } },
+      data: { data: { ...summary, lineCount: 0, salesAmount: 0, sellerCouponDiscount: 0, commissionAmount: 0, shippingFeeOwed: 0, returnFeeBorne: 0, adjustmentAmount: -3000, paidAt: "2026-10-22T10:00:00", paidMemo: "이체 완료", lines: [], adjustments: [{ adjustmentId: 1, sellerId: 1, type: "CARRY_OVER", amount: -3000, reason: "이월" }] } },
     });
     wrap(<SellerSettlementDetailPage settlementId={7} />);
     expect(await screen.findByText("포함된 주문이 없습니다")).toBeInTheDocument();

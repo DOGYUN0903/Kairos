@@ -16,7 +16,7 @@ const item = (status: string, itemStatus = "RETURN_REQUESTED", refundAmount = 0,
     orderItemId: 7,
     productName: "와이드 코튼 팬츠",
     status: itemStatus,
-    returnRequest: { returnId: 11, reason: "DEFECTIVE", status, feeBearer: "BUYER", refundAmount, returnFee, requestedAt: "2026-11-10T10:00:00" },
+    returnRequest: { returnId: 11, reason: "CHANGE_OF_MIND", status, feeBearer: "BUYER", refundAmount, returnFee, requestedAt: "2026-11-10T10:00:00" },
   }) as unknown as OrderItemResult;
 
 function mount(it: OrderItemResult) {
