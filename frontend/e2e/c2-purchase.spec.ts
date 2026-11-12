@@ -89,7 +89,8 @@ test("장바구니 두 판매자 묶음을 한 번에 주문하고 결제·발�
       await expect(s.getByText("1234567890")).toBeVisible();
       await s.getByRole("button", { name: "배송 완료" }).click();
       await s.getByRole("dialog").getByRole("button", { name: "배송 완료" }).click();
-      await expect(s.getByText("배송 완료로 처리했습니다")).toBeVisible();
+      // 토스트가 뜬 직후에는 스크린리더용 알림("Notification …")이 잠깐 함께 있으므로 글자 전체로 고른다.
+      await expect(s.getByText("배송 완료로 처리했습니다", { exact: true })).toBeVisible();
     });
   });
 

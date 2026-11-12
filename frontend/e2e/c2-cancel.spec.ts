@@ -41,7 +41,10 @@ test("구매자가 항목을 하나씩 취소하면 배송비 차감 안내와 �
     await dialog.getByLabel(/취소 사유/).fill("단순 변심");
     await dialog.getByRole("button", { name: "취소하기" }).click();
     await expect(dialog).toBeHidden();
-    await expect(card.getByText("취소", { exact: true })).toBeVisible();
+    // 취소 버튼이 사라지고(버튼 글자 "취소"와 상태 칩 "취소"를 구분한다) 항목에 환불액이 붙는다.
+    await expect(card.getByRole("button", { name: "취소", exact: true })).toHaveCount(0);
+    await expect(card.getByText("취소", { exact: true }).first()).toBeVisible();
+    await expect(card.getByText(/^환불 /)).toHaveText("환불 27,000원");
     await expect(valueOf(summary, "환불 금액")).toHaveText("−27,000원");
   });
 
