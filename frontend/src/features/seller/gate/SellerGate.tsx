@@ -10,14 +10,16 @@ import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { ConsoleShell, type NavItem } from "@/components/layout/ConsoleShell";
 import { ApplicationSummary } from "@/features/seller/apply/components/ApplicationSummary";
 import { ApplyForm } from "@/features/seller/apply/components/ApplyForm";
+import { useSellerOrderCount } from "@/features/seller/orders/api";
 import { SellerBannerContext } from "@/features/seller/gate/banner";
 import { useSellerMe } from "@/features/seller/gate/useSellerMe";
 
 export { useSellerCapabilities } from "@/features/seller/gate/useSellerCapabilities";
 
-const FULL_NAV: NavItem[] = [
+const fullNav = (shipBadge: number | undefined): NavItem[] => [
   { href: "/seller", label: "대시보드" },
   { href: "/seller/products", label: "상품 관리" },
+  { href: "/seller/orders", label: "주문 관리", ...(shipBadge ? { badge: shipBadge } : {}) },
   { href: "/seller/brands", label: "브랜드" },
   { href: "/seller/settlements", label: "정산", disabled: true, soonLabel: "준비 중" },
 ];
@@ -27,6 +29,7 @@ const LIMITED_NAV: NavItem[] = [{ href: "/seller", label: "대시보드" }];
 function titleOf(pathname: string): string {
   if (pathname.startsWith("/seller/apply")) return "입점 신청";
   if (pathname.startsWith("/seller/products")) return "상품 관리";
+  if (pathname.startsWith("/seller/orders")) return "주문 관리";
   if (pathname.startsWith("/seller/brands")) return "브랜드";
   return "대시보드";
 }
@@ -72,6 +75,8 @@ export function SellerGate({ children }: { children: ReactNode }) {
   const [banner, setBanner] = useState<string | null>(null);
 
   const full = status === "APPROVED" || status === "SUSPENDED";
+  // 발송 대기 배지는 전체 메뉴가 보일 때만 조회한다(미신청·심사 중에는 판매자 주문 API 를 부르지 않는다).
+  const shipCount = useSellerOrderCount("PAID", full);
   const userLabel = seller?.companyName ?? me?.name ?? "";
 
   let body: ReactNode;
@@ -121,7 +126,7 @@ export function SellerGate({ children }: { children: ReactNode }) {
 
   return (
     <SellerBannerContext.Provider value={setBanner}>
-      <ConsoleShell role="판매자 센터" nav={full ? FULL_NAV : LIMITED_NAV} userLabel={userLabel} title={titleOf(pathname)} banner={bannerNode}>
+      <ConsoleShell role="판매자 센터" nav={full ? fullNav(shipCount.data) : LIMITED_NAV} userLabel={userLabel} title={titleOf(pathname)} banner={bannerNode}>
         {body}
       </ConsoleShell>
     </SellerBannerContext.Provider>

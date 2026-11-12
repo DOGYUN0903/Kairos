@@ -1,11 +1,38 @@
 "use client";
 
 import Link from "next/link";
+import { useSellerOrderCount } from "@/features/seller/orders/api";
 import { useStatusCounts, type CountedStatus } from "@/features/seller/dashboard/api";
 
 const num = new Intl.NumberFormat("ko-KR");
 
+/** 발송 대기 주문 수 카드. 누르면 발송 대기 탭으로 간다. */
+function PendingShipmentCard() {
+  const q = useSellerOrderCount("PAID");
+  return (
+    <Link
+      href="/seller/orders?status=PAID"
+      className="mb-3 flex items-center justify-between rounded-lg border border-border bg-bg px-4 py-3.5 text-foreground hover:border-navy"
+    >
+      <span>
+        <span className="text-xs text-text-2">발송 대기</span>
+        <span className="mt-0.5 block text-[22px] font-bold tabular-nums">{q.data === undefined ? "—" : `${num.format(q.data)}건`}</span>
+      </span>
+      <span className="text-xs text-navy">주문 보기 →</span>
+    </Link>
+  );
+}
+
 export function StatusCards() {
+  return (
+    <>
+      <PendingShipmentCard />
+      <ProductStatusCards />
+    </>
+  );
+}
+
+function ProductStatusCards() {
   const { counts, isPending, isError, refetch } = useStatusCounts();
 
   if (isPending && !isError) {
