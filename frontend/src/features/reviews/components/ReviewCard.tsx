@@ -23,7 +23,6 @@ export function ReviewCard({ review }: { review: ReviewResult }) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const edited = review.modifiedAt !== review.createdAt;
 
   async function remove() {
     if (deleting) return;
@@ -53,12 +52,6 @@ export function ReviewCard({ review }: { review: ReviewResult }) {
         </Link>
         <span className="ml-auto whitespace-nowrap text-[13px] text-text-2">
           <span className="tabular-nums">{formatDate(review.createdAt)}</span>
-          {edited && (
-            <>
-              {" · "}
-              <b className="font-bold text-foreground">수정됨</b>
-            </>
-          )}
         </span>
       </div>
       <div className="p-5">

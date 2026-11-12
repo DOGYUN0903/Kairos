@@ -16,7 +16,9 @@ test("구매 확정 → 후기 작성(사진) → 판매자 답글 → 수정 �
   await uiLogin(page, buyer.email, buyer.password);
   await page.waitForURL((u) => u.pathname !== "/login");
 
-  const reviewText = "상품이 마음에 들어요 정말 좋습니다";
+  // 정확히 10자: 제출 가능한 최소 길이가 실제 등록까지 이어지는지 본다(9자는 아래에서 거절된다).
+  const reviewText = "가나다라마바사아자차";
+  expect([...reviewText]).toHaveLength(10);
   const editedText = "한 달 써 보니 더욱 마음에 듭니다 추천해요";
   const replyText = "구매해 주셔서 감사합니다 또 이용해 주세요";
 
@@ -32,7 +34,7 @@ test("구매 확정 → 후기 작성(사진) → 판매자 답글 → 수정 �
     await expect(card.getByText(/까지 작성 가능/)).toBeVisible();
   });
 
-  await test.step("후기 작성: 9자는 제출되지 않고 10자부터 사진 포함으로 등록된다", async () => {
+  await test.step("후기 작성: 9자는 제출되지 않고 정확히 10자는 사진 포함으로 등록된다", async () => {
     await page.getByRole("button", { name: "후기 작성" }).click();
     const dialog = page.getByRole("dialog", { name: "후기 작성" });
     await dialog.getByRole("radio", { name: "5점" }).click();
@@ -83,7 +85,8 @@ test("구매 확정 → 후기 작성(사진) → 판매자 답글 → 수정 �
     await expect(dialog).toBeHidden();
     const card = page.getByRole("article").filter({ hasText: productName });
     await expect(card.getByText(editedText, { exact: true })).toBeVisible();
-    await expect(card.getByText("수정됨", { exact: true })).toBeVisible();
+    // 판매자 답글로 modifiedAt 이 바뀌어도 수정됨 표시는 없다.
+    await expect(card.getByText("수정됨")).toHaveCount(0);
     await expect(card.getByRole("button", { name: /^사진 \d+ 크게 보기$/ })).toHaveCount(1);
   });
 
