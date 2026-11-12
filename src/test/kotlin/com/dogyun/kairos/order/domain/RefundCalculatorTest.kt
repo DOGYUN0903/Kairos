@@ -378,4 +378,77 @@ class RefundCalculatorTest {
         assertEquals(3_000, last.shippingFeeRefund)
         assertEquals(13_000, last.refundAmount)
     }
+
+    @Test
+    fun 같은_판매자의_다른_항목이_남아_판매자_주문이_PAID여도_이미_취소한_항목은_취소_계획을_거절한다() {
+        val o = paidOrder(line(1, 10_000, skuId = 11), line(1, 10_000, skuId = 12))
+        val canceled = o.itemIdOf(1, 0)
+        o.cancel(canceled)
+        assertEquals(SellerOrderStatus.PAID, o.sellerOrders.single().status)
+
+        assertCode(ErrorCode.ORDER_ITEM_NOT_CANCELABLE) { o.planCancel(canceled, CancelActor.BUYER, POLICY) }
+    }
+
+    @Test
+    fun 차감하는_취소에서_돌려줄_배송비가_있으면_차감은_환불_현금_더하기_돌려줄_배송비까지다() {
+        // 구매자 부담 배송비를 돌려주는 판매자 주문 3: 환불 대상 현금은 500 + 3,000 이라 기본 배송비 3,000 을 그대로 차감한다.
+        val base = paidOrder(line(2, 49_600), line(3, 500))
+        val o = base.restored(shippingFeePayer = { if (it.sellerId == 3L) ShippingFeePayer.BUYER else it.shippingFeePayer })
+
+        val plan = o.planCancel(o.itemIdOf(3), CancelActor.BUYER, POLICY)
+
+        assertEquals(500, plan.paidAmount)
+        assertEquals(3_000, plan.shippingFeeRefund)
+        assertEquals(3_000, plan.shippingFeeDeducted)
+        assertEquals(500, plan.refundAmount)
+    }
+
+    @Test
+    fun 무료배송이_적용되지_않은_주문은_구매자_취소에서도_차감하지_않는다() {
+        val o = paidOrder(line(2, 30_000), line(3, 30_000)).restored(freeShippingApplied = false)
+
+        val plan = o.planCancel(o.itemIdOf(3), CancelActor.BUYER, POLICY)
+
+        assertEquals(0, plan.shippingFeeDeducted)
+        assertEquals(30_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 앞서_차감한_배송비가_일부_돌려져_있으면_마지막_취소는_남은_차감분만_돌려준다() {
+        val base = paidOrder(line(2, 30_000), line(3, 20_000), line(4, 10_000))
+        assertEquals(3_000, base.cancel(base.itemIdOf(3)).shippingFeeDeducted)
+        base.cancel(base.itemIdOf(4))
+        val partlyReturned = base.itemIdOf(4)
+        // 취소한 항목 하나가 차감분 3,000 중 1,000 을 이미 돌려받은 상태로 복원한다.
+        val o = base.restored(item = { if (it.id == partlyReturned) it.restoredItem(shippingFeeReturned = 1_000) else it })
+
+        val plan = o.planCancel(o.itemIdOf(2), CancelActor.BUYER, POLICY)
+
+        assertEquals(2_000, plan.shippingFeeReturned)
+        assertEquals(0, plan.shippingFeeDeducted)
+        assertEquals(32_000, plan.refundAmount)
+    }
+
+    @Test
+    fun 누적_환불액이_결제_금액을_넘게_되면_IllegalStateException() {
+        val o = paidOrder(line(2, 30_000))
+        assertEquals(33_000, o.totalAmount)
+        assertEquals(33_000, o.planCancel(o.itemIdOf(2), CancelActor.BUYER, POLICY).refundAmount)
+
+        val overRefunded = o.restored(refundedAmount = 1)
+
+        assertFailsWith<IllegalStateException> { overRefunded.planCancel(overRefunded.itemIdOf(2), CancelActor.BUYER, POLICY) }
+    }
+
+    @Test
+    fun 누적_포인트_되돌림이_사용액을_넘게_되면_IllegalStateException_정확히_같으면_허용한다() {
+        val o = paidSpecOrder()
+        val c = o.itemIdOf(3)
+
+        val exact = o.restored(pointsRefunded = 4_375)
+        assertEquals(5_625, exact.planCancel(c, CancelActor.BUYER, POLICY).pointsRefund)
+
+        val over = o.restored(pointsRefunded = 4_376)
+        assertFailsWith<IllegalStateException> { over.planCancel(c, CancelActor.BUYER, POLICY) }
+    }
 }

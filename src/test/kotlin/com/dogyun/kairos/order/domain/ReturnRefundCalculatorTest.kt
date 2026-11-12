@@ -346,4 +346,69 @@ class ReturnRefundCalculatorTest {
         assertEquals(0, plan.outboundFeeRecovered)
         assertEquals(0, plan.refundAmount)
     }
+
+    private fun approvedChangeOfMind(): Pair<Order, Long> {
+        val o = deliveredOrder(line(2, 30_000))
+        val id = o.itemIdOf(2)
+        o.withReturn(id, ReturnReason.CHANGE_OF_MIND)
+        return o to id
+    }
+
+    @Test
+    fun 주문이_PAID가_아니면_반품_환불_계획은_RETURN_INVALID_STATE_TRANSITION() {
+        val (o, id) = approvedChangeOfMind()
+        val closed = o.restored(status = OrderStatus.COMPLETED)
+
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { closed.plan(id) }
+        assertEquals(27_000, o.plan(id).refundAmount)
+    }
+
+    @Test
+    fun 판매자_주문이_DELIVERED가_아니면_반품_환불_계획은_RETURN_INVALID_STATE_TRANSITION() {
+        val (o, id) = approvedChangeOfMind()
+        val confirmed = o.restored(sellerOrderStatus = { SellerOrderStatus.CONFIRMED })
+
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { confirmed.plan(id) }
+    }
+
+    @Test
+    fun 반품_행이_APPROVED가_아니면_항목이_RETURN_APPROVED여도_RETURN_INVALID_STATE_TRANSITION() {
+        val (o, id) = approvedChangeOfMind()
+        val mismatched = o.restored(item = { it.restoredItem(returnRequest = it.returnRequest!!.restoredWithStatus(ReturnStatus.REQUESTED)) })
+        assertEquals(OrderItemStatus.RETURN_APPROVED, mismatched.findItem(id).status)
+
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { mismatched.plan(id) }
+    }
+
+    @Test
+    fun 항목이_RETURN_APPROVED가_아니면_반품_행이_APPROVED여도_RETURN_INVALID_STATE_TRANSITION() {
+        val (o, id) = approvedChangeOfMind()
+        val mismatched = o.restored(item = { it.restoredItem(status = OrderItemStatus.ORDERED) })
+        assertEquals(ReturnStatus.APPROVED, mismatched.findItem(id).returnRequest!!.status)
+
+        assertCode(ErrorCode.RETURN_INVALID_STATE_TRANSITION) { mismatched.plan(id) }
+    }
+
+    @Test
+    fun 반품_환불이_결제_금액을_넘는_누적이_되면_IllegalStateException_정확히_같으면_허용한다() {
+        val (o, id) = approvedChangeOfMind()
+        assertEquals(33_000, o.totalAmount)
+
+        val exact = o.restored(refundedAmount = 6_000)
+        assertEquals(27_000, exact.plan(id).refundAmount)
+
+        val over = o.restored(refundedAmount = 6_001)
+        assertFailsWith<IllegalStateException> { over.plan(id) }
+    }
+
+    @Test
+    fun 반품_포인트_되돌림이_사용액을_넘게_되면_IllegalStateException() {
+        val (o, itemId) = orderD()
+        o.withReturn(itemId, ReturnReason.CHANGE_OF_MIND)
+        assertEquals(3_000, o.plan(itemId).pointsRefund)
+
+        val over = o.restored(pointsRefunded = 1)
+
+        assertFailsWith<IllegalStateException> { over.plan(itemId) }
+    }
 }

@@ -122,3 +122,44 @@ internal fun Order.withReturn(itemId: Long, reason: ReturnReason, status: Return
     check(status == ReturnStatus.COMPLETED)
     item.completeReturn(NOW, item.pointsAllocated)
 }
+
+/**
+ * DB 에서 읽은 것처럼 주문을 복원하되 일부 값만 바꾼다(재구성 생성자 경로). 정상 흐름으로는 만들 수 없는 상태를 만들어
+ * 계산기의 방어 검사(상태 가드·불변식)를 확인할 때 쓴다.
+ */
+internal fun Order.restored(
+    status: OrderStatus = this.status,
+    freeShippingApplied: Boolean = this.freeShippingApplied,
+    refundedAmount: Long = this.refundedAmount,
+    pointsRefunded: Long = this.pointsRefunded,
+    sellerOrderStatus: (SellerOrder) -> SellerOrderStatus = { it.status },
+    shippingFeePayer: (SellerOrder) -> ShippingFeePayer = { it.shippingFeePayer },
+    item: (OrderItem) -> OrderItem = { it },
+): Order = Order(
+    id, orderNo, memberId, status, shippingAddress, itemsAmount, buyerShippingFee, totalAmount,
+    freeShippingApplied, shippingFeeRecovered, refundedAmount, productCouponDiscount, cartCouponId,
+    cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, paidAt,
+    sellerOrders.map { so ->
+        SellerOrder(
+            so.id, so.sellerId, so.sellerName, so.commissionRateBp, sellerOrderStatus(so), so.shippingFee, shippingFeePayer(so),
+            so.carrierCode, so.trackingNumber, so.shippedAt, so.deliveredAt, so.confirmedAt, so.items.map(item),
+        )
+    },
+    NOW,
+)
+
+internal fun OrderItem.restoredItem(
+    status: OrderItemStatus = this.status,
+    shippingFeeReturned: Long = this.shippingFeeReturned,
+    returnRequest: ReturnRequest? = this.returnRequest,
+) = OrderItem(
+    id, skuId, productId, productName, brandName, optionDisplayName, salePrice, extraPrice, quantity, status,
+    cancelActor, cancelReason, refundAmount, shippingFeeDeducted, shippingFeeReturned, canceledAt, productCouponId,
+    productCouponDiscount, productCouponIssuer, cartCouponAllocated, pointsAllocated, paidAmount, pointsRefunded, returnRequest,
+)
+
+internal fun ReturnRequest.restoredWithStatus(status: ReturnStatus) = ReturnRequest(
+    id, orderId, sellerOrderId, orderItemId, memberId, sellerId, reason, detail, status, returnFee, outboundFeeRecovered,
+    shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, rejectReason, requestedAt, decidedAt, decidedBy,
+    receivedAt, completedAt,
+)
