@@ -182,6 +182,7 @@ class OrderQueryService(
             freeShippingApplied = order.freeShippingApplied,
             shippingFeeRecovered = order.shippingFeeRecovered,
             refundedAmount = order.refundedAmount,
+            remainingAmount = order.totalAmount - order.refundedAmount,
             remainingPaidAmount = order.remainingPaidAmount,
             remainingBuyerShippingFee = order.remainingBuyerShippingFee,
             productCouponDiscount = order.productCouponDiscount,
@@ -225,6 +226,7 @@ class OrderQueryService(
         firstProductName = order.allItems.first().productName,
         thumbnailUrl = thumbnails[order.allItems.first().productId],
         sellerOrderStatuses = order.sellerOrders.map { it.status.name },
+        expiresAt = order.expiresAt,
         createdAt = requireNotNull(order.createdAt),
     )
 

@@ -3506,6 +3506,11 @@ export interface components {
             refundedAmount: number;
             /**
              * Format: int64
+             * @description 결제 금액에서 누적 환불액을 뺀 남은 결제 금액. 화면은 이 값을 그대로 보여준다
+             */
+            remainingAmount: number;
+            /**
+             * Format: int64
              * @description 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합
              */
             remainingPaidAmount: number;
@@ -3548,6 +3553,11 @@ export interface components {
             thumbnailUrl: string | null;
             /** @description 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용 */
             sellerOrderStatuses: components["schemas"]["SellerOrderStatus"][];
+            /**
+             * Format: date-time
+             * @description 결제 만료 시각(오프셋 없는 KST). 상세의 `expiresAt` 과 같은 값
+             */
+            expiresAt: string;
             /** Format: date-time */
             createdAt: string;
         };

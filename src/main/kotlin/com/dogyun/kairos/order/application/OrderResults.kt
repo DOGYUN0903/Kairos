@@ -136,6 +136,8 @@ data class OrderDetail(
     val freeShippingApplied: Boolean,
     val shippingFeeRecovered: Long,
     val refundedAmount: Long,
+    /** 결제 금액에서 누적 환불액을 뺀 값. 화면은 이 값을 그대로 보여준다. */
+    val remainingAmount: Long,
     /** 남은 항목(ORDERED·열린 반품)의 현금 결제 몫 합 */
     val remainingPaidAmount: Long,
     /** 아직 환불되지 않은 구매자 부담 배송비 */
@@ -164,6 +166,8 @@ data class OrderSummary(
     val thumbnailUrl: String?,
     /** 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용. */
     val sellerOrderStatuses: List<String>,
+    /** 결제 만료 시각. 상세의 expiresAt 과 같은 값. */
+    val expiresAt: LocalDateTime,
     val createdAt: LocalDateTime,
 )
 

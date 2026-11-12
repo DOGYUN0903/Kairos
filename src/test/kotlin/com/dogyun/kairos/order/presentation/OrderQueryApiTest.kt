@@ -190,4 +190,34 @@ class OrderQueryApiTest : CommerceTestSupport() {
         val summary = json(get("/api/v1/orders", user).andExpect { status { isOk() } }).get("data").get("content").get(0)
         assertEquals(listOf("PAID", "SHIPPING"), summary.get("sellerOrderStatuses").let { st -> (0 until st.size()).map { st.get(it).asString() } }.sorted())
     }
+
+    @Test
+    fun 결제_전_주문의_남은_결제_금액은_주문_총액이다() {
+        val shop = shop()
+        val user = newUserToken()
+        placeOrder(user, listOf(shop.skuId to 1), 11_000).andExpect { status { isCreated() } }
+        val orderId = jdbcTemplate.queryForObject("select max(id) from orders", Long::class.java)!!
+
+        val detail = json(get("/api/v1/orders/$orderId", user).andExpect { status { isOk() } }).get("data")
+
+        assertEquals("PENDING_PAYMENT", detail.get("status").asString())
+        assertEquals(11_000L, detail.get("totalAmount").asLong())
+        assertEquals(detail.get("totalAmount").asLong(), detail.get("remainingAmount").asLong())
+    }
+
+    @Test
+    fun 주문_목록에_결제_만료_시각이_있다() {
+        val shop = shop()
+        val user = newUserToken()
+        val detail = pay(user, shop)
+        val orderId = detail.get("orderId").asLong()
+
+        val mine = json(get("/api/v1/orders", user).andExpect { status { isOk() } }).get("data").get("content").get(0)
+        val admin = json(get("/api/v1/admin/orders?orderNo=${detail.get("orderNo").asString()}", adminToken()).andExpect { status { isOk() } })
+            .get("data").get("content").get(0)
+
+        assertEquals(orderId, mine.get("orderId").asLong())
+        assertEquals(detail.get("expiresAt").asString(), mine.get("expiresAt").asString())
+        assertEquals(detail.get("expiresAt").asString(), admin.get("expiresAt").asString())
+    }
 }

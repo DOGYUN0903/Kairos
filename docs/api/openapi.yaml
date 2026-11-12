@@ -6843,7 +6843,7 @@ components:
           enum: [READY, IN_PROGRESS, APPROVED, PARTIAL_CANCELED, CANCELED, UNKNOWN, FAILED]
     OrderDetail:
       type: object
-      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
+      required: [orderId, orderNo, status, itemsAmount, buyerShippingFee, totalAmount, freeShippingApplied, shippingFeeRecovered, refundedAmount, remainingAmount, remainingPaidAmount, remainingBuyerShippingFee, productCouponDiscount, cartCouponDiscount, pointsUsed, pointsRefunded, expiresAt, createdAt, shippingAddress, sellerOrders]
       properties:
         orderId:
           type: integer
@@ -6869,6 +6869,10 @@ components:
         refundedAmount:
           type: integer
           format: int64
+        remainingAmount:
+          type: integer
+          format: int64
+          description: 결제 금액에서 누적 환불액을 뺀 남은 결제 금액. 화면은 이 값을 그대로 보여준다
         remainingPaidAmount:
           type: integer
           format: int64
@@ -6915,7 +6919,7 @@ components:
           nullable: true
     OrderSummary:
       type: object
-      required: [orderId, orderNo, status, totalAmount, itemCount, firstProductName, thumbnailUrl, sellerOrderStatuses, createdAt]
+      required: [orderId, orderNo, status, totalAmount, itemCount, firstProductName, thumbnailUrl, sellerOrderStatuses, expiresAt, createdAt]
       properties:
         orderId:
           type: integer
@@ -6941,6 +6945,10 @@ components:
           description: 판매자 주문마다의 상태(판매자 주문 수만큼). 주문 카드의 배송 진행 표시용
           items:
             $ref: '#/components/schemas/SellerOrderStatus'
+        expiresAt:
+          type: string
+          format: date-time
+          description: 결제 만료 시각(오프셋 없는 KST). 상세의 `expiresAt` 과 같은 값
         createdAt:
           type: string
           format: date-time

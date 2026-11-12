@@ -150,6 +150,16 @@ class OrderQueryServiceTest {
     }
 
     @Test
+    fun 남은_결제_금액은_총액에서_환불액을_뺀_값이고_목록_만료_시각은_상세와_같다() {
+        val order = place(10L, 20L)
+
+        val before = service.getMine(memberId, order.orderId)
+        assertEquals(before.totalAmount, before.remainingAmount)
+        assertEquals(before.expiresAt, service.listMine(memberId, 0, 20).content.single().expiresAt)
+        assertEquals(before.expiresAt, service.listForAdmin(null, null, null, 0, 20).content.single().expiresAt)
+    }
+
+    @Test
     fun 결제_정보가_없으면_payment는_null이다() {
         val order = place(10L)
         paymentGateway.payments.clear()
