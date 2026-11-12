@@ -7,7 +7,7 @@ import type { ReturnRequestResponse } from "@/features/returns/api";
 import { RefundBreakdown } from "@/features/returns/components/RefundBreakdown";
 import { ReturnSteps } from "@/features/returns/components/ReturnSteps";
 import { refundRows } from "@/features/returns/return-actions";
-import { feeBearerLabel, returnReasonLabel } from "@/features/returns/return-text";
+import { feeBearerLabel, noRefundNotice, returnReasonLabel } from "@/features/returns/return-text";
 import { formatDate } from "@/lib/datetime";
 import { joinDot } from "@/lib/join-dot";
 import { formatKrw } from "@/lib/money";
@@ -20,12 +20,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-
-const NO_REFUND: Record<string, string> = {
-  REJECTED: "거절된 반품이라 환불이 없습니다.",
-  WITHDRAWN: "철회된 반품이라 환불이 없습니다.",
-  CANCELED_BY_ADMIN: "중단된 반품이라 환불이 없습니다.",
-};
 
 /**
  * 반품 상세 본문(판매자·관리자 공용). 처리 버튼·진행 중 안내는 actions 로 받는다.
@@ -109,8 +103,8 @@ export function ReturnDetailView({ data: r, orderHref, actions, showSeller = fal
           <Section title="환불 내역">
             {r.status === "COMPLETED" || r.status === "REFUNDING" ? (
               <RefundBreakdown rows={refundRows(r, "환불 금액")} title="환불 금액" />
-            ) : NO_REFUND[r.status] ? (
-              <p className="text-sm text-text-2">{NO_REFUND[r.status]}</p>
+            ) : noRefundNotice(r.status) ? (
+              <p className="text-sm text-text-2">{noRefundNotice(r.status)}</p>
             ) : (
               <p className="text-sm text-text-2">환불 금액은 판매자가 상품을 받은 뒤 확정됩니다.</p>
             )}

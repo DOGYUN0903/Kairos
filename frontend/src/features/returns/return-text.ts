@@ -45,6 +45,17 @@ export function refundSummaryText(r: { status: Status; refundAmount: number }): 
   return "수거 확인 뒤 확정";
 }
 
+const NO_REFUND: Partial<Record<Status, string>> = {
+  REJECTED: "거절된 반품이라 환불이 없습니다.",
+  WITHDRAWN: "철회된 반품이라 환불이 없습니다.",
+  CANCELED_BY_ADMIN: "중단된 반품이라 환불이 없습니다.",
+};
+
+/** 상세의 환불 내역 자리에 보이는 안내: 환불 없이 끝난 반품이면 문구, 아니면 undefined. */
+export function noRefundNotice(status: string): string | undefined {
+  return NO_REFUND[status as Status];
+}
+
 /** 서버가 환불 결과를 확정하는 중인가(상세를 3초 간격으로 다시 읽는다. 간격·상한은 features/orders/polling.ts). */
 export function needsReturnPolling(status: string): boolean {
   return status === "REFUNDING";

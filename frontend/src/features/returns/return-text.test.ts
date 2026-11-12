@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidedByLabel, feeBearerLabel, RETURN_FILTER_LABEL, feeBearerNotice, needsReturnPolling, refundSummaryText, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
+import { noRefundNotice, decidedByLabel, feeBearerLabel, RETURN_FILTER_LABEL, feeBearerNotice, needsReturnPolling, refundSummaryText, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
 
 describe("return-text", () => {
   it("사유", () => {
@@ -37,6 +37,12 @@ describe("return-text", () => {
       expect(refundSummaryText({ status, refundAmount: 0 })).toBe("환불 없음");
       expect(refundSummaryText({ status, refundAmount: 25000 })).toBe("환불 없음");
     }
+  });
+  it("환불_없이_끝난_반품의_상세_안내", () => {
+    expect(noRefundNotice("REJECTED")).toBe("거절된 반품이라 환불이 없습니다.");
+    expect(noRefundNotice("WITHDRAWN")).toBe("철회된 반품이라 환불이 없습니다.");
+    expect(noRefundNotice("CANCELED_BY_ADMIN")).toBe("중단된 반품이라 환불이 없습니다.");
+    for (const s of ["REQUESTED", "APPROVED", "REFUNDING", "COMPLETED"]) expect(noRefundNotice(s)).toBeUndefined();
   });
   it("재조회는_환불_확인_중일_때만", () => {
     expect(needsReturnPolling("REFUNDING")).toBe(true);
