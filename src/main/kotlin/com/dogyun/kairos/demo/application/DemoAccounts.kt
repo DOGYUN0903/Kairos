@@ -6,6 +6,9 @@ object DemoAccounts {
     const val SELLER = "seller@kairos.demo"
     const val SELLER_PENDING = "seller2@kairos.demo"
     const val ADMIN = "admin@kairos.demo"
+
+    /** 정산 시연 주문 전용 구매자. `buyer@kairos.demo` 의 주문 내역을 더럽히지 않는다. */
+    const val SETTLEMENT_BUYER = "settlement-buyer@kairos.demo"
 }
 
 /** 이번 시드 호출로 새로 만든 수. */

@@ -75,7 +75,12 @@ class Order(
         throw DomainException(ErrorCode.RETURN_NOT_FOUND)
     }
 
-    fun requestReturn(itemId: Long, reason: ReturnReason, detail: String?, window: Duration, now: LocalDateTime): ReturnRequest {
+    /**
+     * 반품을 요청할 수 있는 항목인지 판정한다. 상태를 바꾸지 않고, 아니면 [requestReturn] 이 던지는 것과 같은 순서·코드로 던진다:
+     * 열린 반품 → `RETURN_ALREADY_REQUESTED`, 주문·판매자 주문·항목 상태 → `RETURN_NOT_ELIGIBLE`, 기한 → `RETURN_WINDOW_EXPIRED`,
+     * 철회가 아닌 기존 반품 행 → `RETURN_ALREADY_REQUESTED`.
+     */
+    fun checkReturnRequestable(itemId: Long, window: Duration, now: LocalDateTime) {
         val item = findItem(itemId)
         val sellerOrder = sellerOrderOf(itemId)
         if (item.status.isOpenReturn) throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
@@ -85,13 +90,21 @@ class Order(
         val deliveredAt = checkNotNull(sellerOrder.deliveredAt) { "배송 완료 시각이 없는 DELIVERED 판매자 주문" }
         if (deliveredAt.plus(window).isBefore(now)) throw DomainException(ErrorCode.RETURN_WINDOW_EXPIRED)
         val existing = item.returnRequest
+        if (existing != null && existing.status != ReturnStatus.WITHDRAWN) throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+    }
+
+    fun requestReturn(itemId: Long, reason: ReturnReason, detail: String?, window: Duration, now: LocalDateTime): ReturnRequest {
+        checkReturnRequestable(itemId, window, now)
+        val item = findItem(itemId)
+        val sellerOrder = sellerOrderOf(itemId)
+        val existing = item.returnRequest
         return when {
             existing == null -> ReturnRequest.request(
                 checkNotNull(id) { "저장되지 않은 주문" }, checkNotNull(sellerOrder.id) { "저장되지 않은 판매자 주문" },
                 itemId, memberId, sellerOrder.sellerId, reason, detail, now,
             ).also { item.requestReturn(it) }
             existing.status == ReturnStatus.WITHDRAWN -> existing.also { item.reopenReturn(reason, detail, now) }
-            else -> throw DomainException(ErrorCode.RETURN_ALREADY_REQUESTED)
+            else -> error("checkReturnRequestable 이 걸렀어야 한다")
         }
     }
 
@@ -193,7 +206,8 @@ class Order(
         settle()
     }
 
-    private fun sellerOrderOf(itemId: Long) = sellerOrders.first { so -> so.items.any { it.id == itemId } }
+    internal fun sellerOrderOf(itemId: Long) =
+        sellerOrders.firstOrNull { so -> so.items.any { it.id == itemId } } ?: throw DomainException(ErrorCode.ORDER_ITEM_NOT_FOUND)
 
     /** 모든 판매자 주문이 끝났으면(확정·취소) 주문을 닫는다. 전부 취소면 CANCELED, 하나라도 확정이면 COMPLETED. */
     private fun settle() {

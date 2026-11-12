@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fromDateTimeInput, formatDateTimeMinute, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString } from "@/lib/datetime";
+import { fromDateTimeInput, formatDateTimeMinute, formatDateTimeMinuteWithYear, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString, lastFinishedWeekMonday, isMonday, isWeekFinished, periodLastDay, isPastKst, isCalendarDate, weekLastDay } from "@/lib/datetime";
 
 describe("datetime", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -67,5 +67,65 @@ describe("datetime F3", () => {
   it("formatDateTimeMinute·formatMonthDay", () => {
     expect(formatDateTimeMinute("2026-11-12T10:05:30")).toBe("11월 12일 10:05");
     expect(formatMonthDay("2026-01-05T00:00:00")).toBe("1월 5일");
+  });
+});
+
+describe("정산 주 날짜 함수(KST, 실행 시간대와 무관)", () => {
+  const kst = (s: string) => Date.parse(`${s}+09:00`);
+  it("lastFinishedWeekMonday", () => {
+    expect(lastFinishedWeekMonday(kst("2026-11-12T15:00:00"))).toBe("2026-11-02");
+    expect(lastFinishedWeekMonday(kst("2026-11-15T23:59:59"))).toBe("2026-11-02");
+    expect(lastFinishedWeekMonday(kst("2026-11-16T00:00:00"))).toBe("2026-11-09");
+  });
+  it("isMonday", () => {
+    expect(isMonday("2026-11-09")).toBe(true);
+    expect(isMonday("2026-11-10")).toBe(false);
+    expect(isMonday("2026-11-09T00:00:00")).toBe(false);
+    expect(isMonday("2026-13-09")).toBe(false);
+    expect(isMonday("")).toBe(false);
+  });
+  it("isWeekFinished", () => {
+    expect(isWeekFinished("2026-11-09", kst("2026-11-15T23:59:59"))).toBe(false);
+    expect(isWeekFinished("2026-11-09", kst("2026-11-16T00:00:00"))).toBe(true);
+    expect(isWeekFinished("bad", kst("2026-11-16T00:00:00"))).toBe(false);
+  });
+  it("periodLastDay는_하루_전", () => {
+    expect(periodLastDay("2026-11-09")).toBe("2026-11-08");
+    expect(periodLastDay("2026-12-01")).toBe("2026-11-30");
+    expect(periodLastDay("2027-01-01")).toBe("2026-12-31");
+  });
+  it("isPastKst는_정각까지는_지나지_않은_것", () => {
+    const t = kst("2026-11-12T10:00:00");
+    expect(isPastKst("2026-11-12T10:00:00", t - 1000)).toBe(false);
+    expect(isPastKst("2026-11-12T10:00:00", t)).toBe(false);
+    expect(isPastKst("2026-11-12T10:00:00", t + 1000)).toBe(true);
+  });
+
+  it("isCalendarDate는_달력에_있는_날짜만", () => {
+    expect(isCalendarDate("2026-11-02")).toBe(true);
+    for (const v of ["", "2026/11/02", "26-11-02", "2026-02-30"]) expect(isCalendarDate(v)).toBe(false);
+  });
+
+  it("weekLastDay는_월요일이_시작하는_주의_일요일", () => {
+    expect(weekLastDay("2026-11-02")).toBe("2026-11-08");
+    expect(weekLastDay("2026-12-28")).toBe("2027-01-03");
+    expect(weekLastDay("x")).toBe("x");
+  });
+});
+
+describe("formatDateTimeMinuteWithYear", () => {
+  const now = Date.parse("2026-11-12T10:00:00+09:00");
+  it("올해는_연도를_붙이지_않는다", () => {
+    expect(formatDateTimeMinuteWithYear("2026-11-09T14:22:00", now)).toBe("11월 9일 14:22");
+  });
+  it("올해가_아니면_연도를_붙인다", () => {
+    expect(formatDateTimeMinuteWithYear("2025-12-30T09:00:00", now)).toBe("2025년 12월 30일 09:00");
+  });
+  it("KST_기준으로_연말_경계를_판정한다", () => {
+    const utcStillOld = Date.parse("2026-12-31T16:00:00Z"); // KST 2027-01-01 01:00
+    expect(formatDateTimeMinuteWithYear("2026-12-31T23:00:00", utcStillOld)).toBe("2026년 12월 31일 23:00");
+  });
+  it("형식이_아니면_그대로", () => {
+    expect(formatDateTimeMinuteWithYear("abc", now)).toBe("abc");
   });
 });

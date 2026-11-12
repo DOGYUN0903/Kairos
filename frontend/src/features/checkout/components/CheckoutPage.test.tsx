@@ -164,7 +164,23 @@ describe("CheckoutPage 쿠폰·포인트", () => {
     expect(orderCalls()[0]![1].body.expectedTotalAmount).toBe(0);
     // 완료 화면으로 바로 가므로 장바구니·견적 캐시를 여기서 다시 읽게 한다.
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cart"] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["checkout", "quote"] });
+    // 견적은 낡은 것으로만 표시하고 다시 요청하지 않는다(아직 켜져 있는 견적 조회가 409 를 받는다).
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["checkout", "quote"], refetchType: "none" });
+  });
+
+  it("주문이_만들어진_뒤에는_견적을_다시_요청하지_않는다", async () => {
+    h.POST.mockImplementation(async (path: string, opts: { body: Body }) =>
+      path === "/api/v1/orders/quote" ? ok(quoteFor(opts.body, { totalAmount: 0, maxUsablePoints: 0 })) : ok({ orderId: 9, orderStatus: "PAID", totalAmount: 0 }),
+    );
+    mount();
+    const btn = await screen.findByRole("button", { name: "주문하기" });
+    await fillAddress();
+    await waitFor(() => expect(btn).toBeEnabled());
+    const before = quoteCalls().length;
+    await userEvent.click(btn);
+    await waitFor(() => expect(h.replace).toHaveBeenCalledWith("/my/orders/9/complete"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(quoteCalls().length).toBe(before);
   });
 });
 

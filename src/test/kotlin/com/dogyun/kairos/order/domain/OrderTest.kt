@@ -495,4 +495,96 @@ class OrderTest {
     private fun Order.item(r: ReturnRequest) = findItem(r.orderItemId)
     private fun Order.rejectReturnOf(r: ReturnRequest) = item(r).rejectReturn("거절", NOW)
     private fun Order.withdrawReturnOf(r: ReturnRequest) = item(r).withdrawReturn()
+
+    // ---- 반품 자격 판정(checkReturnRequestable) ----
+
+    private fun Order.checkRequestable(itemId: Long, now: java.time.LocalDateTime = NOW.plusDays(1)) =
+        checkReturnRequestable(itemId, window, now)
+
+    @Test
+    fun 자격_판정_열린_반품은_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        o.requestReturn(o.itemIdOf(1))
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.checkRequestable(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 자격_판정_판매자_주문이_DELIVERED가_아니면_RETURN_NOT_ELIGIBLE() {
+        val o = paidOrder(line(1, 30_000))
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { o.checkRequestable(o.itemIdOf(1)) }
+        o.ship(soId(o, 1), "CJ", "1", NOW)
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { o.checkRequestable(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 자격_판정_기한_정각은_통과하고_1초_뒤는_RETURN_WINDOW_EXPIRED() {
+        val o = deliveredOrder(line(1, 30_000))
+        o.checkRequestable(o.itemIdOf(1), NOW.plusDays(7))
+        assertCode(ErrorCode.RETURN_WINDOW_EXPIRED) { o.checkRequestable(o.itemIdOf(1), NOW.plusDays(7).plusSeconds(1)) }
+    }
+
+    @Test
+    fun 자격_판정_거절된_반품은_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.rejectReturnOf(r)
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.checkRequestable(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 자격_판정_관리자가_중단한_반품은_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.item(r).approveReturn(DecidedBy.SELLER, NOW)
+        o.item(r).cancelReturnByAdmin()
+        assertEquals(ReturnStatus.CANCELED_BY_ADMIN, o.item(r).returnRequest!!.status)
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.checkRequestable(o.itemIdOf(1)) }
+    }
+
+    @Test
+    fun 자격_판정_철회한_반품은_통과한다() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.withdrawReturnOf(r)
+        o.checkRequestable(o.itemIdOf(1))
+    }
+
+    @Test
+    fun 자격_판정_검사_순서_열린_반품이면서_기한도_지났으면_RETURN_ALREADY_REQUESTED() {
+        val o = deliveredOrder(line(1, 30_000))
+        o.requestReturn(o.itemIdOf(1))
+        assertCode(ErrorCode.RETURN_ALREADY_REQUESTED) { o.checkRequestable(o.itemIdOf(1), NOW.plusDays(30)) }
+    }
+
+    @Test
+    fun 자격_판정_검사_순서_상태가_맞지_않으면서_기한도_지났으면_RETURN_NOT_ELIGIBLE() {
+        val o = paidOrder(line(1, 30_000))
+        assertCode(ErrorCode.RETURN_NOT_ELIGIBLE) { o.checkRequestable(o.itemIdOf(1), NOW.plusDays(30)) }
+    }
+
+    @Test
+    fun 자격_판정_기한이_지났고_거절된_반품이면_RETURN_WINDOW_EXPIRED가_먼저다() {
+        val o = deliveredOrder(line(1, 30_000))
+        val r = o.requestReturn(o.itemIdOf(1))
+        o.rejectReturnOf(r)
+        assertCode(ErrorCode.RETURN_WINDOW_EXPIRED) { o.checkRequestable(o.itemIdOf(1), NOW.plusDays(30)) }
+    }
+
+    @Test
+    fun 자격_판정은_없는_항목이면_ORDER_ITEM_NOT_FOUND() {
+        val o = deliveredOrder(line(1, 30_000))
+        assertCode(ErrorCode.ORDER_ITEM_NOT_FOUND) { o.checkRequestable(999_999L) }
+    }
+
+    @Test
+    fun 자격_판정은_주문_상태를_바꾸지_않는다() {
+        val o = deliveredOrder(line(1, 30_000))
+        val itemId = o.itemIdOf(1)
+
+        o.checkRequestable(itemId)
+
+        assertEquals(OrderStatus.PAID, o.status)
+        assertEquals(OrderItemStatus.ORDERED, o.findItem(itemId).status)
+        assertEquals(null, o.findItem(itemId).returnRequest)
+    }
 }

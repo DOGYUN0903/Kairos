@@ -1,4 +1,7 @@
-type Kind = "seller" | "brand" | "product" | "changeRequest" | "order" | "sellerOrder" | "orderItem" | "payment" | "coupon" | "couponPolicy" | "reply";
+type Kind = "seller" | "brand" | "product" | "changeRequest" | "order" | "sellerOrder" | "orderItem" | "payment" | "coupon" | "couponPolicy" | "reply" | "return" | "settlement" | "adjustment";
+import { returnStatusLabel } from "@/features/returns/return-text";
+import { settlementStatusLabel } from "@/features/settlements/settlement-text";
+
 type Tone = "pending" | "onsale" | "rejected" | "paused" | "ended" | "info";
 
 // 스펙 §9-4 표 그대로.
@@ -40,15 +43,16 @@ const table: Record<Kind, Record<string, [string, Tone]>> = {
     DELIVERED: ["배송 완료", "onsale"],
     CONFIRMED: ["구매 확정", "onsale"],
     CANCELED: ["취소", "ended"],
+    ALL_RETURNED: ["전체 반품", "ended"],
   },
   orderItem: {
     ORDERED: ["주문 완료", "info"],
     CANCEL_REQUESTED: ["취소 확인 중", "pending"],
     CANCELED: ["취소", "ended"],
-    RETURN_REQUESTED: ["반품 요청", "pending"],
-    RETURN_APPROVED: ["반품 승인", "info"],
-    RETURN_REFUNDING: ["반품 환불 중", "pending"],
-    RETURNED: ["반품 완료", "ended"],
+    RETURN_REQUESTED: [returnStatusLabel("REQUESTED"), "pending"],
+    RETURN_APPROVED: [returnStatusLabel("APPROVED"), "info"],
+    RETURN_REFUNDING: [returnStatusLabel("REFUNDING"), "pending"],
+    RETURNED: [returnStatusLabel("COMPLETED"), "ended"],
   },
   payment: {
     READY: ["결제 대기", "pending"],
@@ -71,6 +75,24 @@ const table: Record<Kind, Record<string, [string, Tone]>> = {
   },
   reply: {
     UNANSWERED: ["미답변", "pending"],
+  },
+  return: {
+    REQUESTED: [returnStatusLabel("REQUESTED"), "pending"],
+    APPROVED: [returnStatusLabel("APPROVED"), "info"],
+    REFUNDING: [returnStatusLabel("REFUNDING"), "pending"],
+    COMPLETED: [returnStatusLabel("COMPLETED"), "onsale"],
+    REJECTED: [returnStatusLabel("REJECTED"), "rejected"],
+    WITHDRAWN: [returnStatusLabel("WITHDRAWN"), "ended"],
+    CANCELED_BY_ADMIN: [returnStatusLabel("CANCELED_BY_ADMIN"), "ended"],
+  },
+  settlement: {
+    GENERATED: [settlementStatusLabel("GENERATED"), "pending"],
+    CONFIRMED: [settlementStatusLabel("CONFIRMED"), "info"],
+    PAID: [settlementStatusLabel("PAID"), "onsale"],
+  },
+  adjustment: {
+    PENDING: ["다음 정산에 반영 예정", "pending"],
+    APPLIED: ["정산에 반영됨", "ended"],
   },
 };
 

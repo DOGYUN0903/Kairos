@@ -29,6 +29,13 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 3. `cd frontend && cp .env.example .env.local && pnpm install && pnpm dev`
 4. http://localhost:3000 (Grafana도 기본 3000이라 겹치면 `pnpm dev --port 3001` 처럼 다른 포트를 쓴다)
 
+정산 화면 보기: 정산은 `kairos.settlement.start-date`(월요일) 이후의 주만 오래된 순서로 만든다. 새 환경에서 정산 화면에 데이터가 보이려면 백엔드를 띄울 때 시작일을 지난주 월요일로 넘긴다. demo 프로필이 지난주에 구매 확정된 주문 3건(쿠폰·무료배송·반품 포함)을 만들어 두므로, 관리자 정산 화면에서 지난주를 생성하면 판매자 정산이 생긴다. 이 시드는 모의 결제(`KAIROS_PG_PROVIDER=mock`)일 때만 동작한다.
+```bash
+# macOS(BSD date). 지난주 월요일(KST)
+export KAIROS_SETTLEMENT_STARTDATE=$(TZ=Asia/Seoul date -v-"$(( $(TZ=Asia/Seoul date +%u) - 1 + 7 ))"d +%F)
+SPRING_PROFILES_ACTIVE=local,demo KAIROS_DEMO_PASSWORD=… ./gradlew bootRun
+```
+
 결제 방식: 기본은 모의 결제(`frontend/.env.local`의 `NEXT_PUBLIC_PG_PROVIDER=mock`, 백엔드 `.env`의 `KAIROS_PG_PROVIDER=mock`)다. 토스페이먼츠 테스트 모드로 바꾸려면 양쪽을 반드시 같은 값으로 맞춘다. 값이 다르면 방향에 따라 결과가 다르다.
 - 프론트 `mock` + 백엔드 `toss`: 승인이 거절되고 주문이 취소된다.
 - 프론트 `toss` + 백엔드 `mock`: Mock PG가 접두사 없는 키를 전부 승인하므로 토스에서 실제 승인 없이 주문이 결제 완료가 된다(로컬에서만 가능한 조합이다).
@@ -59,7 +66,8 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은
 - [x] C4. 반품과 정산
 - [x] F1. 프론트엔드 기반과 C1 화면
 - [x] F2. 구매 화면
-- [x] F3. 혜택·후기 화면 (PR 대기)
+- [x] F3. 혜택·후기 화면
+- [x] F4. 반품·정산 화면 (PR 대기)
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
@@ -83,6 +91,8 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은
 - F2 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f2-purchase.md`
 - F3 스펙: `docs/superpowers/specs/2026-11-12-frontend-f3-benefits-design.md`
 - F3 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f3-benefits.md`
+- F4 스펙: `docs/superpowers/specs/2026-11-12-frontend-f4-returns-settlement-design.md`
+- F4 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f4-returns-settlement.md`
 - ADR 0005(C4 반품 환불과 정산 불변성): `docs/adr/0005-c4-return-refund-and-settlement-immutability.md`
 - ADR 0004(C3 혜택 트랜잭션과 락 순서): `docs/adr/0004-c3-benefit-transaction-and-lock-order.md`
 - ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`

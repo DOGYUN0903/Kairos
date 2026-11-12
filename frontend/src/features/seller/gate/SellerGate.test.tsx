@@ -16,6 +16,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 vi.mock("@/features/seller/orders/api", () => ({ useSellerOrderCount: () => ({ data: undefined }) }));
+let returnCount: number | undefined;
+vi.mock("@/features/seller/returns/api", () => ({ useSellerReturnCount: () => ({ data: returnCount }) }));
 vi.mock("@/auth/useAuth", () => ({ useAuth: () => ({ me: { name: "홍길동" }, logout: vi.fn() }) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 
@@ -49,6 +51,25 @@ function renderGate() {
 describe("SellerGate", () => {
   beforeEach(() => {
     pathname = "/seller";
+    returnCount = undefined;
+  });
+
+  it("반품_관리_메뉴에_처리할_건수를_배지로_보인다", () => {
+    me = { status: "APPROVED", seller: seller({ status: "APPROVED" }), error: null };
+    returnCount = 3;
+    renderGate();
+    expect(screen.getByRole("link", { name: /반품 관리/ })).toHaveTextContent("3");
+  });
+
+  it("반품_건수가_0이거나_아직_모르면_배지가_없다", () => {
+    me = { status: "APPROVED", seller: seller({ status: "APPROVED" }), error: null };
+    returnCount = 0;
+    const { unmount } = renderGate();
+    expect(screen.getByRole("link", { name: /반품 관리/ })).not.toHaveTextContent(/\d/);
+    unmount();
+    returnCount = undefined;
+    renderGate();
+    expect(screen.getByRole("link", { name: /반품 관리/ })).not.toHaveTextContent(/\d/);
   });
 
   it("404면_입점_안내와_신청_링크", () => {

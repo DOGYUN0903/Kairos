@@ -36,7 +36,7 @@ class OrderQueryServiceTest {
     private val paymentService = OrderPaymentService(orderRepository, paymentGateway, stockManager, FakeBenefitReverter(), FakeCartItemRemover(), tx, clock)
     private val shippingService = OrderShippingService(orderRepository, tx, clock, pointEarner)
     private val returnService = OrderReturnService(
-        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, OrderProperties(), tx, clock,
+        orderRepository, productReader, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, OrderProperties(), tx, clock,
     )
     private val cancelService = OrderCancelService(
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), OrderProperties(), tx, clock,

@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import { Store } from "lucide-react";
 import { Money } from "@/components/common/Money";
 import { StatusChip } from "@/components/common/StatusChip";
+import { sellerOrderChip } from "@/features/orders/actions";
 import { carrierName } from "@/features/orders/carriers";
 import type { OrderItemResult, SellerOrderResult } from "@/features/orders/api";
 import { OrderItemRow } from "@/features/orders/components/OrderItemRow";
 
 /**
  * 판매자 주문 카드(구매자·판매자·관리자 화면이 함께 쓴다). 표시 전용이다.
+ * - 모든 항목이 반품된 판매자 주문의 칩은 어느 화면에서나 "전체 반품"이다. 반품 진입·상태 줄은 구매자 화면이 renderItemAction·renderItemNote 로 넣는다.
  * - renderItemAction: 항목 오른쪽 버튼(취소 등). shipAction: 택배 줄 오른쪽 버튼(구매 확정 등). footer: 배송비 줄 아래 슬롯.
  */
 export function SellerOrderCard({
@@ -34,7 +36,7 @@ export function SellerOrderCard({
           <Store className="h-4 w-4" aria-hidden />
           {sellerOrder.sellerName}
         </span>
-        <StatusChip kind="sellerOrder" status={sellerOrder.status} />
+        <StatusChip kind="sellerOrder" status={sellerOrderChip(sellerOrder)} />
       </div>
       {showShip && (
         <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3 text-[13px] text-text-2">

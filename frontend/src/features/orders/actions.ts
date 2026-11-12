@@ -9,8 +9,21 @@ export function canCancelItem(order: OrderDetail, sellerOrder: SellerOrderResult
   return order.status === "PAID" && sellerOrder.status === "PAID" && item.status === "ORDERED";
 }
 
+/** 구매 확정 버튼을 보일지. 열린 반품이 있어도 숨기지 않는다(비활성과 이유는 confirmBlockedReason). */
 export function canConfirmPurchase(sellerOrder: SellerOrderResult): boolean {
-  return sellerOrder.status === "DELIVERED" && !sellerOrder.hasOpenReturn;
+  return sellerOrder.status === "DELIVERED";
+}
+
+export const OPEN_RETURN_BLOCK_REASON = "반품이 진행 중인 상품이 있어 확정할 수 없습니다";
+
+/** 구매 확정을 막는 이유(없으면 null). 열린 반품이 있으면 서버가 409 로 거절한다. */
+export function confirmBlockedReason(sellerOrder: Pick<SellerOrderResult, "status" | "hasOpenReturn">): string | null {
+  return sellerOrder.hasOpenReturn ? OPEN_RETURN_BLOCK_REASON : null;
+}
+
+/** 판매자 주문 칩의 상태 키(구매자 주문 상세용). 모든 항목이 반품되면 "전체 반품". */
+export function sellerOrderChip(sellerOrder: Pick<SellerOrderResult, "status" | "allItemsReturned">): string {
+  return sellerOrder.allItemsReturned ? "ALL_RETURNED" : sellerOrder.status;
 }
 
 function paymentChecking(order: OrderDetail): boolean {

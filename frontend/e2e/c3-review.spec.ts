@@ -27,7 +27,7 @@ test("구매 확정 → 후기 작성(사진) → 판매자 답글 → 수정 �
     const card = page.getByRole("region", { name: /E2E 판매자 .* 주문/ });
     await card.getByRole("button", { name: "구매 확정" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText("확정하면 되돌릴 수 없습니다. 구매 확정 시 결제 금액의 1%가 포인트로 적립됩니다.", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("확정하면 되돌릴 수 없습니다. 구매 확정 시 결제 금액의 1%가 포인트로 적립됩니다. 확정하면 이 판매자의 상품은 반품할 수 없습니다.", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "구매 확정" }).click();
     await expect(card.getByRole("button", { name: "구매 확정" })).toHaveCount(0);
     await expect(card.getByRole("button", { name: "후기 작성" })).toBeVisible();

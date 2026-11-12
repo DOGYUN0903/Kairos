@@ -100,7 +100,7 @@ function Detail({ so }: { so: SellerOrderDetail }) {
         <div>
           <h2 className="flex items-center gap-3 text-xl font-bold">
             <span className="tabular-nums">{so.orderNo}</span>
-            <SellerStatusChip status={so.status} />
+            <SellerStatusChip status={so.status} allItemsReturned={so.allItemsReturned} />
           </h2>
           <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-text-2">
             <Meta label="주문 일시">{formatDateTime(so.orderedAt)}</Meta>
@@ -166,11 +166,11 @@ function Detail({ so }: { so: SellerOrderDetail }) {
                           </div>
                         </div>
                       </td>
-                      <td className={`${TD} text-right ${canceled ? "opacity-55" : ""}`}>
+                      <td className={`${TD} whitespace-nowrap text-right ${canceled ? "opacity-55" : ""}`}>
                         <Money value={unitPrice(item.salePrice, item.extraPrice)} />
                       </td>
                       <td className={`${TD} text-right tabular-nums ${canceled ? "opacity-55" : ""}`}>{item.quantity}</td>
-                      <td className={`${TD} text-right font-bold ${canceled ? "opacity-55" : ""}`}>
+                      <td className={`${TD} whitespace-nowrap text-right font-bold ${canceled ? "opacity-55" : ""}`}>
                         <Money value={item.lineAmount} />
                       </td>
                       <td className={TD}>

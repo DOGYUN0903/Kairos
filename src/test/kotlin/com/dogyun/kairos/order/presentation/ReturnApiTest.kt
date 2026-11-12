@@ -65,6 +65,52 @@ class ReturnApiTest : CommerceTestSupport() {
     }
 
     @Test
+    fun 반품_응답에_상품_이미지_옵션_주문번호_판매자_이름_결제_금액이_있다() {
+        val shop = shop()
+        val buyer = newUserToken()
+        val order = deliveredOrder(buyer, shop.sellerToken, listOf(shop.skuId to 1), 33_000)
+        val orderId = order.get("orderId").asLong()
+        val orderItem = order.get("sellerOrders").get(0).get("items").get(0)
+        val itemId = orderItem.get("orderItemId").asLong()
+        val thumbnail = orderItem.get("thumbnailUrl").asString()
+        assertTrue(thumbnail.isNotBlank())
+
+        val requestResponse = json(returnPost(buyer, orderId, itemId).andExpect { status { isCreated() } }).get("data")
+        val returnId = requestResponse.get("returnId").asLong()
+
+        fun check(r: JsonNode) {
+            assertEquals(thumbnail, r.get("thumbnailUrl").asString())
+            assertEquals(orderItem.get("optionDisplayName").asString(), r.get("optionDisplayName").asString())
+            assertEquals(order.get("orderNo").asString(), r.get("orderNo").asString())
+            assertEquals(order.get("sellerOrders").get(0).get("sellerName").asString(), r.get("sellerName").asString())
+            assertEquals(orderItem.get("paidAmount").asLong(), r.get("paidAmount").asLong())
+            assertEquals(30_000, r.get("paidAmount").asLong())
+        }
+        check(requestResponse)
+        check(returnDetail(buyer, returnId))
+        check(json(get("/api/v1/returns/me", buyer).andExpect { status { isOk() } }).get("data").get("content").get(0))
+        check(json(get("/api/v1/seller/returns/$returnId", shop.sellerToken).andExpect { status { isOk() } }).get("data"))
+        check(json(get("/api/v1/seller/returns", shop.sellerToken).andExpect { status { isOk() } }).get("data").get("content").get(0))
+        check(json(get("/api/v1/admin/returns/$returnId", adminToken()).andExpect { status { isOk() } }).get("data"))
+        val adminList = json(get("/api/v1/admin/returns?status=REQUESTED", adminToken()).andExpect { status { isOk() } }).get("data").get("content")
+        check(adminList.first { it.get("returnId").asLong() == returnId })
+    }
+
+    @Test
+    fun 자동_승인_예정_시각은_요청_상태에서만_있고_요청_시각에_3일을_더한_값이다() {
+        val shop = shop()
+        val buyer = newUserToken()
+        val order = deliveredOrder(buyer, shop.sellerToken, listOf(shop.skuId to 1), 33_000)
+        val returnId = requestReturn(buyer, order.get("orderId").asLong(), itemIdOf(order))
+
+        val requested = returnDetail(buyer, returnId)
+        assertEquals(LocalDateTime.parse(requested.get("requestedAt").asString()).plusDays(3), LocalDateTime.parse(requested.get("autoApproveAt").asString()))
+
+        approveReturn(shop.sellerToken, returnId)
+        assertTrue(returnDetail(buyer, returnId).get("autoApproveAt").isNull)
+    }
+
+    @Test
     fun 같은_멱등_키_재요청은_같은_returnId이고_다른_키는_409_RETURN_ALREADY_REQUESTED() {
         val shop = shop()
         val buyer = newUserToken()

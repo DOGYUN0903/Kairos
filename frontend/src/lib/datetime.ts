@@ -60,9 +60,85 @@ export function formatDateTimeMinute(s: string): string {
   return `${Number(m[1])}월 ${Number(m[2])}일 ${m[3]}`;
 }
 
+/** formatDateTimeMinute 에 연도를 더한다: 현재(KST) 연도가 아니면 "2025년 12월 30일 09:00". */
+export function formatDateTimeMinuteWithYear(s: string, nowMs: number): string {
+  const m = /^(\d{4})-/.exec(s);
+  if (!m) return s;
+  const currentYear = new Date(nowMs + KST_OFFSET_MS).getUTCFullYear();
+  const base = formatDateTimeMinute(s);
+  return Number(m[1]) === currentYear ? base : `${m[1]}년 ${base}`;
+}
+
 /** "2026-01-05T00:00:00" → "1월 5일". */
 export function formatMonthDay(s: string): string {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(s);
   if (!m) return s;
   return `${Number(m[1])}월 ${Number(m[2])}일`;
+}
+
+const DAY_MS = 86_400_000;
+const KST_OFFSET_MS = 9 * 3_600_000;
+const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** "YYYY-MM-DD" → 1970-01-01 부터 센 일수. 달력에 없는 날짜·형식 오류는 null. 실행 환경 시간대와 무관(UTC 로만 계산). */
+function dayNumber(date: string): number | null {
+  const m = YMD.exec(date);
+  if (!m) return null;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(ms)) return null;
+  const days = floorDiv(ms, DAY_MS);
+  return dayToString(days) === date ? days : null;
+}
+
+function dayToString(days: number): string {
+  return new Date(days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** 1970-01-01(목) 기준 요일. 월요일 = 0. */
+function weekdayIndex(days: number): number {
+  return mod(days + 3, 7);
+}
+
+/** KST 기준 가장 최근에 끝난 월~일 기간의 월요일("YYYY-MM-DD"). */
+export function lastFinishedWeekMonday(nowMs: number): string {
+  const today = floorDiv(nowMs + KST_OFFSET_MS, DAY_MS);
+  return dayToString(today - weekdayIndex(today) - 7);
+}
+
+/** "YYYY-MM-DD" 가 달력에 있는 월요일인지. */
+export function isMonday(date: string): boolean {
+  const days = dayNumber(date);
+  return days !== null && weekdayIndex(days) === 0;
+}
+
+/** 그 월요일 + 7일 00:00 KST 가 지났는지(해석할 수 없는 날짜는 false). */
+export function isWeekFinished(monday: string, nowMs: number): boolean {
+  const days = dayNumber(monday);
+  if (days === null) return false;
+  return (days + 7) * DAY_MS - KST_OFFSET_MS <= nowMs;
+}
+
+/** 서버의 periodEnd(다음 월요일, 미포함)에서 화면에 보일 마지막 날(하루 전)을 구한다. */
+export function periodLastDay(periodEnd: string): string {
+  const days = dayNumber(periodEnd);
+  return days === null ? periodEnd : dayToString(days - 1);
+}
+
+/** "YYYY-MM-DD" 가 달력에 있는 날짜인지(2026-02-30 은 아니다). */
+export function isCalendarDate(date: string): boolean {
+  return dayNumber(date) !== null;
+}
+
+/** 월요일("YYYY-MM-DD")이 시작하는 주의 마지막 날(일요일). 해석할 수 없으면 입력 그대로. */
+export function weekLastDay(monday: string): string {
+  const days = dayNumber(monday);
+  return days === null ? monday : dayToString(days + 6);
+}
+
+/** 해당 KST 시각을 지났는지(정각까지는 지나지 않은 것, 소수 초는 버린다). 해석할 수 없으면 false. */
+export function isPastKst(kstLocalDateTime: string, nowMs: number): boolean {
+  const m = KST_LOCAL.exec(kstLocalDateTime);
+  if (!m) return false;
+  const target = Date.parse(`${m[1]}:${m[2] ?? "00"}+09:00`);
+  return !Number.isNaN(target) && nowMs > target;
 }

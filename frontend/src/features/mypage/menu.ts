@@ -1,5 +1,6 @@
 export const MY_MENU: { href: string; label: string }[] = [
   { href: "/my/orders", label: "주문 내역" },
+  { href: "/my/returns", label: "반품 내역" },
   { href: "/my/coupons", label: "쿠폰" },
   { href: "/my/points", label: "포인트" },
   { href: "/my/reviews", label: "내 후기" },

@@ -633,3 +633,108 @@ table { border-collapse: collapse; width: 100%; }
 .dialog__scroll > * { flex: none; }
 .state-panel > .board__label:first-child { display: block; margin-top: 24px; }
 .toast-fixed { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 90; align-items: center; }
+
+/* ==========================================================
+   F4 · 반품 · 정산 시안 (추가분)
+   ========================================================== */
+.my-content { min-width: 0; }
+.dialog-stage--tight { gap: 24px; padding: 32px 24px; }
+.dialog-stage--tight .dialog { width: 420px; }
+.dialog-stage--tight .dialog--wide { width: 440px; }
+
+/* 주문 상세 항목 줄 — 반품 상태 */
+.line-item--rtn { grid-template-columns: 72px minmax(0, 1fr) 236px 92px 88px; }
+.line-item--rtn .line-item__state { gap: 6px; }
+.line-item--rtn .line-item__state .small { color: var(--text-2); line-height: 1.4; }
+.line-item--rtn .line-item__action { flex-direction: column; align-items: flex-end; gap: 6px; }
+.so-card__note { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface); font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 8px; }
+.so-card__note .icon { flex: none; }
+.so-card__note.is-block { color: var(--danger); }
+.ship-line { display: flex; gap: 12px; align-items: center; }
+.ret-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.link-sm { font-size: 12px; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+.link-sm:hover { color: var(--navy); }
+
+/* 반품 요청 창 */
+.reason-list { display: flex; flex-direction: column; gap: 8px; }
+.reason-list .choice { align-items: center; padding: 10px 14px; }
+.refund-box .refund-empty { color: var(--text-2); font-size: 13px; text-align: center; padding: 14px 0; }
+.refund-box__title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.refund-box .sum-total span { font-weight: 700; }
+.refund-box .sum-total em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--warning); background: #FFF6DD; border-radius: 2px; padding: 1px 5px; margin-left: 6px; vertical-align: 3px; }
+.refund-foot { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); }
+.refund-foot b { color: var(--text); font-weight: 500; }
+
+/* 반품 내역 카드 */
+.ret-card { display: grid; grid-template-columns: 72px minmax(0, 1fr) 190px 150px; gap: 16px; align-items: center; padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); margin-top: 12px; background: #fff; }
+.ret-card:hover { border-color: var(--navy); text-decoration: none; }
+.ret-card__seller { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+.ret-card__meta { font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }
+.ret-card__meta b { color: var(--text); font-weight: 500; margin-right: 6px; }
+.ret-card__refund { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ret-card__refund strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.ret-card__refund .small { color: var(--text-2); }
+.ret-card.is-closed .ph, .ret-card.is-closed .info { opacity: .6; }
+
+/* 진행 단계 */
+.rflow { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 4px 0 0; list-style: none; }
+.rflow li { position: relative; padding-top: 34px; text-align: center; font-size: 13px; color: var(--text-3); }
+.rflow li::before { content: ""; position: absolute; left: 50%; top: 4px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; border: 2px solid var(--border); z-index: 1; }
+.rflow li::after { content: ""; position: absolute; left: calc(50% + 14px); right: calc(-50% + 14px); top: 11px; height: 2px; background: var(--border); }
+.rflow li:last-child::after { display: none; }
+.rflow li.is-done { color: var(--text); }
+.rflow li.is-done::before { background: var(--navy); border-color: var(--navy); }
+.rflow li.is-line::after { background: var(--navy); }
+.rflow li.is-current::before { background: #fff; border-color: var(--navy); box-shadow: 0 0 0 4px #E8EDF7; }
+.rflow li.is-current { color: var(--navy); }
+.rflow li.is-stop { color: var(--danger); }
+.rflow li.is-stop::before { background: var(--danger); border-color: var(--danger); }
+.rflow li.is-skip::before { background: var(--surface-2); border-style: dashed; }
+.rflow b { display: block; font-weight: 700; }
+.rflow .when { display: block; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.rflow .who { display: block; font-size: 12px; color: var(--text-3); }
+.rflow li.is-stop .when, .rflow li.is-stop .who { color: var(--danger); }
+
+/* 구매자 반품 상세 */
+.rd-stack { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.rd-product { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+.rd-reason { padding: 12px 14px; border-radius: var(--radius); background: var(--surface); font-size: 13px; line-height: 1.6; }
+.rd-reason-box { margin-top: 12px; }
+.card__head .head-sub { font-size: 12px; font-weight: 400; color: var(--text-2); margin-left: 10px; }
+.rd-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.kv--wide { grid-template-columns: 96px minmax(0, 1fr); }
+
+/* 판매자 · 관리자 상세/표 보조 */
+.table--dense th, .table--dense td { padding: 10px 8px; font-size: 12.5px; }
+.table--dense th:first-child, .table--dense td:first-child { padding-left: 14px; }
+.table--dense th:last-child, .table--dense td:last-child { padding-right: 14px; }
+.table td .sub { display: block; font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.table tr.is-total td { font-weight: 700; background: var(--surface); }
+.table td.neg, .table .neg { color: var(--danger); font-weight: 700; }
+.filter-bar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.filter-bar .field { min-width: 160px; }
+.filter-bar .field .input, .filter-bar .field .select { min-height: 40px; }
+.kv-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 10px; column-gap: 12px; margin: 0; font-size: 13px; }
+.kv-card dt { color: var(--text-2); }
+.kv-card dd { margin: 0; }
+.stmt { margin: 0; }
+.stmt .sum-rows { font-size: 14px; row-gap: 12px; }
+.stmt .sum-rows .em { font-weight: 700; color: var(--text); }
+.stmt-sign { display: inline-block; width: 18px; color: var(--text-3); font-weight: 500; }
+.stmt .sum-total .pay { font-size: 26px; }
+.stmt .sum-total .pay-zero { color: var(--text-2); }
+.pay-chip-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); margin-left: 8px; font-weight: 400; }
+.sec-title { font-size: 15px; font-weight: 700; }
+.result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.result-grid > div { padding: 12px 8px; border-radius: var(--radius); background: var(--surface); }
+.result-grid strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.result-grid span { font-size: 12px; color: var(--text-2); }
+.result-grid .is-warn { background: #FFF6DD; }
+.result-grid .is-warn strong { color: var(--warning); }
+.seg { align-self: flex-start; display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.seg label { display: inline-flex; align-items: center; justify-content: center; min-width: 96px; min-height: 44px; padding: 0 16px; cursor: pointer; font-weight: 500; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--navy); color: #fff; font-weight: 700; }
+.seg label + label { border-left: 1px solid var(--border); }
+.inline-actions { display: flex; gap: 8px; align-items: center; }
+.toast-row { display: flex; justify-content: center; margin-top: 24px; }

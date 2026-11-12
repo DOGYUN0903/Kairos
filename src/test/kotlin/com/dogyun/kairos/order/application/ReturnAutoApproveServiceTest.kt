@@ -39,7 +39,7 @@ class ReturnAutoApproveServiceTest {
     private val memberId = 7L
 
     private fun returnServiceAt(t: LocalDateTime) = OrderReturnService(
-        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, properties, tx, clockAt(t),
+        orderRepository, productReader, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, properties, tx, clockAt(t),
     )
 
     private fun autoApproveAt(t: LocalDateTime) = ReturnAutoApproveService(orderRepository, returnServiceAt(t), properties, clockAt(t))

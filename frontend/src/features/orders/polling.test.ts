@@ -23,6 +23,10 @@ describe("needsPolling", () => {
     expect(needsPolling(order("APPROVED", ["ORDERED", "CANCEL_REQUESTED"]))).toBe(true);
   });
 
+  it("환불_확인_중인_반품_항목이_있으면_다시_조회한다", () => {
+    expect(needsPolling(order("APPROVED", ["ORDERED", "RETURN_REFUNDING"]))).toBe(true);
+  });
+
   it("둘_다_아니면_멈춘다", () => {
     expect(needsPolling(order("READY"))).toBe(false);
     expect(needsPolling(order("APPROVED", ["ORDERED", "CANCELED"]))).toBe(false);

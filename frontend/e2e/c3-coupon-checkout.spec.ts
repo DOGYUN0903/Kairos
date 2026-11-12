@@ -51,6 +51,16 @@ test("쿠폰 받기부터 상품·장바구니 쿠폰 결제, 사용 완료 목�
   const nCart = `E2E 장바구니 10% ${run}`;
   const nMin = `E2E 플랫폼 1천원 최소3.5만 ${run}`;
   const policyIds: number[] = [];
+  // 견적(POST /orders/quote) 응답을 처음부터 센다: 주문 생성 전에는 견적이 최소 한 번 있어야 하고(대조군), 주문이 만들어진 뒤에는 다시 부르지 않는다.
+  let orderCreated = false;
+  const quotesBeforeOrder: number[] = [];
+  const quoteStatusesAfterOrder: number[] = [];
+  page.on("response", (res) => {
+    const { pathname } = new URL(res.url());
+    if (res.request().method() !== "POST") return;
+    if (pathname === "/api/v1/orders") orderCreated = true;
+    else if (pathname === "/api/v1/orders/quote") (orderCreated ? quoteStatusesAfterOrder : quotesBeforeOrder).push(res.status());
+  });
   try {
     policyIds.push(await createAdminCouponPolicy(request, admin, { name: n2000, couponType: "PRODUCT", targetType: "ALL_PRODUCTS", discountType: "FIXED", discountValue: 2000 }));
     policyIds.push(
@@ -128,8 +138,13 @@ test("쿠폰 받기부터 상품·장바구니 쿠폰 결제, 사용 완료 목�
       await expect(page.getByRole("button", { name: "59,000원 결제하기" })).toBeEnabled();
     });
 
+    // 주문 직후 재견적이 409 를 내던 회귀 방지: 결제 화면이 가라앉은 뒤에도 주문 이후 견적 409 가 없어야 한다.
+    expect(quotesBeforeOrder.length, "주문 전 견적 응답을 관찰하지 못했습니다(대조군)").toBeGreaterThan(0);
     await page.getByRole("button", { name: "59,000원 결제하기" }).click();
     await page.waitForURL((u) => /\/my\/orders\/\d+\/pay$/.test(u.pathname));
+    await page.waitForLoadState("networkidle");
+    expect(orderCreated, "주문 생성 응답을 관찰하지 못했습니다").toBe(true);
+    expect(quoteStatusesAfterOrder.filter((s) => s === 409)).toHaveLength(0);
     await payWithMock(page);
 
     const orders = await api.get<{ content: { orderId: number }[] }>(request, "/api/v1/orders", buyer.accessToken);

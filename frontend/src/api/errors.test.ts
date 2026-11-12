@@ -47,4 +47,11 @@ describe("resolveError F3", () => {
     expect(resolveError(new ApiError(409, "COUPON_SOLD_OUT", "x", null)).message).toBe("쿠폰이 모두 소진되었습니다.");
     expect(resolveError(new ApiError(409, "COUPON_POLICY_ENDED", "x", null)).message).toBe("종료된 쿠폰입니다.");
   });
+  it("F4_반품·정산_오류", () => {
+    expect(resolveError(new ApiError(404, "RETURN_NOT_FOUND", "x", null)).kind).toBe("page");
+    expect(resolveError(new ApiError(404, "SETTLEMENT_NOT_FOUND", "x", null)).kind).toBe("page");
+    expect(resolveError(new ApiError(400, "RETURN_INVALID", "x", null)).kind).toBe("form");
+    expect(resolveError(new ApiError(400, "SETTLEMENT_ADJUSTMENT_INVALID", "x", null)).kind).toBe("form");
+    expect(resolveError(new ApiError(400, "SETTLEMENT_PERIOD_INVALID", "x", null)).kind).toBe("form");
+  });
 });

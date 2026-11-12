@@ -1445,6 +1445,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{orderId}/items/{orderItemId}/return-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * 반품 환불 미리보기 (구매자)
+         * @description 이 항목을 `reason` 사유로 반품 요청하면 얼마를 돌려받는지 보여 준다. 수거 확인 때 실제 환불과 같은 계산이지만 **예상값**이다.
+         *     계산은 호출 시점의 주문 상태로 하며, 같은 주문의 다른 항목이 취소·반품되면 실제 환불은 달라질 수 있다
+         *     (발송 구간 배송비 회수는 주문당 한 번, 판매자 귀책 반품의 발송 배송비 환불은 그 판매자 주문에서 마지막으로 끝나는 반품).
+         *     아무것도 바꾸지 않는다. 자격 판정은 반품 요청과 같아서, 같은 시점·같은 상태라면 미리보기가 성공하면 요청도 성공하고 미리보기가 실패하면 요청도 같은 코드로 실패한다. (그사이 상태나 반품 가능 기한이 바뀌면 달라질 수 있다.)
+         */
+        get: operations["previewMyOrderItemReturn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/returns/me": {
         parameters: {
             query?: never;
@@ -3488,6 +3514,62 @@ export interface components {
             receivedAt?: string | null;
             /** Format: date-time */
             completedAt?: string | null;
+            /** @description 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null */
+            thumbnailUrl: string | null;
+            /** @description 주문 시점 스냅샷 */
+            optionDisplayName: string;
+            orderNo: string;
+            /** @description 주문 시점 판매자 이름(판매자 주문 스냅샷) */
+            sellerName: string;
+            /**
+             * Format: int64
+             * @description 그 항목의 현금 결제 몫
+             */
+            paidAmount: number;
+            /**
+             * Format: date-time
+             * @description REQUESTED 일 때만 requestedAt + 자동 승인 기간(kairos.order.return-auto-approve-after), 그 밖에는 null
+             */
+            autoApproveAt: string | null;
+            /** @description 구매자가 반품 요청 때 적은 상세 내용(최대 500자). 없으면 null */
+            detail: string | null;
+        };
+        ReturnPreview: {
+            /** Format: int64 */
+            orderItemId: number;
+            /** @enum {string} */
+            reason: "CHANGE_OF_MIND" | "DEFECTIVE" | "WRONG_DELIVERY";
+            /** @enum {string} */
+            feeBearer: "BUYER" | "SELLER";
+            /**
+             * Format: int64
+             * @description 이 항목의 결제 몫(쿠폰·포인트 배분 뒤)
+             */
+            paidAmount: number;
+            /**
+             * Format: int64
+             * @description 구매자 부담 회수 구간 반품비
+             */
+            returnFee: number;
+            /**
+             * Format: int64
+             * @description 무료배송 주문의 발송 구간 회수액(주문당 한 번)
+             */
+            outboundFeeRecovered: number;
+            /**
+             * Format: int64
+             * @description 판매자 귀책으로 돌려줄 구매자 부담 배송비
+             */
+            shippingFeeRefund: number;
+            /**
+             * Format: int64
+             * @description paidAmount - returnFee - outboundFeeRecovered + shippingFeeRefund
+             */
+            refundAmount: number;
+            /** Format: int64 */
+            pointsRefund: number;
+            /** @description 그 항목에 상품 쿠폰이 있었는지. 실제 반환은 쿠폰이 만료 전일 때만 한다. */
+            productCouponReturnable: boolean;
         };
         ReturnRequestSummary: {
             /** Format: int64 */
@@ -7329,6 +7411,61 @@ export interface operations {
                 };
             };
             422: components["responses"]["IdempotencyKeyReused"];
+        };
+    };
+    previewMyOrderItemReturn: {
+        parameters: {
+            query: {
+                reason: "CHANGE_OF_MIND" | "DEFECTIVE" | "WRONG_DELIVERY";
+            };
+            header?: never;
+            path: {
+                orderId: components["parameters"]["OrderId"];
+                orderItemId: components["parameters"]["OrderItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 예상 환불 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse"] & {
+                        data?: components["schemas"]["ReturnPreview"];
+                    };
+                };
+            };
+            /** @description `RETURN_INVALID`(모르는 사유 — 반품 요청과 같다) 또는 `INVALID_REQUEST`(사유 누락 또는 빈 값) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description `ORDER_NOT_FOUND`(없거나 내 주문이 아니다) 또는 `ORDER_ITEM_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `RETURN_NOT_ELIGIBLE`(배송 완료 전·구매 확정 뒤·취소 항목), `RETURN_WINDOW_EXPIRED` 또는 `RETURN_ALREADY_REQUESTED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     listMyReturns: {
