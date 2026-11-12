@@ -6801,7 +6801,7 @@ components:
           nullable: true
     ReturnRequestResponse:
       type: object
-      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt]
+      required: [returnId, orderId, sellerOrderId, orderItemId, productName, quantity, reason, feeBearer, status, returnFee, outboundFeeRecovered, shippingFeeRefund, sellerBorneFee, refundAmount, pointsRefund, requestedAt, thumbnailUrl, optionDisplayName, orderNo, sellerName, paidAmount, autoApproveAt]
       properties:
         returnId:
           type: integer
@@ -6874,6 +6874,27 @@ components:
           type: string
           format: date-time
           nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null
+        optionDisplayName:
+          type: string
+          description: 주문 시점 스냅샷
+        orderNo:
+          type: string
+        sellerName:
+          type: string
+          description: 주문 시점 판매자 이름(판매자 주문 스냅샷)
+        paidAmount:
+          type: integer
+          format: int64
+          description: 그 항목의 현금 결제 몫
+        autoApproveAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: REQUESTED 일 때만 requestedAt + 자동 승인 기간(kairos.order.return-auto-approve-after), 그 밖에는 null
     ReturnPreview:
       type: object
       required: [orderItemId, reason, feeBearer, paidAmount, returnFee, outboundFeeRecovered, shippingFeeRefund, refundAmount, pointsRefund, productCouponReturnable]

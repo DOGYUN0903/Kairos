@@ -42,7 +42,7 @@ class OrderReturnServiceTest {
     )
     private val shippingService = OrderShippingService(orderRepository, tx, clock, pointEarner)
     private val service = OrderReturnService(
-        orderRepository, paymentGateway, stockManager, benefitReverter, pointEarner, properties, tx, clock,
+        orderRepository, productReader, paymentGateway, stockManager, benefitReverter, pointEarner, properties, tx, clock,
     )
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)

@@ -3514,6 +3514,23 @@ export interface components {
             receivedAt?: string | null;
             /** Format: date-time */
             completedAt?: string | null;
+            /** @description 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null */
+            thumbnailUrl: string | null;
+            /** @description 주문 시점 스냅샷 */
+            optionDisplayName: string;
+            orderNo: string;
+            /** @description 주문 시점 판매자 이름(판매자 주문 스냅샷) */
+            sellerName: string;
+            /**
+             * Format: int64
+             * @description 그 항목의 현금 결제 몫
+             */
+            paidAmount: number;
+            /**
+             * Format: date-time
+             * @description REQUESTED 일 때만 requestedAt + 자동 승인 기간(kairos.order.return-auto-approve-after), 그 밖에는 null
+             */
+            autoApproveAt: string | null;
         };
         ReturnPreview: {
             /** Format: int64 */

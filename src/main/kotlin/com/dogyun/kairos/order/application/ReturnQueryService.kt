@@ -18,6 +18,7 @@ import java.time.LocalDateTime
 @Transactional(readOnly = true)
 class ReturnQueryService(
     private val orderRepository: OrderRepository,
+    private val productReader: ProductReader,
     private val properties: OrderProperties,
     private val clock: Clock,
 ) {
@@ -65,16 +66,20 @@ class ReturnQueryService(
         val order = orderRepository.findById(orderId) ?: throw DomainException(ErrorCode.RETURN_NOT_FOUND)
         val request = requireNotNull(order.findReturn(returnId).second.returnRequest)
         if (!visible(request)) throw DomainException(ErrorCode.RETURN_NOT_FOUND)
-        return order.returnResult(returnId)
+        val productId = order.findReturn(returnId).second.productId
+        return order.returnResult(returnId, productReader.findThumbnailUrls(listOf(productId)), properties.returnAutoApproveAfter)
     }
 
     private fun list(memberId: Long?, sellerId: Long?, status: ReturnStatus?, page: Int, size: Int): PageResult<ReturnRequestResult> {
         if (page < 0 || size !in 1..MAX_SIZE) throw DomainException(ErrorCode.INVALID_REQUEST)
         val found = orderRepository.findReturnPage(memberId, sellerId, status, page, size)
-        val orders = mutableMapOf<Long, Order?>()
+        val orders = mutableMapOf<Long, Order>()
+        found.content.forEach { r -> orders.getOrPut(r.orderId) { requireNotNull(orderRepository.findById(r.orderId)) } }
+        val productIds = found.content.map { orders.getValue(it.orderId).findItem(it.orderItemId).productId }.toSet()
+        // 한 페이지의 이미지는 한 번에 조회한다(N+1 금지)
+        val thumbnails = if (productIds.isEmpty()) emptyMap() else productReader.findThumbnailUrls(productIds)
         val content = found.content.map { r ->
-            val item = orders.getOrPut(r.orderId) { orderRepository.findById(r.orderId) }?.findItem(r.orderItemId)
-            r.toResult(item?.productName ?: "", item?.quantity ?: 0)
+            orders.getValue(r.orderId).returnResult(requireNotNull(r.id), thumbnails, properties.returnAutoApproveAfter)
         }
         return PageResult(content, found.page, found.size, found.totalElements, found.totalPages, found.hasNext)
     }

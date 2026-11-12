@@ -12,7 +12,10 @@ import com.dogyun.kairos.order.domain.ReturnReason
 import com.dogyun.kairos.order.domain.ReturnRequest
 import com.dogyun.kairos.order.domain.ReturnStatus
 import org.springframework.stereotype.Service
+import com.dogyun.kairos.order.domain.OrderItem
+import com.dogyun.kairos.order.domain.SellerOrder
 import java.time.Clock
+import java.time.Duration
 import java.time.LocalDateTime
 
 /**
@@ -24,6 +27,7 @@ import java.time.LocalDateTime
 @Service
 class OrderReturnService(
     private val orderRepository: OrderRepository,
+    private val productReader: ProductReader,
     private val paymentGateway: PaymentGateway,
     private val stockManager: StockManager,
     private val benefitReverter: BenefitReverter,
@@ -47,7 +51,7 @@ class OrderReturnService(
             order.requestReturn(orderItemId, reason, cmd.detail, properties.returnWindow, now())
             val saved = orderRepository.save(order)
             val returnId = requireNotNull(saved.findItem(orderItemId).returnRequest?.id) { "반품이 저장되지 않았다" }
-            saved.returnResult(returnId)
+            resultOf(saved, returnId)
         }
     }
 
@@ -92,7 +96,7 @@ class OrderReturnService(
         return tx.run {
             val order = lockOrder(orderId, returnId, check)
             action(order)
-            orderRepository.save(order).returnResult(returnId)
+            resultOf(orderRepository.save(order), returnId)
         }
     }
 
@@ -122,7 +126,7 @@ class OrderReturnService(
 
         val finish = finishReturn(orderId, returnId, outcome)
         if (finish == ReturnFinish.REVERTED) throw DomainException(ErrorCode.PAYMENT_CANCEL_FAILED)
-        return tx.run { requireNotNull(orderRepository.findById(orderId)).returnResult(returnId) }
+        return tx.run { resultOf(requireNotNull(orderRepository.findById(orderId)), returnId) }
     }
 
     /**
@@ -133,7 +137,7 @@ class OrderReturnService(
         val order = lockOrder(orderId, returnId, check)
         val item = order.findReturn(returnId).second
         val status = requireNotNull(item.returnRequest).status
-        if (status == ReturnStatus.REFUNDING || status == ReturnStatus.COMPLETED) return Claim.Current(order.returnResult(returnId))
+        if (status == ReturnStatus.REFUNDING || status == ReturnStatus.COMPLETED) return Claim.Current(resultOf(order, returnId))
         val plan = order.planReturnRefund(returnId, properties.returnFeePolicy())
         order.startReturnRefund(returnId, plan, now())
         orderRepository.save(order)
@@ -187,6 +191,12 @@ class OrderReturnService(
     private fun isRefunded(outcome: PgOutcome) = outcome is PgOutcome.Done &&
         (outcome.payment.status == PgPaymentStatus.PARTIAL_CANCELED || outcome.payment.status == PgPaymentStatus.CANCELED)
 
+    /** 응답 조립만 한다(상태를 바꾸지 않는다). 이미지는 읽기 한 번. */
+    private fun resultOf(order: Order, returnId: Long): ReturnRequestResult {
+        val productId = order.findReturn(returnId).second.productId
+        return order.returnResult(returnId, productReader.findThumbnailUrls(listOf(productId)), properties.returnAutoApproveAfter)
+    }
+
     private fun now(): LocalDateTime = LocalDateTime.now(clock)
 
     private fun notFound() = DomainException(ErrorCode.RETURN_NOT_FOUND)
@@ -197,18 +207,20 @@ class OrderReturnService(
     }
 }
 
-/** 주문 안의 반품 하나를 결과로 옮긴다(상품명·수량은 항목에서). */
-internal fun Order.returnResult(returnId: Long): ReturnRequestResult {
-    val item = findReturn(returnId).second
-    return requireNotNull(item.returnRequest).toResult(item.productName, item.quantity)
+/** 주문 안의 반품 하나를 결과로 옮긴다(표시용 필드는 주문·항목·판매자 주문 스냅샷에서, 이미지는 [thumbnails] 에서). */
+internal fun Order.returnResult(returnId: Long, thumbnails: Map<Long, String>, autoApproveAfter: Duration): ReturnRequestResult {
+    val (sellerOrder, item) = findReturn(returnId)
+    return requireNotNull(item.returnRequest).toResult(this, sellerOrder, item, thumbnails[item.productId], autoApproveAfter)
 }
 
-internal fun ReturnRequest.toResult(productName: String, quantity: Int) = ReturnRequestResult(
+internal fun ReturnRequest.toResult(order: Order, sellerOrder: SellerOrder, item: OrderItem, thumbnailUrl: String?, autoApproveAfter: Duration) = ReturnRequestResult(
     returnId = requireNotNull(id), orderId = orderId, sellerOrderId = sellerOrderId, orderItemId = orderItemId,
-    productName = productName, quantity = quantity, reason = reason.name, feeBearer = feeBearer.name, status = status.name,
+    productName = item.productName, quantity = item.quantity, reason = reason.name, feeBearer = feeBearer.name, status = status.name,
     returnFee = returnFee, outboundFeeRecovered = outboundFeeRecovered, shippingFeeRefund = shippingFeeRefund,
     sellerBorneFee = sellerBorneFee, refundAmount = refundAmount, pointsRefund = pointsRefund, rejectReason = rejectReason,
     requestedAt = requestedAt, decidedAt = decidedAt, decidedBy = decidedBy?.name, receivedAt = receivedAt, completedAt = completedAt,
+    thumbnailUrl = thumbnailUrl, optionDisplayName = item.optionDisplayName, orderNo = order.orderNo, sellerName = sellerOrder.sellerName,
+    paidAmount = item.paidAmount, autoApproveAt = if (status == ReturnStatus.REQUESTED) requestedAt.plus(autoApproveAfter) else null,
 )
 
 internal fun ReturnRequest.toSummary() =

@@ -27,6 +27,16 @@ data class ReturnRequestResult(
     val decidedBy: String?,
     val receivedAt: LocalDateTime?,
     val completedAt: LocalDateTime?,
+    /** 조회 시점 상품의 대표 이미지 URL. 상품이 삭제됐거나 이미지가 없으면 null */
+    val thumbnailUrl: String?,
+    val optionDisplayName: String,
+    val orderNo: String,
+    /** 주문 시점 판매자 이름(판매자 주문 스냅샷) */
+    val sellerName: String,
+    /** 그 항목의 현금 결제 몫 */
+    val paidAmount: Long,
+    /** `REQUESTED` 일 때만 `requestedAt + 자동 승인 기간`, 그 밖에는 null */
+    val autoApproveAt: LocalDateTime?,
 )
 
 /** 주문 상세 항목에 붙는 반품 요약. */
