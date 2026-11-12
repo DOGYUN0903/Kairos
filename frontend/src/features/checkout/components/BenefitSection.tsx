@@ -15,10 +15,12 @@ type Props = {
   onPointsRaw: (raw: string) => void;
   onCommitPoints: (points: number) => void;
   onPickCart: () => void;
+  /** 새 견적을 기다리는 중(보이는 값이 옛 견적의 것). */
+  requoting: boolean;
 };
 
 /** 할인·포인트 영역. 모든 금액·한도는 견적 값이다. */
-export function BenefitSection({ quote, selection, balance, pointsRaw, onPointsRaw, onCommitPoints, onPickCart }: Props) {
+export function BenefitSection({ quote, selection, balance, pointsRaw, onPointsRaw, onCommitPoints, onPickCart, requoting }: Props) {
   const picked = selection.cartCouponId === null ? undefined : quote.cartCoupons.find((c) => c.couponId === selection.cartCouponId);
   const usableCount = quote.cartCoupons.filter((c) => c.usable).length;
   return (
@@ -49,7 +51,7 @@ export function BenefitSection({ quote, selection, balance, pointsRaw, onPointsR
               </span>
               <span className="flex items-center gap-3">
                 <span className="font-bold tabular-nums text-danger">
-                  −<Money value={quote.cartCouponDiscount} />
+                  {requoting ? "계산 중…" : <>−<Money value={quote.cartCouponDiscount} /></>}
                 </span>
                 <button type="button" className="min-h-9 text-[13px] text-text-2 underline underline-offset-[3px] hover:text-navy" onClick={onPickCart}>
                   변경
@@ -73,7 +75,7 @@ export function BenefitSection({ quote, selection, balance, pointsRaw, onPointsR
         <div className="pt-2.5 font-bold">
           포인트<small className="mt-0.5 block text-xs font-normal text-text-2">{balance === undefined ? "보유 포인트 확인 중" : `보유 ${formatPoints(balance)}`}</small>
         </div>
-        <PointsField balance={balance} maxUsable={quote.maxUsablePoints} raw={pointsRaw} onRawChange={onPointsRaw} applied={selection.points} onCommit={onCommitPoints} />
+        <PointsField balance={balance} maxUsable={quote.maxUsablePoints} raw={pointsRaw} onRawChange={onPointsRaw} applied={selection.points} onCommit={onCommitPoints} busy={requoting} />
       </div>
     </section>
   );

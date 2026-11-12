@@ -154,7 +154,7 @@ describe("CheckoutPage 쿠폰·포인트", () => {
     h.POST.mockImplementation(async (path: string, opts: { body: Body }) =>
       path === "/api/v1/orders/quote" ? ok(quoteFor(opts.body, { totalAmount: 0, maxUsablePoints: 0 })) : ok({ orderId: 9, orderStatus: "PAID", totalAmount: 0 }),
     );
-    mount();
+    const { invalidate } = mount();
     const btn = await screen.findByRole("button", { name: "주문하기" });
     expect(screen.getByLabelText("사용할 포인트")).toBeDisabled();
     await fillAddress();
@@ -162,5 +162,75 @@ describe("CheckoutPage 쿠폰·포인트", () => {
     await userEvent.click(btn);
     await waitFor(() => expect(h.replace).toHaveBeenCalledWith("/my/orders/9/complete"));
     expect(orderCalls()[0]![1].body.expectedTotalAmount).toBe(0);
+    // 완료 화면으로 바로 가므로 장바구니·견적 캐시를 여기서 다시 읽게 한다.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cart"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["checkout", "quote"] });
+  });
+});
+
+/** 쿠폰 1장과 포인트 1,000P 를 고르고 새 견적이 확정될 때까지 기다린 뒤 주소를 채운다. */
+async function selectCouponAndPoints() {
+  await screen.findByRole("button", { name: "30,000원 결제하기" });
+  await userEvent.type(screen.getByLabelText("사용할 포인트"), "1000");
+  await waitFor(() => expect(quoteCalls().some((c) => c[1].body.pointsToUse === 1000)).toBe(true), { timeout: 3000 });
+  await pickProductCoupon();
+  const pay = await screen.findByRole("button", { name: "28,000원 결제하기" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  await fillAddress();
+  return pay;
+}
+const lastQuoteBody = (): Body => quoteCalls().at(-1)![1].body;
+
+describe("CheckoutPage 주문 생성 오류 (스펙 7-4)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.GET.mockImplementation(async (path: string) => (path === "/api/v1/points/me" ? ok({ balance: 20000, expiringWithin30Days: 0 }) : ok({ items: [] })));
+    h.POST.mockImplementation(async (path: string, opts: { body: Body }) => {
+      if (path === "/api/v1/orders/quote") return ok(quoteFor(opts.body));
+      throw new ApiError(0, "INTERNAL_ERROR", "x", null);
+    });
+  });
+  const failOrder = (status: number, code: ApiError["code"], message = "서버 메시지") =>
+    h.POST.mockImplementation(async (path: string, opts: { body: Body }) => {
+      if (path === "/api/v1/orders/quote") return ok(quoteFor(opts.body));
+      throw new ApiError(status, code, message, null);
+    });
+  const settle = () => new Promise((r) => setTimeout(r, 300));
+
+  it("쿠폰_코드는_쿠폰_선택만_비우고_포인트는_유지한_채_다시_견적하며_재제출하지_않는다", async () => {
+    failOrder(409, "COUPON_NOT_AVAILABLE");
+    const { invalidate } = mount();
+    const pay = await selectCouponAndPoints();
+    await userEvent.click(pay);
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "쿠폰을 사용할 수 없습니다. 다시 선택해 주세요." })));
+    await waitFor(() => expect(lastQuoteBody()).toMatchObject({ productCoupons: [], pointsToUse: 1000 }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["checkout", "quote"] });
+    await settle();
+    expect(orderCalls()).toHaveLength(1);
+  });
+
+  it("포인트_코드는_포인트를_0으로_비우고_쿠폰은_유지한_채_다시_견적하며_재제출하지_않는다", async () => {
+    failOrder(409, "POINT_INSUFFICIENT", "포인트가 부족합니다");
+    mount();
+    const pay = await selectCouponAndPoints();
+    await userEvent.click(pay);
+    await waitFor(() => expect(h.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "포인트가 부족합니다" })));
+    await waitFor(() => expect(lastQuoteBody()).toMatchObject({ productCoupons: [{ skuId: 1, couponId: 10 }], pointsToUse: 0 }));
+    expect(screen.getByLabelText("사용할 포인트")).toHaveValue("");
+    await settle();
+    expect(orderCalls()).toHaveLength(1);
+  });
+
+  it("ORDER_PRICE_CHANGED는_선택을_유지한_채_다시_견적하고_재제출하지_않는다", async () => {
+    failOrder(409, "ORDER_PRICE_CHANGED");
+    mount();
+    const pay = await selectCouponAndPoints();
+    const before = quoteCalls().length;
+    await userEvent.click(pay);
+    expect(await screen.findByText("금액이 변경되었습니다.")).toBeInTheDocument();
+    await waitFor(() => expect(quoteCalls().length).toBeGreaterThan(before));
+    expect(lastQuoteBody()).toMatchObject({ productCoupons: [{ skuId: 1, couponId: 10 }], pointsToUse: 1000 });
+    await settle();
+    expect(orderCalls()).toHaveLength(1);
   });
 });

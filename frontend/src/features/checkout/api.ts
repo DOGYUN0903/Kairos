@@ -36,13 +36,15 @@ export function useQuote(items: { skuId: number; quantity: number }[], selection
   });
 }
 
-/** 주문 생성. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 성공하면 주문 목록·내 쿠폰·포인트를 무효화한다(장바구니는 결제 승인 때 서버가 비우므로 여기서 건드리지 않는다). */
+/** 주문 생성. 실패는 던진다(useIdempotentSubmit 이 키를 정하고 onError 로 넘긴다). 성공하면 주문 목록·장바구니·내 쿠폰·포인트·견적 캐시를 무효화한다(0원 주문은 PAID 로 바로 완료 화면에 가서 결제 승인 화면을 거치지 않으므로 장바구니도 여기서 다시 읽게 한다). */
 export function useCreateOrder() {
   const qc = useQueryClient();
   return async (body: CreateOrderRequest, key: string): Promise<CreateOrderResponse> => {
     const res = unwrap<CreateOrderResponse>(await api.POST("/api/v1/orders", { params: { header: { [IDEMPOTENCY_HEADER]: key } }, body }));
     void qc.invalidateQueries({ queryKey: queryKeys.orders.root });
-    // 쿠폰은 사용 처리되고 포인트는 차감된다.
+    // 쿠폰은 사용 처리되고 포인트는 차감된다. 장바구니는 서버가 비웠을 수 있고, 캐시된 견적은 쓴 쿠폰을 아직 쓸 수 있다고 보일 수 있다.
+    void qc.invalidateQueries({ queryKey: queryKeys.cart });
+    void qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes });
     void qc.invalidateQueries({ queryKey: queryKeys.coupons.mineRoot });
     void qc.invalidateQueries({ queryKey: queryKeys.points.root });
     return res;

@@ -16,7 +16,7 @@ import { FormNotice } from "@/features/auth/components/FormNotice";
 import { applyFormError } from "@/features/auth/apply-form-error";
 import { useCart } from "@/features/cart/api";
 import { useCreateOrder, useQuote, type QuoteLine, type QuoteResult } from "@/features/checkout/api";
-import { clearCoupons, couponAppliedElsewhere, EMPTY_SELECTION, selectCartCoupon, selectProductCoupon, setPoints, type BenefitSelection } from "@/features/checkout/benefit-selection";
+import { clearCoupons, couponAppliedElsewhere, EMPTY_SELECTION, isSameSelection, selectCartCoupon, selectProductCoupon, setPoints, type BenefitSelection } from "@/features/checkout/benefit-selection";
 import { BenefitSection } from "@/features/checkout/components/BenefitSection";
 import { CouponPickerDialog } from "@/features/checkout/components/CouponPickerDialog";
 import { validatePoints } from "@/features/checkout/points-input";
@@ -198,7 +198,7 @@ function CheckoutBody({ items, mode, created, onOrderCreated }: { items: Checkou
       router.replace(href);
     },
     {
-      // 같은 키로 내용이 다른 요청이 나가면 서버가 옛 주문을 돌려줄 수 있다: 금액·혜택 선택이 바뀌면 새 키.
+      // 같은 키로 내용이 다른 요청이 나가면 서버가 422 IDEMPOTENCY_KEY_REUSED 로 거절한다: 금액·혜택 선택이 바뀌면 새 키.
       // 견적이 아직 없어 알 수 없으면 빈 문자열(직전 지문 유지).
       fingerprint: () => {
         const snap = shownRef.current.snapshot;
@@ -244,6 +244,8 @@ function CheckoutBody({ items, mode, created, onOrderCreated }: { items: Checkou
     return <ErrorState error={quote.error} onRetry={() => void quote.refetch()} />;
   }
 
+  // 보이는 견적이 지금 선택으로 받은 것이 아니면(새 견적을 기다리는 중) 선택한 쿠폰의 할인액·포인트 한도를 믿지 않는다.
+  const requoting = quote.isFetching || !isSameSelection(shownResult.selection, selection);
   const pickerLine: QuoteLine | undefined = picker?.kind === "product" ? shown.items.find((l) => l.skuId === picker.skuId) : undefined;
 
   return (
@@ -266,7 +268,7 @@ function CheckoutBody({ items, mode, created, onOrderCreated }: { items: Checkou
             <span>
               주문이 접수되었습니다. 화면이 넘어가지 않으면{" "}
               <Link className="font-medium text-navy underline underline-offset-2" href={created.href}>
-                {created.paid ? "주문 완료 보기" : "주문 보기"}
+                {created.paid ? "주문 완료 보기" : created.href.endsWith("/pay?auto=1") ? "결제 페이지로 이동" : "주문 보기"}
               </Link>
               를 눌러 주세요.
             </span>
@@ -290,8 +292,9 @@ function CheckoutBody({ items, mode, created, onOrderCreated }: { items: Checkou
           </p>
         )}
         <ShippingAddressForm form={form} />
-        <OrderItems quote={shown} selection={selection} onPickCoupon={(l) => setPicker({ kind: "product", skuId: l.skuId })} />
+        <OrderItems quote={shown} selection={selection} requoting={requoting} onPickCoupon={(l) => setPicker({ kind: "product", skuId: l.skuId })} />
         <BenefitSection
+          requoting={requoting}
           quote={shown}
           selection={selection}
           balance={points.data?.balance}

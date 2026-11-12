@@ -19,9 +19,11 @@ type Props = {
   applied: number;
   /** 검증을 통과한 값을 선택에 반영한다. */
   onCommit: (points: number) => void;
+  /** 새 견적을 기다리는 중이면 "최대 사용"을 막는다(옛 견적의 한도를 넣지 않게). */
+  busy?: boolean;
 };
 
-export function PointsField({ balance, maxUsable, raw, onRawChange, applied, onCommit }: Props) {
+export function PointsField({ balance, maxUsable, raw, onRawChange, applied, onCommit, busy = false }: Props) {
   // 잔액을 모르면 "없음"이라 단정하지 않는다(일반 안내가 나오게 0 이 아닌 값으로 본다).
   const disabledReason = pointsDisabledReason(balance ?? 1, maxUsable);
   const check = validatePoints(raw, maxUsable);
@@ -65,7 +67,7 @@ export function PointsField({ balance, maxUsable, raw, onRawChange, applied, onC
         <button
           type="button"
           className="btn"
-          disabled={disabledReason !== null}
+          disabled={disabledReason !== null || busy}
           onClick={() => {
             onRawChange(String(maxUsable));
             onCommit(maxUsable);
