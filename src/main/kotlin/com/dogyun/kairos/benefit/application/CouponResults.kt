@@ -43,7 +43,7 @@ data class CouponResult(
 
 data class ClaimedCoupon(val couponId: Long, val expiresAt: LocalDateTime)
 
-internal fun CouponPolicy.toResult(claimed: Boolean, targetProductName: String? = null) = CouponPolicyResult(
+internal fun CouponPolicy.toResult(claimed: Boolean, targetProductName: String?) = CouponPolicyResult(
     policyId = requireNotNull(id),
     name = name,
     issuerType = issuerType.name,
