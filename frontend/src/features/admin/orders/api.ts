@@ -48,7 +48,7 @@ export function useAdminCancelItem(orderId: number) {
   const invalidate = () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: queryKeys.adminOrders.detail(orderId) }),
-      qc.invalidateQueries({ queryKey: ["adminOrders", "list"] }),
+      qc.invalidateQueries({ queryKey: queryKeys.adminOrders.lists }),
     ]);
   return async (orderItemId: number, reason: string, key: string): Promise<CancelItemResponse> => {
     try {

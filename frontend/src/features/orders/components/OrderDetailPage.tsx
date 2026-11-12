@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useNow } from "@/hooks/useNow";
 import { ApiError } from "@/api/client";
 import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
@@ -17,15 +18,6 @@ import { ShippingAddressCard } from "@/features/orders/components/ShippingAddres
 import { expiredRecheckInterval, isPastExpiry, shouldRefetchAtExpiry } from "@/features/orders/expiry";
 import { secondsUntilKst } from "@/lib/datetime";
 import { needsPolling, usePollingWindow } from "@/features/orders/polling";
-
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 /** 구매자 주문 상세. 결과가 확정되지 않은 동안만 3초 간격으로 다시 읽고(최대 2분), 그 뒤에는 새로고침을 안내한다. */
 export function OrderDetailPage({ orderId }: { orderId: number }) {

@@ -1,19 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useNow } from "@/hooks/useNow";
 import { formatCountdown, secondsUntilKst } from "@/lib/datetime";
 import { floorDiv, mod } from "@/lib/money";
 import { cn } from "@/lib/utils";
-
-function useNow(enabled: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [enabled]);
-  return now;
-}
 
 /** 결제 기한까지 남은 시간(1초 간격). 0 이 되면 onExpire 를 한 번 부른다(같은 expiresAt 에 대해). */
 export function PayCountdown({

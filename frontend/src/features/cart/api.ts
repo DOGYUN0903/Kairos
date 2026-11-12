@@ -59,7 +59,7 @@ export function useChangeCartQuantity() {
     onSettled: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.cart }),
-        qc.invalidateQueries({ queryKey: ["checkout", "quote"] }),
+        qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes }),
       ]);
     },
   });
@@ -75,7 +75,7 @@ export function useRemoveCartItem() {
     onSettled: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.cart }),
-        qc.invalidateQueries({ queryKey: ["checkout", "quote"] }),
+        qc.invalidateQueries({ queryKey: queryKeys.checkout.quotes }),
       ]);
     },
   });

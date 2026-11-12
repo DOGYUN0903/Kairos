@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNow } from "@/hooks/useNow";
 import { ErrorState } from "@/components/common/ErrorState";
 import { Money } from "@/components/common/Money";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
@@ -17,15 +18,6 @@ import { formatCountdown, secondsUntilKst } from "@/lib/datetime";
 import { floorDiv, mod } from "@/lib/money";
 
 const TOSS_KEY_MISSING = "토스 클라이언트 키가 설정되지 않았습니다";
-
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 /**
  * 결제 페이지. 주문서에서 넘어온 직후(?auto=1)와 결제 대기 주문의 "결제하기"가 모두 여기로 온다.

@@ -31,6 +31,19 @@ describe("secondsUntilKst", () => {
   it("소수_초는_잘라낸다", () => {
     expect(secondsUntilKst("2026-11-12T10:15:00.123456", now)).toBe(900);
   });
+  it("초가_없는_값도_읽는다", () => {
+    // 백엔드(Jackson)는 초·소수 초가 0 이면 초를 생략할 수 있다. 0 을 돌려주면 결제 기한이 지난 것으로 처리돼 결제가 막힌다.
+    expect(secondsUntilKst("2026-11-12T10:15", now)).toBe(900);
+  });
+  it("소수_7~9자리(나노초)도_읽는다", () => {
+    expect(secondsUntilKst("2026-11-12T10:15:00.1234567", now)).toBe(900);
+    expect(secondsUntilKst("2026-11-12T10:15:30.123456789", now)).toBe(930);
+  });
+  it("형식이_아니면_0", () => {
+    expect(secondsUntilKst("2026-11-12", now)).toBe(0);
+    expect(secondsUntilKst("2026-11-12T10:15:00+09:00", now)).toBe(0);
+    expect(secondsUntilKst("", now)).toBe(0);
+  });
 });
 
 describe("formatCountdown", () => {

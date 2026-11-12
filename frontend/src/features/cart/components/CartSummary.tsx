@@ -27,13 +27,27 @@ function Pending({ className }: { className?: string }) {
   );
 }
 
+/** 견적을 받지 못해 금액을 알 수 없을 때의 중립 표시. */
+function Unknown() {
+  return (
+    <span className="text-text-3">
+      <span aria-hidden>—</span>
+      <span className="sr-only">알 수 없음</span>
+    </span>
+  );
+}
+
 /** 모든 금액은 서버 견적 값이다. 프론트가 계산하는 것은 무료배송까지 남은 금액(amountUntil)뿐이다. */
 export function CartSummary({ selectedIds, quote, stale, error, onRetry }: Props) {
   const none = selectedIds.length === 0;
   const shown = none ? undefined : quote;
   const btn = "btn btn-primary btn-lg btn-block mt-5";
   const quoteFailed = !none && error !== null && error !== undefined && !(error instanceof ApiError && error.code === "SKU_NOT_ORDERABLE");
-  const calculating = !none && (stale || !quote);
+  // 견적이 실패하면 계산 중이 아니다: 스켈레톤·aria-busy 를 멈추고 금액 자리는 중립 표시로 둔다(이전 견적 금액이나 0원을 보여 주지 않는다).
+  // 다시 시도해 새 견적을 기다리는 동안(stale)은 다시 계산 중이다.
+  const calculating = !none && (stale || (!quote && !quoteFailed));
+  const amount = (value: number | undefined, pendingClass?: string) =>
+    calculating ? <Pending className={pendingClass} /> : quoteFailed ? <Unknown /> : <Money value={value ?? 0} />;
   const remaining = shown ? amountUntil(shown.freeShippingThreshold, shown.itemsAmount) : 0;
 
   return (
@@ -42,13 +56,13 @@ export function CartSummary({ selectedIds, quote, stale, error, onRetry }: Props
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2.5 text-sm">
         <dt className="text-text-2">상품 금액</dt>
         <dd className="text-right font-medium tabular-nums">
-          {calculating ? <Pending /> : <Money value={shown?.itemsAmount ?? 0} />}
+          {amount(shown?.itemsAmount)}
         </dd>
         <dt className="text-text-2">배송비</dt>
         <dd className="text-right font-medium tabular-nums">
-          {calculating ? <Pending /> : <Money value={shown?.buyerShippingFee ?? 0} />}
+          {amount(shown?.buyerShippingFee)}
         </dd>
-        {!calculating && shown?.sellerQuotes.map((s) => (
+        {!calculating && !quoteFailed && shown?.sellerQuotes.map((s) => (
           <div key={s.sellerId} className="col-span-2 -mt-1.5 flex justify-between pl-2.5 text-xs text-text-3">
             <span>{s.sellerName}</span>
             <span className="tabular-nums">
@@ -61,7 +75,7 @@ export function CartSummary({ selectedIds, quote, stale, error, onRetry }: Props
         <dt>결제 예정 금액</dt>
         <dd>
           <strong className="text-2xl tracking-tight">
-            {calculating ? <Pending className="w-24" /> : <Money value={shown?.totalAmount ?? 0} />}
+            {amount(shown?.totalAmount, "w-24")}
           </strong>
         </dd>
       </dl>
@@ -69,7 +83,7 @@ export function CartSummary({ selectedIds, quote, stale, error, onRetry }: Props
       {calculating && (
         <div aria-hidden className="mt-4 h-[44px] rounded bg-surface" />
       )}
-      {!calculating && shown &&
+      {!calculating && !quoteFailed && shown &&
         (remaining > 0 ? (
           <div className="mt-4 rounded bg-surface px-3.5 py-3 text-[13px]">
             <span>

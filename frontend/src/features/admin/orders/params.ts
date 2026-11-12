@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@/features/admin/orders/api";
+import { parsePage } from "@/lib/page";
 
 export const ADMIN_ORDER_STATUSES: readonly { value: OrderStatus; label: string }[] = [
   { value: "PENDING_PAYMENT", label: "결제 대기" },
@@ -18,8 +19,7 @@ export function parseAdminOrderParams(sp: { get(name: string): string | null }):
   const rawMember = sp.get("memberId");
   const member = rawMember !== null && /^[1-9]\d{0,14}$/.test(rawMember) ? Number(rawMember) : undefined;
   const orderNo = (sp.get("orderNo") ?? "").trim().slice(0, ORDER_NO_MAX);
-  const rawPage = sp.get("page");
-  const page = rawPage !== null && /^\d{1,9}$/.test(rawPage) ? Number(rawPage) : 0;
+  const page = parsePage(sp.get("page"));
   return {
     ...(status ? { status } : {}),
     ...(member !== undefined ? { memberId: member } : {}),

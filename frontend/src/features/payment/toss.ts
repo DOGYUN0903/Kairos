@@ -9,6 +9,9 @@ import { failUrl, successUrl } from "@/features/payment/payment-urls";
  *   새 "결제창형"(widgets.renderPaymentWindow)은 결제위젯 키(test_gck_…)와 상점 관리자 설정이 필요해 쓰지 않는다.)
  * - successUrl·failUrl 을 주면 Redirect 방식이다. 성공: `{successUrl}?amount=&orderId=&paymentKey=`,
  *   실패: `{failUrl}?code=&message=&orderId=`(사용자가 결제를 중단한 PAY_PROCESS_CANCELED 는 orderId 가 없다).
+ * - 사용자 취소 코드(docs.tosspayments.com/sdk/v2/error-codes): failUrl 의 `PAY_PROCESS_CANCELED`("사용자에 의해 결제가 취소되었습니다"),
+ *   SDK 의 `USER_CANCEL`("취소되었습니다"). 같은 표의 `PAY_PROCESS_ABORTED` 는 승인 실패로 중단된 것이라 사용자 취소가 아니다.
+ *   실패 화면(FailPage)은 이 두 코드만 "취소"로 안내하고, 주소의 message 는 화면에 옮기지 않는다.
  *   orderId 는 영문·숫자·`-_=` 6~64자 → 주문번호(21자 [A-Z0-9])가 그대로 맞는다. orderName 은 100자 이하.
  * - successUrl 의 기존 쿼리(oid) 보존: 문서(blog/what-is-successurl)가 "커스텀 파라미터는 지원하지 않으니 필요하면
  *   successUrl 에 쿼리 파라미터를 임의로 붙이라"며 `"/success?key={VALUE}"` 예시를 든다. 보존된다는 문장을 직접 적지는 않았고

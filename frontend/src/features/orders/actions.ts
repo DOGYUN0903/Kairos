@@ -21,9 +21,8 @@ function paymentChecking(order: OrderDetail): boolean {
 export type OrderHeaderKind = "pending" | "checking" | "paid" | "completed" | "canceled";
 
 /** 상태 헤더 종류. 결제가 확인 중이면 주문 상태보다 우선한다(결과를 단정하지 않는다). */
-export function orderHeader(order: OrderDetail, nowMs: number): OrderHeaderKind {
-  // nowMs 는 쓰지 않는다: 기한이 지나도 서버가 취소할 때까지는 결제 대기 헤더를 유지한다(시각으로 상태를 추측하지 않고 서버가 정한다).
-  void nowMs;
+export function orderHeader(order: OrderDetail): OrderHeaderKind {
+  // 시각을 받지 않는다: 기한이 지나도 서버가 취소할 때까지는 결제 대기 헤더를 유지한다(시각으로 상태를 추측하지 않고 서버가 정한다).
   if (order.status === "CANCELED") return "canceled";
   if (order.status === "COMPLETED") return "completed";
   if (paymentChecking(order)) return "checking";

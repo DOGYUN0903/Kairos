@@ -22,13 +22,14 @@ export function toLocalDateTimeString(d: { y: number; m: number; d: number; hh: 
   return `${pad(d.y, 4)}-${pad(d.m)}-${pad(d.d)}T${pad(d.hh)}:${pad(d.mm)}:00`;
 }
 
-const KST_LOCAL = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d{1,6})?$/;
+// LOCAL_DATE_TIME 과 같은 범위를 받는다: 초는 생략될 수 있고(초·소수 초가 0), 소수 초는 1~9자리다.
+const KST_LOCAL = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(?:\.\d{1,9})?)?$/;
 
 /** 백엔드 LocalDateTime(KST) 까지 남은 초. 소수 초는 버리고 +09:00 으로 해석하며, 지났거나 해석할 수 없으면 0. */
 export function secondsUntilKst(kstLocalDateTime: string, nowMs: number): number {
   const m = KST_LOCAL.exec(kstLocalDateTime);
   if (!m) return 0;
-  const target = Date.parse(`${m[1]}+09:00`);
+  const target = Date.parse(`${m[1]}:${m[2] ?? "00"}+09:00`);
   if (Number.isNaN(target)) return 0;
   return Math.max(floorDiv(target - nowMs, 1000), 0);
 }

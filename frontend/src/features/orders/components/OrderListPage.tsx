@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { PageSkeleton } from "@/components/common/PageSkeleton";
 import { Pagination } from "@/components/common/Pagination";
 import { useMyOrders } from "@/features/orders/api";
-import { parsePage } from "@/features/orders/page-param";
+import { parsePage } from "@/lib/page";
 import { OrderCard } from "@/features/orders/components/OrderCard";
 import { queryKeys } from "@/lib/query-keys";
 

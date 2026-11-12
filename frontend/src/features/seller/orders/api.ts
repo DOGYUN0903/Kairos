@@ -56,8 +56,8 @@ export function useInvalidateSellerOrders(id: number) {
   return () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: queryKeys.sellerOrders.detail(id) }),
-      qc.invalidateQueries({ queryKey: ["sellerOrders", "list"] }),
-      qc.invalidateQueries({ queryKey: ["sellerOrders", "count"] }),
+      qc.invalidateQueries({ queryKey: queryKeys.sellerOrders.lists }),
+      qc.invalidateQueries({ queryKey: queryKeys.sellerOrders.counts }),
     ]);
 }
 

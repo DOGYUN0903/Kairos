@@ -61,23 +61,23 @@ describe("canPay", () => {
 describe("orderHeader", () => {
   const pending = (over: Partial<OrderDetail> = {}) => order({ status: "PENDING_PAYMENT", payment: { status: "READY" } as OrderDetail["payment"], ...over });
   it("결제 대기", () => {
-    expect(orderHeader(pending(), NOW)).toBe("pending");
+    expect(orderHeader(pending())).toBe("pending");
   });
   it("결제 대기는 기한이 지나도 서버가 취소할 때까지 결제 대기 헤더다", () => {
-    expect(orderHeader(pending({ expiresAt: "2026-11-12T11:00:00" }), NOW)).toBe("pending");
+    expect(orderHeader(pending({ expiresAt: "2026-11-12T11:00:00" }))).toBe("pending");
   });
   it("결제가 확인 중이면 확인 중", () => {
-    expect(orderHeader(pending({ payment: { status: "UNKNOWN" } as OrderDetail["payment"] }), NOW)).toBe("checking");
-    expect(orderHeader(order({ payment: { status: "IN_PROGRESS" } as OrderDetail["payment"] }), NOW)).toBe("checking");
+    expect(orderHeader(pending({ payment: { status: "UNKNOWN" } as OrderDetail["payment"] }))).toBe("checking");
+    expect(orderHeader(order({ payment: { status: "IN_PROGRESS" } as OrderDetail["payment"] }))).toBe("checking");
   });
   it("결제 완료", () => {
-    expect(orderHeader(order(), NOW)).toBe("paid");
+    expect(orderHeader(order())).toBe("paid");
   });
   it("구매 확정", () => {
-    expect(orderHeader(order({ status: "COMPLETED" }), NOW)).toBe("completed");
+    expect(orderHeader(order({ status: "COMPLETED" }))).toBe("completed");
   });
   it("취소", () => {
-    expect(orderHeader(order({ status: "CANCELED" }), NOW)).toBe("canceled");
+    expect(orderHeader(order({ status: "CANCELED" }))).toBe("canceled");
   });
 });
 

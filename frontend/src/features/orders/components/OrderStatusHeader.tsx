@@ -22,7 +22,7 @@ export function OrderStatusHeader({
   pollExpired: boolean;
   onRefresh: () => void;
 }) {
-  const kind = orderHeader(order, nowMs);
+  const kind = orderHeader(order);
   const meta = [
     { label: "주문번호", value: order.orderNo },
     { label: "주문 일시", value: formatDateTime(order.createdAt) },

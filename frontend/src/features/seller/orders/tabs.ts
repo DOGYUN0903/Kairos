@@ -1,4 +1,5 @@
 import type { SellerOrderStatus } from "@/features/seller/orders/api";
+import { parsePage } from "@/lib/page";
 
 export const SELLER_ORDER_TABS: readonly { status: SellerOrderStatus | undefined; label: string }[] = [
   { status: undefined, label: "전체" },
@@ -13,7 +14,6 @@ export const SELLER_ORDER_TABS: readonly { status: SellerOrderStatus | undefined
 export function parseSellerOrderParams(sp: { get(name: string): string | null }): { status?: SellerOrderStatus; page: number } {
   const raw = sp.get("status");
   const tab = SELLER_ORDER_TABS.find((t) => t.status !== undefined && t.status === raw);
-  const rawPage = sp.get("page");
-  const page = rawPage !== null && /^\d{1,9}$/.test(rawPage) ? Number(rawPage) : 0;
+  const page = parsePage(sp.get("page"));
   return tab?.status ? { status: tab.status, page } : { page };
 }
