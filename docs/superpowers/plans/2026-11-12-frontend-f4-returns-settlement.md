@@ -101,11 +101,11 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 - Test: 수정(추가만) `order/domain/ReturnRefundCalculatorTest.kt`, 신규 `order/presentation/ReturnPreviewApiTest.kt`, 필요하면 `order/domain/OrderTest.kt`에 자격 판정 테스트 추가
 
 **Interfaces:**
-- Produces (OpenAPI): `GET /api/v1/orders/{orderId}/items/{orderItemId}/return-preview`(operationId `previewMyOrderItemReturn`, 인증, 쿼리 `reason` 필수 enum `CHANGE_OF_MIND|DEFECTIVE|WRONG_DELIVERY`, 헤더 없음) → `ReturnPreview { orderItemId, reason, feeBearer(BUYER|SELLER), paidAmount, returnFee, outboundFeeRecovered, shippingFeeRefund, refundAmount, pointsRefund, productCouponReturnable(boolean) }` 전부 required. 오류: 400 `RETURN_INVALID`(또는 잘못된 enum의 기존 처리 코드 — 반품 요청 API가 잘못된 사유에 내는 코드와 같게), 401, 404 `ORDER_NOT_FOUND`/`ORDER_ITEM_NOT_FOUND`, 409 `RETURN_NOT_ELIGIBLE`/`RETURN_WINDOW_EXPIRED`/`RETURN_ALREADY_REQUESTED`.
+- Produces (OpenAPI): `GET /api/v1/orders/{orderId}/items/{orderItemId}/return-preview`(operationId `previewMyOrderItemReturn`, 인증, 쿼리 `reason` 필수 enum `CHANGE_OF_MIND|DEFECTIVE|WRONG_DELIVERY`, 헤더 없음) → `ReturnPreview { orderItemId, reason, feeBearer(BUYER|SELLER), paidAmount, returnFee, outboundFeeRecovered, shippingFeeRefund, refundAmount, pointsRefund, productCouponReturnable(boolean) }` 전부 required. 오류: 400 `RETURN_INVALID`(모르는 사유 — 요청 API와 같다), 400 `INVALID_REQUEST`(사유 누락), 401, 404 `ORDER_NOT_FOUND`/`ORDER_ITEM_NOT_FOUND`, 409 `RETURN_NOT_ELIGIBLE`/`RETURN_WINDOW_EXPIRED`/`RETURN_ALREADY_REQUESTED`.
 - Produces (Kotlin):
   - `ReturnRefundCalculator.preview(order: Order, itemId: Long, reason: ReturnReason, fees: ReturnFeePolicy): ReturnRefundPlan` — 상태 검사 없이 금액만 계산한다(자격은 호출 전에 판정). `plan`과 `preview`는 같은 private 본체를 부른다.
   - `Order.checkReturnRequestable(itemId: Long, window: Duration, now: LocalDateTime)` — 상태를 바꾸지 않고, `requestReturn`이 던지던 것과 같은 순서·같은 코드로 던진다. `requestReturn`은 이 함수를 먼저 부른다.
-  - 미리보기 조회 서비스 메서드 `previewReturn(memberId: Long, orderId: Long, orderItemId: Long, reason: ReturnReason): ReturnPreviewResult`(락 없는 읽기 트랜잭션, 남의 주문은 `ORDER_NOT_FOUND`)
+  - 미리보기 조회 서비스 메서드 `previewReturn(memberId: Long, orderId: Long, orderItemId: Long, reason: String): ReturnPreviewResult`(락 없는 읽기 트랜잭션, 남의 주문은 `ORDER_NOT_FOUND`). **사유는 문자열로 받아** 반품 요청(`OrderReturnService.request`)이 쓰는 것과 같은 변환으로 바꾼다(모르는 값 → `RETURN_INVALID`, 주문 조회보다 먼저). 컨트롤러의 `@RequestParam`도 enum이 아니라 String으로 받는다(enum으로 받으면 잘못된 값이 `INVALID_REQUEST`가 되어 요청 API와 어긋난다)
 
 - [ ] **Step 1: OpenAPI에 경로와 스키마를 추가한다.** 설명에 "수거 확인 때 실제 환불과 같은 계산이지만 **예상값**이다. 계산은 호출 시점의 주문 상태로 하며, 같은 주문의 다른 항목이 취소·반품되면 실제 환불은 달라질 수 있다. 아무것도 바꾸지 않는다"를 적는다.
 - [ ] **Step 2: 실패하는 테스트 — `ReturnRefundCalculatorTest`에 추가**(기존 테스트는 고치지 않는다. 기존 픽스처 재사용)
@@ -142,6 +142,7 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 **Interfaces:**
 - Produces (OpenAPI, `ReturnRequestResponse`에 추가): `thumbnailUrl: string|null`(required + nullable), `optionDisplayName: string`(required), `orderNo: string`(required), `sellerName: string`(required), `paidAmount: int64`(required — 그 항목의 현금 결제 몫), `autoApproveAt: LocalDateTime|null`(`REQUESTED`일 때만 `requestedAt + kairos.order.return-auto-approve-after`). nullable 표기는 이 파일에서 `| null`이 실제로 생성되는 방식(기존 `thumbnailUrl` 필드와 같은 선언)을 따르고, 생성된 `schema.d.ts`에서 `| null`을 확인한다.
 - Produces (Kotlin): `ReturnRequestResult`에 같은 6개 필드. 이미지: `ProductReader.findThumbnailUrls(productIds)`(F2에서 추가된 것)로 **목록 한 페이지당 한 번**.
+- 생성자 변경: `ReturnQueryService`는 지금 `OrderRepository`만 받는다 — `ProductReader`와 `OrderProperties`(자동 승인 기간)를 더 받는다. `OrderReturnService`도 `ProductReader`가 필요하다(`returnResult()`는 주문 행 락 트랜잭션 안에서 불린다 — 이미지 조회는 읽기 한 번이라 허용하되, 응답 조립만 하고 상태를 바꾸지 않는다). 이 서비스들을 직접 만드는 테스트의 Fake·픽스처 생성자 호출을 함께 고친다(단언은 고치지 않는다).
 
 - [ ] **Step 1: OpenAPI에 필드를 추가한다.**
 - [ ] **Step 2: 실패하는 테스트**
@@ -158,8 +159,9 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 스펙 §5-3.
 
 **Files:**
-- Modify: `common/infrastructure/ClockConfig.kt`(시스템 시계 빈을 다른 `Clock` 빈이 없을 때만 등록), 필요하면 `common/infrastructure/JpaAuditingConfig.kt`
-- Create: `demo/infrastructure/` 아래 demo 전용 `Clock`(스레드 로컬 오프셋), `demo/application/DemoSettlementSeeder.kt`
+- Modify: `common/infrastructure/ClockConfig.kt`(시스템 시계 빈에 `@Profile("!demo")`), 필요하면 `common/infrastructure/JpaAuditingConfig.kt`
+- Modify(테스트, 이 태스크에 한해 허용): `src/test/kotlin/com/dogyun/kairos/demo/DemoApiTest.kt`의 `assertEquals(20, countMine(seller, "ON_SALE"))` — 시연 상품 5개가 같은 판매자 소유라 25가 된다. 기존 데모 브랜드의 상품만 세도록 바꾸거나 기대값을 25로 고치고, 보고서에 적는다(Task 5 Step 3의 "기존 테스트 삭제 줄 없음"에서 이 한 곳은 예외).
+- Create: `demo/application/` 아래 demo 전용 `Clock`(스레드 로컬 오프셋 — `java.time`만 쓰는 클래스다. `demo.application`의 시더가 직접 부르므로 `infrastructure`에 두면 `ArchitectureTest`의 "application은 infrastructure에 의존하지 않는다"를 어긴다), `demo/application/DemoSettlementSeeder.kt`
 - Modify: `demo/application/{DemoSeeder,DemoCatalog,DemoAccounts}.kt`, `demo/infrastructure/DemoDataInitializer.kt`·`demo/presentation/DemoController.kt`(기동·`POST /demo/reseed`에서 시더 호출)
 - Test: 신규 `demo/` 통합 테스트(기존 demo 테스트 위치·패턴을 따른다)
 
@@ -171,16 +173,21 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 
 - [ ] **Step 1: 기존 구조를 읽는다** — `DemoSeeder`(멱등 판정, 상품 보충 계산), `DemoProfileGuard`, `ClockConfig`, 주문 생성부터 구매 확정·반품까지의 서비스 진입점(`OrderService.place`, 결제 승인 `OrderPaymentService`, `OrderShippingService`의 발송·배송 완료·확정, `OrderReturnService`의 요청·승인·수거 확인, 쿠폰 발급 `CouponService.claim`·정책 생성 `CouponPolicyService`), `SettlementGenerationService.generate`와 `kairos.settlement.start-date`.
 - [ ] **Step 2: 실패하는 테스트 — demo 시계**(단위): `블록_안에서만_시각이_옮겨진다`(블록 안 `LocalDateTime.now(clock)`이 오프셋만큼 과거, 블록 뒤 실제 시각), `다른_스레드는_실제_시각을_본다`(블록 실행 중 다른 스레드에서 읽은 시각이 옮겨지지 않음), `블록이_예외로_끝나도_오프셋이_풀린다`.
-- [ ] **Step 3: 구현.** `ClockConfig`는 `@ConditionalOnMissingBean(Clock::class)`(또는 같은 효과)로 바꾸고, demo 전용 `Clock`은 demo 프로필 조건으로 등록한다. demo가 아닌 프로필에서 컨텍스트의 `Clock`이 시스템 시계임을 확인하는 테스트를 둔다(`demo가_아니면_시스템_시계_하나다`).
-- [ ] **Step 4: 실패하는 테스트 — 시더 통합 테스트**(demo 프로필, 실제 DB, `kairos.settlement.start-date`를 지난주 월요일로 준 테스트 설정)
+- [ ] **Step 3: 구현.** `ClockConfig.clock()`에 `@Profile("!demo")`를 붙이고, demo 전용 `Clock`은 `@Component @Profile("demo")`로 등록한다(`@ConditionalOnMissingBean`은 컴포넌트 스캔 순서에 따라 빈이 둘이 될 수 있어 쓰지 않는다). 테스트의 `@Primary` 시계(`FixedClockConfig`, `OffsetClockConfig`)는 영향이 없다. demo가 아닌 프로필에서 컨텍스트의 `Clock`이 시스템 시계임을 확인하는 테스트를 둔다(`demo가_아니면_시스템_시계_하나다`).
+- [ ] **Step 4: 실패하는 테스트 — 시더 통합 테스트**(demo 프로필, 실제 DB. `kairos.settlement.start-date`는 `@DynamicPropertySource`로 **지난주 월요일**을 준다 — `application-test.yaml`의 값은 과거 날짜라 그대로 두면 생성 순서 규칙이 앞선 주들을 먼저 요구한다)
   - `시더_실행_뒤_지난주_정산을_생성하면_데모_판매자의_라인이_70500_13500_마이너스3000이고_합계는_81000이다` — `seedLastWeek()` → `SettlementGenerationService.generate(지난주 월요일)` → 그 판매자 정산: 라인 금액 집합 `{70500, 13500, -3000}`, `salesAmount=95000`, `sellerCouponDiscount=5000`, `commissionAmount=9000`, `shippingFeeOwed=6000`, `returnFeeBorne=6000`, `totalAmount=81000`, `payableAmount=81000`
   - `같은_주에_시더를_두_번_실행해도_주문_수가_같다`
+  - `다음_주에_다시_실행하면_새_묶음을_만든다` — 시계를 한 주 뒤로 옮긴 상태(테스트용 시계 조작)에서 `seedLastWeek()`가 예외 없이 새 주문 3건을 만든다(쿠폰 정책은 주마다 새로 만든다 — 같은 정책은 회원당 한 장이라 재사용하면 `COUPON_ALREADY_ISSUED`로 기동이 실패한다)
+  - `중간에_멈춘_묶음은_다음_실행에서_다시_만든다` — 완성 판정이 "그 주에 확정된 시연 판매자 주문 3건"임을 고정: 주문 1건만 있는 상태에서 실행하면 나머지를 포함해 새 묶음이 완성된다(금액이 맞는 라인 3개가 정산에 들어간다)
   - `시연_주문의_확정_시각은_지난주_기간_안이다` — 세 판매자 주문의 `confirmedAt` ∈ [지난주 월 00:00, 이번 주 월 00:00)
   - `시더가_만든_주문은_일반_주문과_같은_불변식을_만족한다` — 각 주문에서 (결제 금액 − 누적 환불액)이 C4 §5의 확장 불변식과 일치(기존 `ReturnConsistencyApiTest`가 쓰는 검증 헬퍼가 있으면 재사용)
   - `demo가_아닌_프로필에는_시더_빈이_없다`
   - `시연_상품을_더해도_기존_데모_상품_보충_수가_변하지_않는다` — 시더 실행 전후 기존 `DemoSeeder`가 만드는 판매 중 상품 수(20)가 같음
-- [ ] **Step 5: 시더 구현.** 지난주 화요일 10:00(KST)을 기준 시각으로 삼아 `withShift` 안에서: (1) 시연 상품·쿠폰 정책 준비(없을 때만), 구매자가 쿠폰 받기 (2) 주문 A: 50,000 + 30,000 한 판매자 주문, 50,000 항목에 판매자 쿠폰 5,000 → 결제 승인(Mock PG) → 발송 → 배송 완료 → 구매 확정 (3) 주문 B: 20,000 + 15,000(합 35,000, 배송비 3,000 구매자 부담) → … 배송 완료 → 20,000 항목 불량 반품 요청 → 승인 → 수거 확인 → 남은 항목 구매 확정 (4) 주문 C: 30,000(배송비 3,000 구매자 부담) → … 배송 완료 → 불량 반품 요청 → 승인 → 수거 확인(판매자 주문이 전부 반품으로 자동 확정). 단계 사이에 시각을 조금씩 앞으로 옮겨(예: 한 시간씩) 모두 지난주 안에 들어가게 한다. 금액 값을 직접 저장하는 코드는 없어야 한다. 멱등: 지난주 기간에 시연 구매자의 주문이 이미 있으면 건너뛴다.
-- [ ] **Step 6: 주문 일시.** `created_at` 감사 시각이 `Clock` 빈을 쓰게 바꿀 수 있는지 확인한다(`JpaAuditingConfig`의 `dateTimeProviderRef`). 바꿔도 `./gradlew test`의 기존 테스트가 그대로 통과하면 바꾸고, 아니면 바꾸지 않고 보고서에 "주문 일시는 실제 시각"이라고 적는다.
+- [ ] **Step 5: 시더 구현.** 지난주 화요일 10:00(KST)을 기준 시각으로 삼아 `withShift` 안에서: (1) 시연 상품·쿠폰 정책 준비(없을 때만), 구매자가 쿠폰 받기 (2) 주문 A: 50,000 + 30,000 한 판매자 주문, 50,000 항목에 판매자 쿠폰 5,000 → 결제 승인(Mock PG) → 발송 → 배송 완료 → 구매 확정 (3) 주문 B: 20,000 + 15,000(합 35,000, 배송비 3,000 구매자 부담) → … 배송 완료 → 20,000 항목 불량 반품 요청 → 승인 → 수거 확인 → 남은 항목 구매 확정 (4) 주문 C: 30,000(배송비 3,000 구매자 부담) → … 배송 완료 → 불량 반품 요청 → 승인 → 수거 확인(판매자 주문이 전부 반품으로 자동 확정). 단계 사이에 시각을 조금씩 앞으로 옮겨(예: 한 시간씩) 모두 지난주 안에 들어가게 한다. 금액 값을 직접 저장하는 코드는 없어야 한다.
+  - **쿠폰 정책은 주마다 하나**: 이름과 유효 기간에 그 주 월요일을 넣어 새로 만든다(옮긴 시각 아래에서).
+  - **멱등 판정은 완성된 묶음 기준**: 지난주 기간 안에 `confirmedAt`이 있는 시연 구매자의 판매자 주문이 3건이면 건너뛴다. `created_at`은 실제 시각일 수 있으므로 판정에 쓰지 않는다(`paidAt`·`confirmedAt`을 쓴다).
+  - **스케줄러와의 경합**: demo에서는 스케줄 작업이 켜져 있고 그 스레드는 실제 시각을 본다. 시더가 만드는 중인 지난주 주문(결제 대기, 배송 완료 직후)을 만료·자동 확정 작업이 건드릴 수 있다(창은 밀리초 단위). 그래서 `DemoDataInitializer`는 시더 예외를 **잡아 로그만 남기고 기동을 계속**하며(기존 데모 시더의 다른 단계는 그대로), 다음 기동·`POST /demo/reseed`가 완성 판정으로 다시 만든다. 이 경합과 처리 방식을 시더 클래스 주석에 적는다.
+- [ ] **Step 6: 주문 일시.** `created_at` 감사 시각은 **바꾸지 않는다**(`AdminSettlementApiTest` 등이 실제 `created_at`에 기대고 있다). 시연 주문은 "주문 일시는 실제 시각, 결제·확정은 지난주"로 보인다 — 보고서에 적는다.
 - [ ] **Step 7: `./gradlew test --tests '*Demo*' --tests '*Settlement*' --tests '*ArchitectureTest'` 통과 → Commit** `feat(backend): demo 프로필 전용 정산 시연 데이터 추가`
 
 ---
@@ -189,7 +196,7 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 
 - [ ] **Step 1: `./gradlew test` 전체 통과**(실패·건너뜀 0).
 - [ ] **Step 2: `./gradlew pitest`** — 임계값(mutation 79, line 99) 통과. 통과하지 못하면 `ReturnRefundCalculator`의 새 진입점에서 살아남은 변이를 리포트에서 찾아 Task 2의 테스트를 보강한다(임계값을 낮추지 않는다). 클래스별 결과(`ReturnRefundCalculator` 생성/kill)를 기록한다.
-- [ ] **Step 3: `git diff dev -- src/main/kotlin/com/dogyun/kairos/order/domain/ src/main/kotlin/com/dogyun/kairos/settlement/domain/`를 읽어 돈 계산 클래스의 변경이 Task 2의 추출뿐인지 확인한다.** `git diff dev --stat -- src/test/kotlin`에서 기존 테스트 파일의 삭제 줄이 없는지 확인한다.
+- [ ] **Step 3: `git diff dev -- src/main/kotlin/com/dogyun/kairos/order/domain/ src/main/kotlin/com/dogyun/kairos/settlement/domain/`를 읽어 돈 계산 클래스의 변경이 Task 2의 추출뿐인지 확인한다.** `git diff dev --stat -- src/test/kotlin`에서 기존 테스트 파일의 삭제 줄이 없는지 확인한다(예외: Task 3의 생성자 호출 수정과 Task 4의 `DemoApiTest` 한 줄).
 - [ ] **Step 4: Gradle 데몬 정리.** 고친 것이 있으면 Commit `test(backend): F4 백엔드 보강 점검`.
 
 ---
@@ -204,28 +211,28 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 
 **Interfaces:**
 - Produces:
-  - `money.ts`: `signedAmount(kind: "ADD" | "SUBTRACT", amount: number): number`(양의 안전 정수만, 아니면 throw — `SUBTRACT`면 음수), `formatSignedKrw(n: number): string`(`+3,000원` / `−3,000원`(U+2212) / `0원`)
-  - `datetime.ts`: `lastFinishedWeekMonday(nowMs: number): string`(KST 기준 가장 최근에 끝난 월~일 기간의 월요일 `"YYYY-MM-DD"`), `isMonday(date: string): boolean`(`"YYYY-MM-DD"`), `isWeekFinished(monday: string, nowMs: number): boolean`(그 월요일 + 7일 00:00 KST ≤ now). 브라우저 시간대와 무관해야 한다.
+  - `money.ts`: `signedAmount(kind: "ADD" | "SUBTRACT", amount: number): number`(양의 안전 정수만, 아니면 throw — `SUBTRACT`면 음수), `formatSignedKrw(n: number): string`(`+3,000원` / `−3,000원`(U+2212) / `0원`), `formatKrwMinus(n: number): string`(양수·0은 `formatKrw` 그대로 `70,500원`, 음수는 U+2212로 `−3,000원` — 기존 `formatKrw(-3000)`은 ASCII 하이픈이라 정산 표에 쓰지 않는다)
+  - `datetime.ts`: `lastFinishedWeekMonday(nowMs: number): string`(KST 기준 가장 최근에 끝난 월~일 기간의 월요일 `"YYYY-MM-DD"`), `isMonday(date: string): boolean`(`"YYYY-MM-DD"`), `isWeekFinished(monday: string, nowMs: number): boolean`(그 월요일 + 7일 00:00 KST ≤ now), `periodLastDay(periodEnd: string): string`(서버의 `periodEnd`는 **다음 월요일(미포함)**이다 — 하루 전 날짜 `"YYYY-MM-DD"`를 돌려준다. 화면의 기간은 항상 `{periodStart} ~ {periodLastDay(periodEnd)}`). 브라우저 시간대와 무관해야 한다.
   - `features/returns/return-text.ts`: `returnReasonLabel(r)`(`CHANGE_OF_MIND` "단순 변심" / `DEFECTIVE` "상품 불량" / `WRONG_DELIVERY` "오배송"), `returnStatusLabel(s)`(`REQUESTED` "반품 요청됨" / `APPROVED` "반품 승인 · 수거 대기" / `REFUNDING` "환불 확인 중" / `COMPLETED` "반품 완료" / `REJECTED` "반품 거절" / `WITHDRAWN` "철회됨" / `CANCELED_BY_ADMIN` "반품 중단됨"), `feeBearerNotice(b)`(`BUYER` "반품 배송비는 구매자 부담입니다" / `SELLER` "판매자 부담이라 차감이 없습니다"), `decidedByLabel(d)`(`SELLER` "판매자" / `SYSTEM` "자동 승인" / `ADMIN` "관리자")
   - `features/returns/return-actions.ts`: `returnEntry(input: { sellerOrderStatus: string; itemStatus: string; returnableUntil: string | null | undefined; returnStatus: string | null | undefined }, nowMs: number): { kind: "request"; until: string } | { kind: "expired" } | { kind: "blocked"; text: string } | { kind: "none" }` — 판매자 주문 `DELIVERED` + 항목 `ORDERED` + 반품 없음 또는 `WITHDRAWN`: 기한 안이면 `request`, 지났으면 `expired`; `REJECTED` → `blocked`("반품이 거절된 상품입니다"), `CANCELED_BY_ADMIN` → `blocked`("반품이 중단된 상품입니다"); 그 밖은 `none`. `canWithdraw(returnStatus): boolean`(`REQUESTED`만). `refundRows(r: { paidAmount; returnFee; outboundFeeRecovered; shippingFeeRefund; refundAmount; pointsRefund })`: 0이 아닌 줄만 순서대로(`paidAmount`와 `refundAmount`는 항상) — 금액은 그대로 옮기고 부호만 정한다.
   - `features/returns/return-steps.ts`: `returnSteps(r: { status; requestedAt; decidedAt?; receivedAt?; completedAt? }): { key: "requested" | "approved" | "received" | "completed"; state: "done" | "current" | "todo" | "stopped"; at?: string }[]`와 `returnEndNote(status): string | null`(`REJECTED` "판매자가 반품을 거절했습니다" / `WITHDRAWN` "반품 요청을 철회했습니다" / `CANCELED_BY_ADMIN` "관리자가 반품을 중단했습니다")
-  - `features/settlements/settlement-text.ts`: `settlementStatusLabel(s)`(`GENERATED` "정산 생성" / `CONFIRMED` "확정" / `PAID` "지급 완료"), `adjustmentTypeLabel(t)`(`MANUAL` "수동 조정" / `CARRY_OVER` "이월"), `settlementRows(d)`: 계산 내역 8줄을 고정 순서로(상품 매출 +, 판매자 쿠폰 할인 −, 수수료 −, 배송비 +, 판매자 부담 반품비 −, 조정(부호 그대로), 합계, 지급액 — 값은 서버 필드 그대로, 0도 포함), `isCarriedOver(d: { totalAmount: number }): boolean`(합계 < 0)
+  - `features/settlements/settlement-text.ts`: `settlementStatusLabel(s)`(`GENERATED` "정산 생성" / `CONFIRMED` "확정" / `PAID` "지급 완료"), `adjustmentTypeLabel(t)`(`MANUAL` "수동 조정" / `CARRY_OVER` "이월"), `settlementRows(d)`: 계산 내역 8줄을 고정 순서로 `{ label, text }`를 돌려준다(0도 포함, 값은 서버 필드 그대로이고 **표시 문자만** 정한다): 상품 매출 `formatKrwMinus(salesAmount)`, 판매자 쿠폰 할인 `formatSignedKrw(-sellerCouponDiscount)`, 수수료 `formatSignedKrw(-commissionAmount)`, 배송비 `formatSignedKrw(shippingFeeOwed)`, 판매자 부담 반품비 `formatSignedKrw(-returnFeeBorne)`, 조정 `formatSignedKrw(adjustmentAmount)`, 합계 `formatKrwMinus(totalAmount)`, 지급액 `formatKrwMinus(payableAmount)`. (부호 반전은 표시용 단항 연산이다 — 합산이 아니다. `-0`이 `0원`으로 나오게 한다.) 라인 표의 `lineAmount`·매출 등은 `formatKrwMinus`, `isCarriedOver(d: { totalAmount: number }): boolean`(합계 < 0)
   - `query-keys.ts`: `returns: { root, mine(params?), detail(id), preview(orderId, itemId, reason) }`, `sellerReturns: { lists, list(params?), detail(id) }`, `adminReturns: { lists, list(params?), detail(id) }`, `sellerSettlements: { lists, list(params?), detail(id) }`, `adminSettlements: { lists, list(params?), detail(id) }`, `adminAdjustments: (sellerId: number)`
   - `MY_MENU`에 `{ href: "/my/returns", label: "반품 내역" }`(주문 내역 다음), `activeMenuHref("/my/returns/3") === "/my/returns"`
   - `console-titles.ts`: `/seller/returns*` "반품 관리", `/seller/settlements*` "정산", `/admin/returns*` "반품", `/admin/settlements/adjustments` "정산 조정", `/admin/settlements*` "정산"
-  - `StatusChip`: kind `return`(7 상태, 문구는 `returnStatusLabel`), kind `settlement`(3 상태), kind `adjustment`(`PENDING` "다음 정산에 반영 예정" / `APPLIED` "정산에 반영됨")
+  - `StatusChip`: kind `return`(7 상태, 문구는 `returnStatusLabel`), kind `settlement`(3 상태), kind `adjustment`(`PENDING` "다음 정산에 반영 예정" / `APPLIED` "정산에 반영됨"). 그리고 기존 주문 항목 칩(`orderItem` kind)의 반품 상태 문구를 스펙 §7-1에 맞춘다: `RETURN_REQUESTED` "반품 요청됨", `RETURN_APPROVED` "반품 승인 · 수거 대기", `RETURN_REFUNDING` "환불 확인 중", `RETURNED` "반품 완료" — `StatusChip.test.tsx`가 옛 문구("반품 환불 중" 등)를 고정하고 있으면 그 기대값을 새 문구로 고친다(이 수정은 허용, 보고서에 적는다)
   - `errors.ts`: `RETURN_NOT_FOUND`·`SETTLEMENT_NOT_FOUND` → `page`, `RETURN_INVALID`·`SETTLEMENT_ADJUSTMENT_INVALID`·`SETTLEMENT_PERIOD_INVALID` → `form`
 
 - [ ] **Step 1: 실패하는 테스트**
-  - `money.test.ts`: `signedAmount("SUBTRACT", 10000) === -10000`, `("ADD", 10000) === 10000`, `0`·`-5`·`1.5`·`NaN`·안전 정수 초과는 throw; `formatSignedKrw(3000) === "+3,000원"`, `(-3000) === "−3,000원"`, `(0) === "0원"`
-  - `datetime.test.ts`(KST 고정 — 실행 환경 시간대를 바꿔도 같아야 한다): 2026-11-12(목) 15:00 KST → `"2026-11-02"`; 2026-11-15(일) 23:59:59 KST → `"2026-11-02"`; 2026-11-16(월) 00:00:00 KST → `"2026-11-09"`; `isMonday("2026-11-09") === true`, `("2026-11-10") === false`, 형식이 아니면 false; `isWeekFinished("2026-11-09", <2026-11-15 23:59:59 KST>) === false`, `(…, <2026-11-16 00:00:00 KST>) === true`
+  - `money.test.ts`: `signedAmount("SUBTRACT", 10000) === -10000`, `("ADD", 10000) === 10000`, `0`·`-5`·`1.5`·`NaN`·안전 정수 초과는 throw; `formatSignedKrw(3000) === "+3,000원"`, `(-3000) === "−3,000원"`, `(0) === "0원"`, `(-0) === "0원"`; `formatKrwMinus(70500) === "70,500원"`, `(-3000) === "−3,000원"`, `(0) === "0원"`
+  - `datetime.test.ts`(KST 고정 — 실행 환경 시간대를 바꿔도 같아야 한다): 2026-11-12(목) 15:00 KST → `"2026-11-02"`; 2026-11-15(일) 23:59:59 KST → `"2026-11-02"`; 2026-11-16(월) 00:00:00 KST → `"2026-11-09"`; `isMonday("2026-11-09") === true`, `("2026-11-10") === false`, 형식이 아니면 false; `isWeekFinished("2026-11-09", <2026-11-15 23:59:59 KST>) === false`, `(…, <2026-11-16 00:00:00 KST>) === true`; `periodLastDay("2026-11-09") === "2026-11-08"`, `("2026-12-01") === "2026-11-30"`, `("2027-01-01") === "2026-12-31"`
   - `return-actions.test.ts`(Review Focus 3): 기한 1초 전 `request`, 기한 정각 `request`, 1초 뒤 `expired`; 판매자 주문 `SHIPPING`·`CONFIRMED`·`PAID` → `none`; 항목 `RETURN_REQUESTED`(반품 `REQUESTED`) → `none`; `REJECTED` → `blocked`; `CANCELED_BY_ADMIN` → `blocked`; `WITHDRAWN` → `request`; `returnableUntil` null → `none`; `canWithdraw` 7 상태; `refundRows`: 변심(20000, 3000, 3000, 0, 14000, 0) → 결제 금액·반품비·발송 배송비 회수·환불 금액 4줄, 불량(30000, 0, 0, 3000, 33000, 0) → 3줄, 포인트 반환 포함 시 줄 추가
   - `return-steps.test.ts`: `REQUESTED`(요청 done·승인 current), `APPROVED`, `REFUNDING`(수거 확인 done·환불 완료 current), `COMPLETED`(전부 done, 각 `at`), `REJECTED`·`WITHDRAWN`·`CANCELED_BY_ADMIN`(멈춘 칸 `stopped`, `returnEndNote` 문구)
-  - `settlement-text.test.ts`(Review Focus 4): 8줄 순서와 0 포함; 음수 합계(`totalAmount=-3000, payableAmount=0`)에서 값 그대로이고 `isCarriedOver` true; 라벨 전부
+  - `settlement-text.test.ts`(Review Focus 4): 8줄 순서와 문자열 — (95000, 5000, 9000, 6000, 6000, 0, 81000, 81000) → `["95,000원", "−5,000원", "−9,000원", "+6,000원", "−6,000원", "0원", "81,000원", "81,000원"]`; 전부 0이면 여덟 줄 모두 `"0원"`; 음수 합계(`totalAmount=-3000, payableAmount=0`)는 합계 `"−3,000원"`·지급액 `"0원"`이고 `isCarriedOver` true; 조정 −10,000 → `"−10,000원"`; 라벨 전부
   - `return-text.test.ts`, `menu.test.ts`, `console-titles.test.ts`, `errors.test.ts`, `StatusChip.test.tsx`: 위 Interfaces의 값 전부
 - [ ] **Step 2: 실패 확인 → 구현 → 통과.**
 - [ ] **Step 3: 메뉴.** 판매자 사이드 메뉴: "정산"의 `disabled`·"준비 중"을 없애고 `/seller/settlements`로, "반품 관리"(`/seller/returns`)를 주문 관리 다음에 추가. 관리자 사이드 메뉴: "반품"(`/admin/returns`), "정산"(`/admin/settlements`) 추가.
-- [ ] **Step 4: F3 후속 — 견적 재요청 제거.** `features/checkout/api.ts`의 `useCreateOrder`가 주문 성공 뒤 `checkout.quotes`를 무효화하며 재요청을 일으킨다(아직 켜져 있는 견적 조회가 409를 받는다). 재요청 없이 캐시만 버리도록 바꾼다(`refetchType: "none"` 무효화 또는 `removeQueries` — 장바구니·주문·쿠폰·포인트 무효화는 그대로). `CheckoutPage.test.tsx`에 `주문이_만들어진_뒤에는_견적을_다시_요청하지_않는다`(주문 성공 뒤 견적 호출 수가 늘지 않음) 추가. 기존 0원 주문 테스트의 "견적 캐시 무효화" 단언은 새 동작에 맞게 고친다(이 한 줄은 수정 허용 — 보고서에 적는다).
+- [ ] **Step 4: F3 후속 — 견적 재요청 제거.** `features/checkout/api.ts`의 `useCreateOrder`가 주문 성공 뒤 `checkout.quotes`를 무효화하며 재요청을 일으킨다(아직 켜져 있는 견적 조회가 409를 받는다). 재요청 없이 캐시만 낡은 것으로 표시하도록 `invalidateQueries({ queryKey: queryKeys.checkout.quotes, refetchType: "none" })`로 바꾼다(`removeQueries`는 쓰지 않는다 — 화면에 붙어 있는 조회는 다음 렌더에서 다시 요청해 같은 409가 난다. 견적은 `staleTime: 0`이라 다음에 주문서를 열면 새로 받는다). 장바구니·주문·쿠폰·포인트 무효화는 그대로. `CheckoutPage.test.tsx`에 `주문이_만들어진_뒤에는_견적을_다시_요청하지_않는다`(주문 성공 뒤 견적 호출 수가 늘지 않음) 추가. 기존 0원 주문 테스트의 "견적 캐시 무효화" 단언은 새 동작에 맞게 고친다(이 한 줄은 수정 허용 — 보고서에 적는다).
 - [ ] **Step 5: `pnpm lint && pnpm typecheck && pnpm test && pnpm build` → Commit** `feat(frontend): F4 공통 기반(반품·정산 문구, 날짜 함수, 메뉴) 추가`
 
 ---
@@ -254,7 +261,7 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 - [ ] **Step 3: `ReturnRequestDialog`.** 상품 요약, 사유 라디오 3개(`role="radiogroup"`), 상세 내용(글자 수), `ReturnPreviewBox`: 사유 전 "사유를 선택하면 환불 예정 금액을 보여 드립니다" / 로딩 / 성공 — `RefundBreakdown(refundRows(preview), "환불 예정 금액")` + `feeBearerNotice` + (`outboundFeeRecovered > 0`이면) "무료배송으로 받은 상품이라 발송 배송비가 함께 차감됩니다" + (`productCouponReturnable`이면) 쿠폰 안내 + **항상** "실제 환불 금액은 판매자가 상품을 받은 뒤 확정됩니다. 같은 주문의 다른 상품을 취소·반품하면 달라질 수 있습니다" / 실패(막지 않음) "환불 예정 금액을 불러오지 못했습니다" / 409(막음) 서버 메시지. 제출 `useIdempotentSubmit` → 성공 토스트 "반품을 요청했습니다. 판매자가 3일 안에 확인합니다", `orders.detail(orderId)`·`returns.root` 무효화. 409 → 닫고 서버 메시지 + `orders.detail` 무효화. 400 → 폼 상단.
   - 컴포넌트 테스트: `사유를_바꾸면_미리보기를_다시_요청한다`, `미리보기가_409면_요청_버튼이_막힌다`, `미리보기가_네트워크_오류여도_요청할_수_있다`, `요청은_멱등_키와_함께_한_번만_나간다`(연타), `요청이_409면_창을_닫고_주문_상세를_다시_읽는다`
 - [ ] **Step 4: 주문 상세.** 항목 줄에 `returnEntry` 결과로: `request` → "반품 요청" 버튼 + `"{formatDateTimeMinute(until)}까지 반품 가능"`; `expired` → "반품 가능 기간이 지났습니다"; `blocked` → 문구 + 반품 상세 링크. 항목에 `returnRequest`가 있고 `WITHDRAWN`이 아니면 `ReturnStatusLine`(상태 칩, `COMPLETED`면 환불 금액, 반품 상세 링크 `/my/returns/{returnId}`, `canWithdraw`면 "철회" — `ConfirmDialog` 뒤 `withdrawReturn`, 처리 중 재호출 막기, 409 → 서버 메시지 + 다시 읽기). 구매자 주문 상세에서만 보인다(판매자·관리자 주문 화면은 그대로).
-- [ ] **Step 5: 구매 확정과 요약.** `ConfirmPurchaseButton`: 확인 창에 "확정하면 이 판매자의 상품은 반품할 수 없습니다" 추가; `confirmBlockedReason`이 있으면 버튼 비활성 + 이유; 409 `SELLER_ORDER_HAS_OPEN_RETURN` → "반품이 진행 중인 상품이 있어 확정할 수 없습니다. 반품을 철회하거나 완료된 뒤 다시 시도해 주세요". `SellerOrderCard` 칩은 `sellerOrderChip`. `PaymentSummaryCard`: 반품이 완료된 항목이 하나라도 있으면 환불 금액 줄 아래 "반품 배송비가 차감된 금액입니다"(반품 완료 항목 중 `returnFee > 0`인 것이 있을 때만 — 비교이지 합산이 아니다). 테스트에 문구 노출 조건 추가.
+- [ ] **Step 5: 구매 확정과 요약.** `ConfirmPurchaseButton`: 확인 창에 "확정하면 이 판매자의 상품은 반품할 수 없습니다" 추가; `confirmBlockedReason`이 있으면 버튼 비활성 + 이유(지금은 `features/orders/actions.ts`의 `canConfirmPurchase`가 `hasOpenReturn`이면 false를 돌려줘 버튼이 **숨겨진다** — 열린 반품일 때는 숨기지 않고 비활성으로 보이게 `canConfirmPurchase`와 그 테스트(`actions.test.ts`의 해당 단언)를 고친다. 이 수정은 허용, 보고서에 적는다); 409 `SELLER_ORDER_HAS_OPEN_RETURN` → "반품이 진행 중인 상품이 있어 확정할 수 없습니다. 반품을 철회하거나 완료된 뒤 다시 시도해 주세요". `SellerOrderCard` 칩은 `sellerOrderChip`. `PaymentSummaryCard`: 반품이 완료된 항목이 하나라도 있으면 환불 금액 줄 아래 "반품 배송비가 차감된 금액입니다"(반품 완료 항목 중 `returnFee > 0`인 것이 있을 때만 — 비교이지 합산이 아니다. 스펙 §7-1은 "반품이 완료된 항목이 있으면"이라고 적었지만, 판매자 귀책 반품은 차감이 없으므로 조건을 좁힌다 — 오케스트레이터 결정). 테스트에 문구 노출 조건 추가.
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 반품 요청과 주문 상세의 반품 상태 추가`
 
 ---
@@ -320,7 +327,7 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 - Produces: `SettlementBreakdown` props `detail: SettlementDetail` · `SettlementLinesTable` props `lines`, `orderHref?(line): string | undefined` · `SettlementAdjustmentsTable` props `adjustments` — 관리자 화면이 재사용. `useSellerSettlements(page)`, `useSellerSettlement(id)`.
 
 - [ ] **Step 1: 컴포넌트 테스트**(Review Focus 4) — `SettlementBreakdown`: 8줄이 고정 순서로 0 포함해 보인다; 값이 서버 필드 그대로(매출 95,000 / −5,000 / −9,000 / +6,000 / −6,000 / 0 / 81,000 / 81,000); 음수 합계(−3,000, 지급액 0)에서 "합계가 0원보다 적어 이번 지급액은 0원입니다. 부족한 금액은 다음 정산으로 넘어갑니다"가 보인다. `SettlementLinesTable`: 음수 라인 "−3,000원", 수수료율 `formatBp(1000)` "10%"와 800bp "8%"가 섞여도 줄마다 표시, 라인 0개면 "포함된 주문이 없습니다".
-- [ ] **Step 2: 목록.** 기간(`{periodStart} ~ {periodEnd}`), 지급 예정일, `StatusChip(kind="settlement")`, 포함 주문 수, 합계, **지급액**(강조). `?page=`. 빈 상태 "아직 정산이 없습니다. 정산은 매주 월요일에 지난주 구매 확정 주문으로 만들어집니다".
+- [ ] **Step 2: 목록.** 기간(`{periodStart} ~ {periodLastDay(periodEnd)}`), 지급 예정일, `StatusChip(kind="settlement")`, 포함 주문 수, 합계, **지급액**(강조). `?page=`. 빈 상태 "아직 정산이 없습니다. 정산은 매주 월요일에 지난주 구매 확정 주문으로 만들어집니다".
 - [ ] **Step 3: 상세.** `SettlementBreakdown` + `SettlementLinesTable`(주문번호 → `/seller/orders/{sellerOrderId}`) + `SettlementAdjustmentsTable`(종류, 금액 `formatSignedKrw`, 사유) + 안내 "플랫폼이 부담한 쿠폰·포인트·무료배송은 정산에서 차감되지 않습니다" + `PAID`면 지급일·메모. 404 → 없음 페이지.
 - [ ] **Step 4: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 판매자 정산 화면 추가`
 
@@ -359,8 +366,8 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 
 - [ ] **Step 1: 실패하는 테스트**(Review Focus 5) — `generate.test.ts`: 화요일 → `NOT_MONDAY`; 이번 주 월요일 → `NOT_FINISHED`; 지난주 월요일 → null; 빈 값·형식 오류 → `INVALID`; 결과 문구 세 경우. `adjustment-schema.test.ts`: 차감 10,000 → 요청 `amount === -10000`; 가산 → `10000`; `0`·`-1`·`1.5`·`1e3` 거절; 사유 공백만 거절·501자 거절; 근거 주문 비우면 요청에 없음. `adjustmentState`·`canDeleteAdjustment`(MANUAL 미부착 true, MANUAL 부착 false, CARRY_OVER false).
 - [ ] **Step 2: 구현 → 통과.**
-- [ ] **Step 3: 목록과 생성.** 목록: 필터(판매자 ID, 상태 — URL 쿼리), 표(판매자 이름 + 상태가 `APPROVED`가 아니면 표시, 기간, 지급 예정일, 상태, 합계, 지급액). "정산 생성" → `GenerateDialog`: 날짜 입력(`type="date"`) 기본값 `lastFinishedWeekMonday(now)`, `validatePeriodStart` 오류 문구("월요일을 선택해 주세요" / "아직 끝나지 않은 주입니다" / "날짜를 선택해 주세요") — 오류면 제출 막기. `useIdempotentSubmit` → `POST /admin/settlements/generate`. 결과는 창 안에 `generateResultText`로 보인다(창을 닫지 않는다). 400 `SETTLEMENT_PERIOD_INVALID` → 서버 메시지 + "앞선 기간이 아직 생성되지 않았다면 그 기간부터 생성해 주세요". 성공 뒤 `adminSettlements.lists` 무효화.
-  - 컴포넌트 테스트: `생성_버튼을_연타해도_요청은_한_번만_나간다`, `월요일이_아니면_요청하지_않는다`.
+- [ ] **Step 3: 목록과 생성.** 목록: 필터(판매자 ID, 상태 — URL 쿼리), 표(판매자 이름 + 상태가 `APPROVED`가 아니면 표시, 기간 `{periodStart} ~ {periodLastDay(periodEnd)}`, 지급 예정일, 상태, 합계, 지급액). 생성 결과의 기간도 같은 방식으로 보인다. "정산 생성" → `GenerateDialog`: 날짜 입력(`type="date"`) 기본값 `lastFinishedWeekMonday(now)`, `validatePeriodStart` 오류 문구("월요일을 선택해 주세요" / "아직 끝나지 않은 주입니다" / "날짜를 선택해 주세요") — 오류면 제출 막기. `useIdempotentSubmit` → `POST /admin/settlements/generate`. 결과는 창 안에 `generateResultText`로 보인다(창을 닫지 않는다). 400 `SETTLEMENT_PERIOD_INVALID` → 서버 메시지 + "앞선 기간이 아직 생성되지 않았다면 그 기간부터 생성해 주세요". 성공 뒤 `adminSettlements.lists` 무효화.
+  - 컴포넌트 테스트: `생성_버튼을_연타해도_요청은_한_번만_나간다`, `월요일이_아니면_요청하지_않는다`, `앞_기간이_없어_서버가_거절하면_서버_메시지와_안내를_보인다`(400 `SETTLEMENT_PERIOD_INVALID`).
 - [ ] **Step 4: 상세.** Task 10의 세 컴포넌트 + 판매자 정보 + 버튼: 확정(`GENERATED`, `ConfirmDialog` → `PATCH …/confirm`), 지급 완료(`CONFIRMED`, `PayDialog` — 메모 0~200자, 문구 `"지급액 {formatKrw(payableAmount)}을 지급 완료로 표시합니다(실제 이체는 따로 진행합니다)"`, 지급액 0원이면 "지급할 금액이 없는 정산입니다. 지급 완료로 닫습니다" → `PATCH …/pay`). 409 `SETTLEMENT_INVALID_STATE_TRANSITION` → 서버 메시지 + 다시 읽기. "이 판매자의 조정 보기" → `/admin/settlements/adjustments?sellerId=`. 라인의 주문번호 → `/admin/orders/{orderId}`.
 - [ ] **Step 5: 조정.** 판매자 ID 입력 → `?sellerId=`. 목록: 종류, 금액(`formatSignedKrw`), 사유, 근거 주문, `StatusChip(kind="adjustment")`(반영됨이면 정산 상세 링크), 삭제 버튼(`canDeleteAdjustment`일 때만 — `ConfirmDialog` → `DELETE`; 409 `SETTLEMENT_ADJUSTMENT_APPLIED` → "이미 정산에 반영된 조정은 삭제할 수 없습니다" + 다시 읽기). 등록 양식: 구분 라디오, 금액, 사유, 근거 주문 ID, 안내(스펙 §9-3 문구) → `useIdempotentSubmit` → `POST`. 400 → 폼 상단. 성공 → `adminAdjustments(sellerId)` 무효화.
 - [ ] **Step 6: `pnpm lint && pnpm typecheck && pnpm test` → Commit** `feat(frontend): 관리자 정산과 정산 조정 화면 추가`
@@ -376,8 +383,8 @@ app/admin/returns/page.tsx  returns/[returnId]/page.tsx  settlements/page.tsx  s
 - Modify: `frontend/e2e/fixtures/api.ts`, `frontend/playwright.config.ts`(머리말 주석에 정산 시작일 환경 변수 설명)
 
 **Interfaces:**
-- Produces(픽스처): `deliverSellerOrder(sellerToken, sellerOrderId)`(발송 + 배송 완료 — 기존 헬퍼가 있으면 재사용), `requestReturnApi`, `approveReturnApi`, `receiveReturnApi`, 데모 판매자 로그인 정보(`seller@kairos.demo` + `KAIROS_DEMO_PASSWORD`).
-- 실행 환경: 백엔드 `local,demo` + Mock PG, **`kairos.settlement.start-date`에 해당하는 환경 변수를 지난주 월요일로** 준다(변수 이름은 `application.yaml`에서 확인). 새 빈 임시 스키마(`kairos_e2e`)에서 **전체 스위트를 한 번에** 돌린다. `.env` 값을 출력하지 않는다. 끝나면 스키마·서버·Gradle을 정리한다.
+- Produces(픽스처): 발송 + 배송 완료는 기존 `shipAndDeliver` 재사용, 한 판매자의 두 번째 상품은 `brandIdByName` + `registerProduct`로 만든다(`createSellerWithProduct`는 상품 하나만 만든다), `requestReturnApi`, `approveReturnApi`, `receiveReturnApi`, 데모 판매자 로그인 정보(`seller@kairos.demo` + `KAIROS_DEMO_PASSWORD`).
+- 실행 환경: 백엔드 `local,demo` + Mock PG, **정산 시작일을 지난주 월요일로** 준다 — `application.yaml`은 값을 고정해 두었으므로(환경 변수 자리 표시 없음) Spring의 느슨한 바인딩 환경 변수 `KAIROS_SETTLEMENT_STARTDATE=YYYY-MM-DD`로 덮어쓴다(먹지 않으면 `--kairos.settlement.start-date=` 실행 인자를 쓴다. 실제로 적용됐는지 정산 생성이 통과하는 것으로 확인한다). 새 빈 임시 스키마(`kairos_e2e`)에서 **전체 스위트를 한 번에** 돌린다. `.env` 값을 출력하지 않는다. 끝나면 스키마·서버·Gradle을 정리한다.
 
 - [ ] **Step 1: 픽스처를 추가한다.** 주문 생성 뒤 `POST /orders/quote`가 409를 내지 않는지 확인하는 단언을 `c3-coupon-checkout.spec.ts`의 주문 직후에 더한다(응답 관찰 — 주문 생성 응답 이후의 견적 응답 중 409가 0건).
 - [ ] **Step 2: `c4-return-change-of-mind.spec.ts`**(금액은 `toHaveText` 정확 비교). 판매자 S의 상품 40,000원 + 20,000원을 한 주문으로(무료배송) → API로 발송·배송 완료 → 주문 상세의 20,000원 항목 "반품 요청" → 단순 변심 선택 → 결제 금액 `20,000원`, 반품비 `−3,000원`, 발송 배송비 회수 `−3,000원`, 환불 예정 금액 `14,000원`, "예상" 안내 문구 → 요청(버튼 연타) → 반품 내역에 1건 → 판매자: 반품 목록 "요청" 탭 → 상세 → 승인 → 수거 확인 창의 재고 복구 안내 → 확인 → "환불 금액 14,000원" → 구매자: 반품 상세 환불 금액 `14,000원` → 주문 상세 40,000원 항목 미리보기 환불 예정 `37,000원`(발송 배송비 회수 줄 없음) → 요청 → (API) 승인·수거 확인 → 주문 상세: 판매자 주문 칩 "전체 반품", 환불 금액 `51,000원`, "반품 배송비가 차감된 금액입니다".
