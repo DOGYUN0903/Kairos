@@ -115,6 +115,17 @@ export function periodLastDay(periodEnd: string): string {
   return days === null ? periodEnd : dayToString(days - 1);
 }
 
+/** "YYYY-MM-DD" 가 달력에 있는 날짜인지(2026-02-30 은 아니다). */
+export function isCalendarDate(date: string): boolean {
+  return dayNumber(date) !== null;
+}
+
+/** 월요일("YYYY-MM-DD")이 시작하는 주의 마지막 날(일요일). 해석할 수 없으면 입력 그대로. */
+export function weekLastDay(monday: string): string {
+  const days = dayNumber(monday);
+  return days === null ? monday : dayToString(days + 6);
+}
+
 /** 해당 KST 시각을 지났는지(정각까지는 지나지 않은 것, 소수 초는 버린다). 해석할 수 없으면 false. */
 export function isPastKst(kstLocalDateTime: string, nowMs: number): boolean {
   const m = KST_LOCAL.exec(kstLocalDateTime);

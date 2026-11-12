@@ -117,9 +117,10 @@ export function AdminSettlementListPage() {
           </div>
         </form>
 
+        {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
         {q.isError && !data ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-        ) : !data ? (
+        ) : !data || q.isPlaceholderData ? (
           <div aria-busy="true" aria-label="불러오는 중" className="flex flex-col gap-3 p-5">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 w-full" />

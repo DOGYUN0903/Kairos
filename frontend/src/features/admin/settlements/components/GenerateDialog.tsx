@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useGenerateSettlements } from "@/features/admin/settlements/api";
@@ -10,12 +11,11 @@ import {
   PERIOD_GUIDANCE,
   PERIOD_START_MESSAGE,
   validatePeriodStart,
-  weekLastDay,
   type GenerateSettlementResult,
 } from "@/features/admin/settlements/generate";
 import { toast } from "@/hooks/use-toast";
 import { useIdempotentSubmit } from "@/hooks/useIdempotentSubmit";
-import { lastFinishedWeekMonday, periodLastDay } from "@/lib/datetime";
+import { lastFinishedWeekMonday, periodLastDay, weekLastDay } from "@/lib/datetime";
 
 type Values = { periodStart: string };
 
@@ -42,7 +42,7 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
     {
       onError: (e) => {
         const r = resolveError(e);
-        if (r.kind === "form") setFormError({ message: r.message, guidance: true });
+        if (r.kind === "form") setFormError({ message: r.message, guidance: e instanceof ApiError && e.code === "SETTLEMENT_PERIOD_INVALID" });
         else toast({ title: r.message, variant: "destructive" });
       },
     },
@@ -65,6 +65,9 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
               <div className="font-bold tabular-nums">
                 {result.periodStart} ~ {periodLastDay(result.periodEnd)}
               </div>
+              <div className="mt-1 text-text-2">
+                대상 판매자 <b className="text-foreground">{result.sellerCount}명</b>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
@@ -85,7 +88,12 @@ export function GenerateDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </span>
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {result.failedCount > 0 && !result.alreadyGenerated && (
+                <button type="button" className="btn btn-ghost" onClick={() => setResult(null)}>
+                  다시 생성
+                </button>
+              )}
               <button type="button" className="btn btn-primary" onClick={onClose}>
                 {text.tone === "success" ? "목록 보기" : "닫기"}
               </button>

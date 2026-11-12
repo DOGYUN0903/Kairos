@@ -17,7 +17,8 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(h.search),
 }));
 
-const wrap = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const wrap = (ui: React.ReactElement, qc = newClient()) => render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 const page = (content: unknown[]) => ({ data: { data: { content, page: 0, size: 20, totalElements: content.length, totalPages: content.length ? 1 : 0 } } });
 const summary = { settlementId: 7, sellerId: 12, sellerName: "판매자 C", sellerStatus: "SUSPENDED", periodStart: "2026-11-02", periodEnd: "2026-11-09", payoutDate: "2026-11-11", status: "CONFIRMED", totalAmount: 12500, payableAmount: 12500, lineCount: 1 };
 const detail = (over: object = {}) => ({ data: { data: { ...summary, salesAmount: 15000, sellerCouponDiscount: 0, commissionAmount: 1500, shippingFeeOwed: 0, returnFeeBorne: 1000, adjustmentAmount: 0, lines: [], adjustments: [], ...over } } });
@@ -34,6 +35,33 @@ describe("관리자 정산 목록", () => {
     expect(await screen.findByRole("link", { name: "2026-11-02 ~ 2026-11-08" })).toHaveAttribute("href", "/admin/settlements/7");
     expect(screen.getByText("판매자 C")).toBeInTheDocument();
     expect(screen.getByText("정지")).toBeInTheDocument();
+  });
+
+  it("다시_읽기가_실패하면_이전_행과_함께_오류와_다시_시도를_보인다", async () => {
+    h.GET.mockResolvedValueOnce(page([summary]));
+    const qc = newClient();
+    wrap(<AdminSettlementListPage />, qc);
+    await screen.findByRole("link", { name: "2026-11-02 ~ 2026-11-08" });
+    h.GET.mockRejectedValue(new ApiError(500, "INTERNAL_ERROR", "서버 오류", null));
+    await qc.invalidateQueries({ queryKey: ["adminSettlements", "list"] });
+    expect(await screen.findByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
+  });
+
+  it("필터를_바꾸면_새_응답이_오기_전까지_이전_필터의_행을_보이지_않는다", async () => {
+    h.GET.mockResolvedValueOnce(page([summary]));
+    const qc = newClient();
+    const ui = () => (
+      <QueryClientProvider client={qc}>
+        <AdminSettlementListPage />
+      </QueryClientProvider>
+    );
+    const view = render(ui());
+    await screen.findByText("판매자 C");
+    h.GET.mockReturnValue(new Promise(() => {}));
+    h.search = "sellerId=99";
+    view.rerender(ui());
+    await waitFor(() => expect(screen.getByLabelText("불러오는 중")).toBeInTheDocument());
+    expect(screen.queryByText("판매자 C")).not.toBeInTheDocument();
   });
 
   it("필터_결과가_없으면_안내한다", async () => {
@@ -134,6 +162,31 @@ describe("관리자 정산 조정", () => {
     expect(screen.getAllByText("다음 정산에 반영 예정")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /정산에 반영됨/ })).toHaveAttribute("href", "/admin/settlements/3");
     expect(screen.getByText("−10,000원")).toBeInTheDocument();
+  });
+
+  it("다시_읽기가_실패하면_이전_조정과_함께_오류를_보인다", async () => {
+    h.GET.mockResolvedValueOnce(page([manual]));
+    const qc = newClient();
+    wrap(<AdminAdjustmentsPage />, qc);
+    await screen.findByText("파손 보상");
+    h.GET.mockRejectedValue(new ApiError(500, "INTERNAL_ERROR", "서버 오류", null));
+    await qc.invalidateQueries({ queryKey: ["adminAdjustments", 12] });
+    expect(await screen.findByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
+  });
+
+  it("주소의_판매자_ID가_바뀌면_입력_칸도_따라간다", () => {
+    h.GET.mockReturnValue(new Promise(() => {}));
+    const qc = newClient();
+    const ui = () => (
+      <QueryClientProvider client={qc}>
+        <AdminAdjustmentsPage />
+      </QueryClientProvider>
+    );
+    const view = render(ui());
+    expect(screen.getByLabelText("판매자 ID")).toHaveValue("12");
+    h.search = "sellerId=34";
+    view.rerender(ui());
+    expect(screen.getByLabelText("판매자 ID")).toHaveValue("34");
   });
 
   it("이미_반영된_조정_삭제_409는_안내하고_목록을_다시_읽는다", async () => {

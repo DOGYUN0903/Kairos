@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateResultText, validatePeriodStart, weekLastDay } from "@/features/admin/settlements/generate";
+import { generateResultText, validatePeriodStart } from "@/features/admin/settlements/generate";
 
 // 2026-11-12(목) 낮 KST. 가장 최근에 끝난 주의 월요일은 2026-11-02.
 const NOW = Date.parse("2026-11-12T10:00:00+09:00");
@@ -35,12 +35,5 @@ describe("generateResultText", () => {
     const t = generateResultText({ ...base, createdCount: 2, skippedCount: 1 });
     expect(t.tone).toBe("success");
     expect(t.lines).toEqual(["대상 판매자 3명 · 생성 2 · 건너뜀 1"]);
-  });
-});
-
-describe("weekLastDay", () => {
-  it("월요일이_시작하는_주의_일요일", () => {
-    expect(weekLastDay("2026-11-02")).toBe("2026-11-08");
-    expect(weekLastDay("2026-12-28")).toBe("2027-01-03");
   });
 });

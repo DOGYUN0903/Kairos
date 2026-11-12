@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fromDateTimeInput, formatDateTimeMinute, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString, lastFinishedWeekMonday, isMonday, isWeekFinished, periodLastDay, isPastKst } from "@/lib/datetime";
+import { fromDateTimeInput, formatDateTimeMinute, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString, lastFinishedWeekMonday, isMonday, isWeekFinished, periodLastDay, isPastKst, isCalendarDate, weekLastDay } from "@/lib/datetime";
 
 describe("datetime", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -99,5 +99,16 @@ describe("정산 주 날짜 함수(KST, 실행 시간대와 무관)", () => {
     expect(isPastKst("2026-11-12T10:00:00", t - 1000)).toBe(false);
     expect(isPastKst("2026-11-12T10:00:00", t)).toBe(false);
     expect(isPastKst("2026-11-12T10:00:00", t + 1000)).toBe(true);
+  });
+
+  it("isCalendarDate는_달력에_있는_날짜만", () => {
+    expect(isCalendarDate("2026-11-02")).toBe(true);
+    for (const v of ["", "2026/11/02", "26-11-02", "2026-02-30"]) expect(isCalendarDate(v)).toBe(false);
+  });
+
+  it("weekLastDay는_월요일이_시작하는_주의_일요일", () => {
+    expect(weekLastDay("2026-11-02")).toBe("2026-11-08");
+    expect(weekLastDay("2026-12-28")).toBe("2027-01-03");
+    expect(weekLastDay("x")).toBe("x");
   });
 });

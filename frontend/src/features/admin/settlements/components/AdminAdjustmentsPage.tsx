@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api/client";
 import { resolveError } from "@/api/errors";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -34,6 +34,10 @@ export function AdminAdjustmentsPage() {
   const page = parsePage(sp.get("page"));
   const [input, setInput] = useState(rawSeller ?? "");
   const [inputError, setInputError] = useState(false);
+  useEffect(() => {
+    setInput(rawSeller ?? "");
+    setInputError(false);
+  }, [rawSeller]);
   const invalid = rawSeller !== null && rawSeller !== "" && sellerId === null;
 
   function submit(e: FormEvent) {
@@ -128,9 +132,10 @@ function SellerAdjustments({ sellerId, page, onPage }: { sellerId: number; page:
             </button>
           )}
         </div>
+        {q.isError && data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
         {q.isError && !data ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-        ) : !data ? (
+        ) : !data || q.isPlaceholderData ? (
           <PageSkeleton />
         ) : data.content.length === 0 ? (
           data.totalPages > 0 && page > 0 ? (
