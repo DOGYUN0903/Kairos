@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ApiError, api, unwrap } from "@/api/client";
 import { IDEMPOTENCY_HEADER } from "@/api/idempotency";
 import type { components } from "@/api/schema";
@@ -50,4 +50,31 @@ export async function requestReturn(orderId: number, orderItemId: number, body: 
 /** 반품 철회. 키 없음(서버가 멱등). 실패는 던진다. */
 export async function withdrawReturn(returnId: number): Promise<void> {
   unwrap<unknown>(await api.DELETE("/api/v1/returns/{returnId}", { params: { path: { returnId } } }));
+}
+
+export type ReturnRequestResponse = components["schemas"]["ReturnRequestResponse"];
+export type ReturnPage = Omit<components["schemas"]["PageResponse"], "content"> & { content: ReturnRequestResponse[] };
+
+export const RETURN_PAGE_SIZE = 10;
+
+/** 내 반품 목록(최신 요청순). page 는 0부터. */
+export function useMyReturns(page: number) {
+  const query = { page, size: RETURN_PAGE_SIZE };
+  return useQuery({
+    queryKey: queryKeys.returns.mine(query),
+    queryFn: async () => unwrap<ReturnPage>(await api.GET("/api/v1/returns/me", { params: { query } })),
+    placeholderData: keepPreviousData,
+    staleTime: 0,
+  });
+}
+
+/** 반품 상세. 상태가 바뀌므로 마운트마다 다시 읽는다. refetchInterval 은 환불 확인 중의 재조회에 쓴다. */
+export function useMyReturn(returnId: number, opts?: { refetchInterval?: number | false }) {
+  return useQuery({
+    queryKey: queryKeys.returns.detail(returnId),
+    queryFn: async () => unwrap<ReturnRequestResponse>(await api.GET("/api/v1/returns/{returnId}", { params: { path: { returnId } } })),
+    enabled: Number.isSafeInteger(returnId) && returnId > 0,
+    staleTime: 0,
+    refetchInterval: opts?.refetchInterval ?? false,
+  });
 }

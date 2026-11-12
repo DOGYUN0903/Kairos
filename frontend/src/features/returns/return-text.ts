@@ -1,3 +1,5 @@
+import { formatKrw } from "@/lib/money";
+
 type Reason = "CHANGE_OF_MIND" | "DEFECTIVE" | "WRONG_DELIVERY";
 type Status = "REQUESTED" | "APPROVED" | "REFUNDING" | "COMPLETED" | "REJECTED" | "WITHDRAWN" | "CANCELED_BY_ADMIN";
 
@@ -21,4 +23,14 @@ export function feeBearerNotice(b: "BUYER" | "SELLER"): string {
 
 export function decidedByLabel(d: "SELLER" | "SYSTEM" | "ADMIN"): string {
   return d === "SELLER" ? "판매자" : d === "SYSTEM" ? "자동 승인" : "관리자";
+}
+
+/** 목록 카드의 환불 요약: 완료일 때만 금액, 그 밖에는 확정 전 안내. */
+export function refundSummaryText(r: { status: Status; refundAmount: number }): string {
+  return r.status === "COMPLETED" ? formatKrw(r.refundAmount) : "수거 확인 뒤 확정";
+}
+
+/** 서버가 환불 결과를 확정하는 중인가(상세를 3초 간격으로 다시 읽는다. 간격·상한은 features/orders/polling.ts). */
+export function needsReturnPolling(status: string): boolean {
+  return status === "REFUNDING";
 }

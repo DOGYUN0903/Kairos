@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidedByLabel, feeBearerNotice, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
+import { decidedByLabel, feeBearerNotice, needsReturnPolling, refundSummaryText, returnReasonLabel, returnStatusLabel } from "@/features/returns/return-text";
 
 describe("return-text", () => {
   it("사유", () => {
@@ -24,5 +24,17 @@ describe("return-text", () => {
     expect(decidedByLabel("SELLER")).toBe("판매자");
     expect(decidedByLabel("SYSTEM")).toBe("자동 승인");
     expect(decidedByLabel("ADMIN")).toBe("관리자");
+  });
+
+  it("환불_요약은_완료일_때만_금액", () => {
+    const all = ["REQUESTED", "APPROVED", "REFUNDING", "COMPLETED", "REJECTED", "WITHDRAWN", "CANCELED_BY_ADMIN"] as const;
+    for (const status of all) {
+      const text = refundSummaryText({ status, refundAmount: 25000 });
+      expect(text).toBe(status === "COMPLETED" ? "25,000원" : "수거 확인 뒤 확정");
+    }
+  });
+  it("재조회는_환불_확인_중일_때만", () => {
+    expect(needsReturnPolling("REFUNDING")).toBe(true);
+    for (const s of ["REQUESTED", "APPROVED", "COMPLETED", "REJECTED", "WITHDRAWN", "CANCELED_BY_ADMIN"]) expect(needsReturnPolling(s)).toBe(false);
   });
 });
