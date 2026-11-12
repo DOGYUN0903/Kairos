@@ -21,6 +21,7 @@ import {
 } from "@/features/cart/selection";
 import { isQuoteStale, useQuantitySync } from "@/features/cart/quantity-sync";
 import { useQuote } from "@/features/checkout/api";
+import { EMPTY_SELECTION } from "@/features/checkout/benefit-selection";
 import { queryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -58,7 +59,7 @@ function CartBody({ items }: { items: CartItem[] }) {
   const sel = useMemo(() => pruneSelection(items, rawSel), [items, rawSel]);
 
   const quoteItems = useMemo(() => selectedQuoteItems(items, sel), [items, sel]);
-  const quote = useQuote(quoteItems, quoteItems.length > 0);
+  const quote = useQuote(quoteItems, EMPTY_SELECTION, quoteItems.length > 0);
 
   // 견적 사이에 품절·중지·판매자 정지가 되면 장바구니를 다시 읽어 구매 불가 표시를 갱신한다.
   useEffect(() => {
@@ -123,7 +124,7 @@ function CartBody({ items }: { items: CartItem[] }) {
         {groups.map((g) => {
           const sellerSelectable = g.items.filter(isSelectable);
           const sellerOn = sellerSelectable.length > 0 && sellerSelectable.every((i) => sel.has(i.cartItemId));
-          const sq = quote.data?.sellerQuotes.find((s) => s.sellerId === g.sellerId);
+          const sq = quote.data?.quote.sellerQuotes.find((s) => s.sellerId === g.sellerId);
           const showFoot = sq !== undefined && !stale && selectedIds.length > 0 && g.items.some((i) => sel.has(i.cartItemId));
           return (
             <section key={g.sellerId ?? "none"} aria-label={`${g.sellerName} 상품`} className="mt-4 rounded-lg border border-border">
@@ -176,7 +177,7 @@ function CartBody({ items }: { items: CartItem[] }) {
       </div>
 
       <aside aria-label="결제 예정 금액" className="sticky top-24">
-        <CartSummary selectedIds={selectedIds} quote={quote.data} stale={stale && selectedIds.length > 0} error={quote.error} onRetry={() => void quote.refetch()} />
+        <CartSummary selectedIds={selectedIds} quote={quote.data?.quote} stale={stale && selectedIds.length > 0} error={quote.error} onRetry={() => void quote.refetch()} />
       </aside>
     </div>
   );

@@ -38,6 +38,10 @@ class ProductQueryService(
     fun findProductRef(productId: Long): ProductRefResult? =
         productRepository.findById(ProductId(productId))?.let { ProductRefResult(productId, it.sellerId) }
 
+    /** 다른 모듈(benefit)이 이름만 필요할 때 쓴다. 한 번의 조회이며 없는 상품은 결과에 없다. */
+    fun findProductNames(productIds: Collection<Long>): Map<Long, String> =
+        productRepository.findAllByIds(productIds).associate { requireNotNull(it.id).value to it.content.name }
+
     fun listMine(
         seller: SellerPrincipal,
         status: ProductStatus?,

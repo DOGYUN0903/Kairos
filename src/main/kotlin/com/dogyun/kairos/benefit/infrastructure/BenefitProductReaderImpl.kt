@@ -11,4 +11,7 @@ class BenefitProductReaderImpl(private val productQueryService: ProductQueryServ
 
     override fun findProduct(productId: Long): ProductRef? =
         productQueryService.findProductRef(productId)?.let { ProductRef(it.productId, it.sellerId) }
+
+    override fun findProductNames(productIds: Collection<Long>): Map<Long, String> =
+        productQueryService.findProductNames(productIds)
 }

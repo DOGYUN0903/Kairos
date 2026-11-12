@@ -1098,6 +1098,9 @@ export interface paths {
          * 주문 금액 미리보기 (쿠폰·포인트 적용)
          * @description 주문 생성과 같은 계산으로 항목별 할인·배분·`paidAmount` 와 PG 결제 금액을 돌려준다. 쿠폰 상태·포인트·재고를 바꾸지 않고
          *     저장하지 않으므로 `Idempotency-Key` 가 없다. `maxUsablePoints` 는 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(10P 단위)다.
+         *     `availableCoupons`·`cartCoupons` 는 내 사용 가능한 쿠폰이며 `usable`·`expectedDiscount` 는 주문 생성과 같은 판정이다.
+         *     상품 쿠폰의 `usable` 은 그 항목에 그 쿠폰만 썼을 때의 판정이다(한 쿠폰을 두 항목에 쓰거나 한 항목에 두 장 쓰는 것은 별도로 `ORDER_INVALID`).
+         *     장바구니 쿠폰은 요청에 담긴 상품 쿠폰을 적용한 뒤 금액으로 판정한다.
          */
         post: operations["quoteOrder"];
         delete?: never;
@@ -2812,6 +2815,11 @@ export interface components {
             /** @description 답글 내용(공백 불가, 최대 500자) */
             content: string;
         };
+        ReviewImage: {
+            /** Format: int64 */
+            fileId: number;
+            url: string;
+        };
         ReviewResult: {
             /** Format: int64 */
             reviewId: number;
@@ -2823,6 +2831,8 @@ export interface components {
             rating: number;
             content: string;
             imageUrls: string[];
+            /** @description `imageUrls` 와 같은 순서. 수정 시 `fileId` 를 `imageFileIds` 로 그대로 보내면 사진이 유지된다. */
+            images: components["schemas"]["ReviewImage"][];
             /** @description 마스킹한 작성자 이름(예 `김**`) */
             writerName: string;
             replyContent?: string | null;
@@ -3146,6 +3156,42 @@ export interface components {
             pointsAllocated: number;
             /** Format: int64 */
             paidAmount: number;
+            /** @description 이 항목에 쓸 수 있는 내 상품 쿠폰(대상이 맞는 것만). 사용 가능 먼저, 예상 할인 큰 순, 만료 빠른 순 */
+            availableCoupons: components["schemas"]["QuoteCoupon"][];
+        };
+        QuoteCoupon: {
+            /** Format: int64 */
+            couponId: number;
+            name: string;
+            /** @enum {string} */
+            issuerType: "PLATFORM" | "SELLER";
+            /** @enum {string} */
+            discountType: "FIXED" | "RATE";
+            /**
+             * Format: int64
+             * @description 정액은 원, 정률은 bp(10000 = 100%)
+             */
+            discountValue: number;
+            /** Format: int64 */
+            maxDiscount?: number | null;
+            /** Format: int64 */
+            minOrderAmount?: number | null;
+            /**
+             * Format: date-time
+             * @description 오프셋 없는 LocalDateTime(KST)
+             */
+            expiresAt: string;
+            usable: boolean;
+            /**
+             * @description `usable=false` 일 때만
+             * @enum {string|null}
+             */
+            unusableReason?: "MIN_AMOUNT_NOT_MET" | "NOTHING_TO_DISCOUNT" | null;
+            /**
+             * Format: int64
+             * @description `usable=true` 일 때만
+             */
+            expectedDiscount?: number | null;
         };
         SellerQuote: {
             /** Format: int64 */
@@ -3191,6 +3237,8 @@ export interface components {
             totalAmount: number;
             /** Format: int64 */
             maxUsablePoints: number;
+            /** @description 쓸 수 있는 내 장바구니 쿠폰. 요청의 상품 쿠폰 적용 뒤 금액으로 판정한다. 정렬은 `availableCoupons` 와 같다 */
+            cartCoupons: components["schemas"]["QuoteCoupon"][];
         };
         ShipRequest: {
             carrierCode: string;
@@ -3354,6 +3402,25 @@ export interface components {
             pointsRefunded: number;
             /** @description 이 항목의 반품 요청(없으면 null) */
             returnRequest?: components["schemas"]["ReturnRequestSummary"] | null;
+            /** @description 후기 상태. 구매자 주문 상세에서만 채우고 판매자·관리자 응답에서는 null */
+            review?: components["schemas"]["OrderItemReview"] | null;
+        };
+        OrderItemReview: {
+            /**
+             * @description 구매 확정 전이거나 취소·반품된 항목은 NOT_ELIGIBLE, 작성 기한이 지나면 EXPIRED, 삭제한 후기는 DELETED(다시 쓸 수 없음)
+             * @enum {string}
+             */
+            status: "NOT_ELIGIBLE" | "WRITABLE" | "WRITTEN" | "EXPIRED" | "DELETED";
+            /**
+             * Format: int64
+             * @description WRITTEN 일 때
+             */
+            reviewId?: number | null;
+            /**
+             * Format: date-time
+             * @description WRITABLE·EXPIRED 일 때. 구매 확정 시각 + 작성 기한(초 단위 시각, 이 시각까지 작성할 수 있다)
+             */
+            writableUntil?: string | null;
         };
         /** @enum {string} */
         ReturnStatus: "REQUESTED" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "REFUNDING" | "COMPLETED" | "CANCELED_BY_ADMIN";
@@ -3694,6 +3761,8 @@ export interface components {
             status: "ACTIVE" | "ENDED";
             /** @description 내가 이미 받았는지(관리자·판매자 목록에서는 항상 false) */
             claimed: boolean;
+            /** @description `targetType=PRODUCT` 일 때 대상 상품 이름. 다른 대상 유형이거나 상품이 삭제됐으면 null */
+            targetProductName?: string | null;
         };
         CouponResult: {
             /** Format: int64 */

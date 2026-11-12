@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, DEMO_PASSWORD, leafCategory } from "./fixtures/api";
+import { adminToken, api, createSellerWithProduct, DEMO_PASSWORD, leafCategory, uniq } from "./fixtures/api";
 
 type Page_ = { totalElements: number };
 
@@ -11,11 +11,20 @@ async function cardPrices(page: import("@playwright/test").Page): Promise<number
 }
 
 test("구매자 목록: 카테고리·정렬·검색·페이지가 URL 에 실리고 뒤로 가기로 복원된다", async ({ page, request }) => {
-  const all = await api.get<Page_>(request, "/api/v1/products?size=20", null);
+  const MIN_PRODUCTS = 21; // 한 페이지 20개 + 2페이지 확인
+  let all = await api.get<Page_>(request, "/api/v1/products?size=20", null);
+  // 데모 백엔드(비밀번호가 주어진 경우)라면 모자란 판매 중 상품을 API 로 채우고 다시 센다. 없으면 건너뛴다.
+  if (DEMO_PASSWORD && all.totalElements < MIN_PRODUCTS) {
+    const admin = await adminToken(request);
+    for (let i = all.totalElements; i < MIN_PRODUCTS; i++) {
+      const id = uniq();
+      await createSellerWithProduct(request, admin, { sellerName: `E2E 목록 ${id}`, productName: `E2E 목록 상품 ${id}`, price: 10000, stock: 10 });
+    }
+    all = await api.get<Page_>(request, "/api/v1/products?size=20", null);
+  }
   const reason = `상품이 ${all.totalElements}개뿐이라 2페이지가 없습니다(데모 데이터 필요).`;
-  // 데모 백엔드(비밀번호가 주어진 경우)라면 데이터가 있어야 하므로 건너뛰지 않고 실패시킨다.
-  if (DEMO_PASSWORD) expect(all.totalElements, reason).toBeGreaterThanOrEqual(21);
-  else test.skip(all.totalElements < 21, reason);
+  if (DEMO_PASSWORD) expect(all.totalElements, reason).toBeGreaterThanOrEqual(MIN_PRODUCTS);
+  else test.skip(all.totalElements < MIN_PRODUCTS, reason);
 
   await page.goto("/products");
   const { parentId, parentName } = await leafCategory(request);

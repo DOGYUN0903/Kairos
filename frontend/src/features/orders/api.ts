@@ -68,6 +68,7 @@ export function useInvalidateOrders(orderId: number) {
  */
 export function useCancelItem(orderId: number) {
   const invalidate = useInvalidateOrders(orderId);
+  const qc = useQueryClient();
   return async (orderItemId: number, reason: string, key: string): Promise<CancelItemResponse> => {
     try {
       return unwrap<CancelItemResponse>(
@@ -78,6 +79,9 @@ export function useCancelItem(orderId: number) {
       );
     } finally {
       void invalidate();
+      // 취소하면 쿠폰이 돌아오고 포인트가 환불될 수 있다.
+      void qc.invalidateQueries({ queryKey: queryKeys.coupons.mineRoot });
+      void qc.invalidateQueries({ queryKey: queryKeys.points.root });
     }
   };
 }

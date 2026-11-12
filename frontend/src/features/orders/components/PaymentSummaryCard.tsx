@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Money } from "@/components/common/Money";
+import { formatPoints } from "@/lib/money";
 import { showsRemainingAmount } from "@/features/orders/actions";
 import type { OrderDetail } from "@/features/orders/api";
 
@@ -37,9 +38,7 @@ export function PaymentSummaryCard({ order }: { order: OrderDetail }) {
           </Row>
         )}
         {order.pointsUsed !== 0 && (
-          <Row label="포인트 사용">
-            −<Money value={order.pointsUsed} />
-          </Row>
+          <Row label="포인트 사용">−{formatPoints(order.pointsUsed)}</Row>
         )}
         <Row label="결제 금액" strong>
           <Money value={order.totalAmount} />
@@ -55,9 +54,7 @@ export function PaymentSummaryCard({ order }: { order: OrderDetail }) {
           </Row>
         )}
         {order.pointsRefunded !== 0 && (
-          <Row label="포인트 환불">
-            <Money value={order.pointsRefunded} />
-          </Row>
+          <Row label="되돌려받은 포인트">{formatPoints(order.pointsRefunded)}</Row>
         )}
         {order.shippingFeeRecovered > 0 && (
           <div className="col-span-2 -mt-1.5 flex justify-between pl-2.5 text-xs text-text-3">

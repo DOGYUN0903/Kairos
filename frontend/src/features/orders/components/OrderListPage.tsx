@@ -23,7 +23,7 @@ export function OrderListPage() {
   const data = q.data;
 
   return (
-    <div className="container max-w-[1040px] pb-16 pt-9">
+    <div>
       <div className="mb-5 flex items-end justify-between">
         <h1 className="text-[26px] font-bold tracking-tight">주문 내역</h1>
         {data && data.totalElements > 0 && <span className="text-[13px] text-text-2">전체 {data.totalElements}건</span>}

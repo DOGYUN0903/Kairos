@@ -38,7 +38,11 @@ class OrderQueryServiceTest {
     private val returnService = OrderReturnService(
         orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), pointEarner, OrderProperties(), tx, clock,
     )
-    private val service = OrderQueryService(orderRepository, paymentGateway, productReader, OrderProperties())
+    private val cancelService = OrderCancelService(
+        orderRepository, paymentGateway, stockManager, FakeBenefitReverter(stockManager.events), OrderProperties(), tx, clock,
+    )
+    private val reviewStateReader = FakeReviewStateReader()
+    private val service = OrderQueryService(orderRepository, paymentGateway, productReader, OrderProperties(), reviewStateReader)
 
     private val address = ShippingAddressCommand("홍길동", "010-1234-5678", "06236", "서울 강남구 테헤란로 1", "101호", null)
     private val memberId = 7L
@@ -203,6 +207,106 @@ class OrderQueryServiceTest {
         assertError(ErrorCode.INVALID_REQUEST) { service.listMine(memberId, 0, 101) }
         assertError(ErrorCode.INVALID_REQUEST) { service.listForSeller(1L, null, 0, 0) }
         assertError(ErrorCode.INVALID_REQUEST) { service.listForAdmin(null, null, null, 0, 101) }
+    }
+
+    /** 결제·발송·배송 완료까지 하고, [confirmSellerIds] 의 판매자 주문만 구매 확정한다. */
+    private fun deliverAndConfirm(order: PlaceOrderResult, vararg confirmSellerIds: Long) {
+        pay(order)
+        orderRepository.findById(order.orderId)!!.sellerOrders.forEach {
+            shippingService.ship(it.sellerId, it.id!!, "04", "T-${it.id}")
+            shippingService.deliver(it.sellerId, it.id!!)
+        }
+        confirmSellerIds.forEach { shippingService.confirmPurchase(memberId, order.orderId, sellerOrderIdOf(order, it)) }
+    }
+
+    private fun itemIdOf(order: PlaceOrderResult, skuId: Long) =
+        orderRepository.findById(order.orderId)!!.allItems.first { it.skuId == skuId }.id!!
+
+    @Test
+    fun 구매_확정된_항목은_후기_상태를_reader에서_받는다() {
+        val order = place(10L)
+        deliverAndConfirm(order, 1L)
+        val itemId = itemIdOf(order, 10L)
+        reviewStateReader.states[itemId] = ItemReviewState("WRITABLE", null, now.plusDays(90))
+
+        val item = service.getMine(memberId, order.orderId).sellerOrders.single().items.single()
+
+        assertEquals(listOf(ReviewCandidate(itemId, now)), reviewStateReader.calls.single())
+        assertEquals("WRITABLE", item.review?.status)
+        assertNull(item.review?.reviewId)
+        assertEquals(now.plusDays(90), item.review?.writableUntil)
+    }
+
+    @Test
+    fun 확정_전_판매자_주문의_항목과_취소된_항목은_NOT_ELIGIBLE이고_reader에_묻지_않는다() {
+        productReader.put(11L, sellerId = 1L, salePrice = 9_000)
+        stockManager.stock[11L] = 50
+        val order = orderService.place(
+            memberId, PlaceOrderCommand(listOf(OrderItemCommand(10L, 1), OrderItemCommand(11L, 1), OrderItemCommand(20L, 1)), 33_000, address),
+        )
+        pay(order)
+        val confirmedItemId = itemIdOf(order, 10L)
+        val canceledId = itemIdOf(order, 11L)
+        val unconfirmedItemId = itemIdOf(order, 20L)
+        // 판매자 1 의 항목 11 을 발송 전에 취소하고, 판매자 1 만 발송·배송 완료·확정한다(판매자 2 는 결제 완료 상태).
+        paymentGateway.nextCancel = PgOutcome.Done(PgPaymentInfo(PgPaymentStatus.PARTIAL_CANCELED, 33_000, 24_000, listOf(PgCancelInfo(9_000, "사유"))))
+        cancelService.cancelByBuyer(memberId, order.orderId, canceledId, "변심")
+        shippingService.ship(1L, sellerOrderIdOf(order, 1L), "04", "T-1")
+        shippingService.deliver(1L, sellerOrderIdOf(order, 1L))
+        shippingService.confirmPurchase(memberId, order.orderId, sellerOrderIdOf(order, 1L))
+        reviewStateReader.states[confirmedItemId] = ItemReviewState("WRITABLE", null, now.plusDays(90))
+
+        val items = service.getMine(memberId, order.orderId).sellerOrders.flatMap { it.items }.associateBy { it.orderItemId }
+
+        assertEquals("CANCELED", items.getValue(canceledId).status)
+        assertEquals("NOT_ELIGIBLE", items.getValue(canceledId).review?.status)
+        assertEquals("NOT_ELIGIBLE", items.getValue(unconfirmedItemId).review?.status)
+        assertEquals("WRITABLE", items.getValue(confirmedItemId).review?.status)
+        assertEquals(listOf(confirmedItemId), reviewStateReader.calls.single().map { it.orderItemId })
+    }
+
+    @Test
+    fun 주문_한_건의_후기_상태는_한_번에_조회한다() {
+        productReader.put(11L, sellerId = 1L, salePrice = 9_000)
+        stockManager.stock[11L] = 50
+        val order = orderService.place(
+            memberId, PlaceOrderCommand(listOf(OrderItemCommand(10L, 1), OrderItemCommand(11L, 1), OrderItemCommand(20L, 1)), 33_000, address),
+        )
+        deliverAndConfirm(order, 1L, 2L)
+        val itemIds = listOf(itemIdOf(order, 10L), itemIdOf(order, 11L), itemIdOf(order, 20L))
+        itemIds.forEach { reviewStateReader.states[it] = ItemReviewState("WRITABLE", null, now.plusDays(90)) }
+
+        val detail = service.getMine(memberId, order.orderId)
+
+        assertEquals(1, reviewStateReader.calls.size)
+        assertEquals(itemIds.toSet(), reviewStateReader.calls.single().map { it.orderItemId }.toSet())
+        assertEquals(listOf("WRITABLE", "WRITABLE", "WRITABLE"), detail.sellerOrders.flatMap { it.items }.map { it.review?.status })
+        assertEquals(itemIds.toSet(), detail.sellerOrders.flatMap { it.items }.map { it.orderItemId }.toSet())
+    }
+
+    @Test
+    fun 구매_확정_전_주문의_후기_상태는_NOT_ELIGIBLE이고_reader를_부르지_않는다() {
+        val order = place(10L)
+        pay(order)
+
+        val detail = service.getMine(memberId, order.orderId)
+
+        assertEquals("NOT_ELIGIBLE", detail.sellerOrders.single().items.single().review?.status)
+        assertEquals(0, reviewStateReader.calls.size)
+    }
+
+    @Test
+    fun 판매자와_관리자_주문_조회의_review는_null이다() {
+        val order = place(10L)
+        deliverAndConfirm(order, 1L)
+        reviewStateReader.states[itemIdOf(order, 10L)] = ItemReviewState("WRITABLE", null, now.plusDays(90))
+
+        val seller = service.getForSeller(1L, sellerOrderIdOf(order, 1L))
+        val admin = service.getForAdmin(order.orderId)
+
+        assertNull(seller.items.single().review)
+        assertNull(admin.sellerOrders.single().items.single().review)
+        assertEquals(0, reviewStateReader.calls.size)
     }
 
     @Test

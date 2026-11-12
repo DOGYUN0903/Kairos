@@ -53,6 +53,9 @@ class FakeCouponRepository : CouponRepository {
         return true
     }
 
+    override fun findAvailableByMember(memberId: Long, now: LocalDateTime): List<Coupon> =
+        coupons.values.filter { it.memberId == memberId && it.status == CouponStatus.AVAILABLE && !it.isExpired(now) }.sortedBy { it.id }
+
     override fun findUsedByOrderId(orderId: Long): List<Coupon> =
         coupons.values.filter { it.status == CouponStatus.USED && it.usedOrderId == orderId }
 

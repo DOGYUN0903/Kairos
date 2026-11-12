@@ -2330,6 +2330,9 @@ paths:
       description: |
         주문 생성과 같은 계산으로 항목별 할인·배분·`paidAmount` 와 PG 결제 금액을 돌려준다. 쿠폰 상태·포인트·재고를 바꾸지 않고
         저장하지 않으므로 `Idempotency-Key` 가 없다. `maxUsablePoints` 는 이 쿠폰 조합에서 쓸 수 있는 포인트 최대치(10P 단위)다.
+        `availableCoupons`·`cartCoupons` 는 내 사용 가능한 쿠폰이며 `usable`·`expectedDiscount` 는 주문 생성과 같은 판정이다.
+        상품 쿠폰의 `usable` 은 그 항목에 그 쿠폰만 썼을 때의 판정이다(한 쿠폰을 두 항목에 쓰거나 한 항목에 두 장 쓰는 것은 별도로 `ORDER_INVALID`).
+        장바구니 쿠폰은 요청에 담긴 상품 쿠폰을 적용한 뒤 금액으로 판정한다.
       requestBody:
         required: true
         content:
@@ -5782,9 +5785,18 @@ components:
           type: string
           maxLength: 500
           description: 답글 내용(공백 불가, 최대 500자)
+    ReviewImage:
+      type: object
+      required: [fileId, url]
+      properties:
+        fileId:
+          type: integer
+          format: int64
+        url:
+          type: string
     ReviewResult:
       type: object
-      required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, writerName, rewardPoints, createdAt, modifiedAt]
+      required: [reviewId, orderItemId, productId, productName, rating, content, imageUrls, images, writerName, rewardPoints, createdAt, modifiedAt]
       properties:
         reviewId:
           type: integer
@@ -5805,6 +5817,11 @@ components:
           type: array
           items:
             type: string
+        images:
+          type: array
+          description: "`imageUrls` 와 같은 순서. 수정 시 `fileId` 를 `imageFileIds` 로 그대로 보내면 사진이 유지된다."
+          items:
+            $ref: '#/components/schemas/ReviewImage'
         writerName:
           type: string
           description: 마스킹한 작성자 이름(예 `김**`)
@@ -6306,7 +6323,7 @@ components:
           default: 0
     QuoteLine:
       type: object
-      required: [skuId, productId, productName, brandName, optionDisplayName, thumbnailUrl, unitPrice, sellerId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount]
+      required: [skuId, productId, productName, brandName, optionDisplayName, thumbnailUrl, unitPrice, sellerId, quantity, lineAmount, productCouponDiscount, cartCouponAllocated, pointsAllocated, paidAmount, availableCoupons]
       properties:
         skuId:
           type: integer
@@ -6348,6 +6365,54 @@ components:
         paidAmount:
           type: integer
           format: int64
+        availableCoupons:
+          type: array
+          description: 이 항목에 쓸 수 있는 내 상품 쿠폰(대상이 맞는 것만). 사용 가능 먼저, 예상 할인 큰 순, 만료 빠른 순
+          items:
+            $ref: '#/components/schemas/QuoteCoupon'
+    QuoteCoupon:
+      type: object
+      required: [couponId, name, issuerType, discountType, discountValue, expiresAt, usable]
+      properties:
+        couponId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        issuerType:
+          type: string
+          enum: [PLATFORM, SELLER]
+        discountType:
+          type: string
+          enum: [FIXED, RATE]
+        discountValue:
+          type: integer
+          format: int64
+          description: 정액은 원, 정률은 bp(10000 = 100%)
+        maxDiscount:
+          type: integer
+          format: int64
+          nullable: true
+        minOrderAmount:
+          type: integer
+          format: int64
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          description: 오프셋 없는 LocalDateTime(KST)
+        usable:
+          type: boolean
+        unusableReason:
+          type: string
+          nullable: true
+          enum: [MIN_AMOUNT_NOT_MET, NOTHING_TO_DISCOUNT]
+          description: "`usable=false` 일 때만"
+        expectedDiscount:
+          type: integer
+          format: int64
+          nullable: true
+          description: "`usable=true` 일 때만"
     SellerQuote:
       type: object
       required: [sellerId, sellerName, itemsAmount, shippingFee, shippingFeePayer]
@@ -6369,7 +6434,7 @@ components:
           enum: [BUYER, PLATFORM]
     OrderQuote:
       type: object
-      required: [items, sellerQuotes, freeShippingThreshold, baseShippingFee, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints]
+      required: [items, sellerQuotes, freeShippingThreshold, baseShippingFee, itemsAmount, productCouponDiscount, cartCouponDiscount, pointsUsed, buyerShippingFee, totalAmount, maxUsablePoints, cartCoupons]
       properties:
         items:
           type: array
@@ -6409,6 +6474,11 @@ components:
         maxUsablePoints:
           type: integer
           format: int64
+        cartCoupons:
+          type: array
+          description: 쓸 수 있는 내 장바구니 쿠폰. 요청의 상품 쿠폰 적용 뒤 금액으로 판정한다. 정렬은 `availableCoupons` 와 같다
+          items:
+            $ref: '#/components/schemas/QuoteCoupon'
     ShipRequest:
       type: object
       required: [carrierCode, trackingNumber]
@@ -6632,6 +6702,29 @@ components:
             - $ref: '#/components/schemas/ReturnRequestSummary'
           nullable: true
           description: 이 항목의 반품 요청(없으면 null)
+        review:
+          allOf:
+            - $ref: '#/components/schemas/OrderItemReview'
+          nullable: true
+          description: 후기 상태. 구매자 주문 상세에서만 채우고 판매자·관리자 응답에서는 null
+    OrderItemReview:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [NOT_ELIGIBLE, WRITABLE, WRITTEN, EXPIRED, DELETED]
+          description: 구매 확정 전이거나 취소·반품된 항목은 NOT_ELIGIBLE, 작성 기한이 지나면 EXPIRED, 삭제한 후기는 DELETED(다시 쓸 수 없음)
+        reviewId:
+          type: integer
+          format: int64
+          nullable: true
+          description: WRITTEN 일 때
+        writableUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: WRITABLE·EXPIRED 일 때. 구매 확정 시각 + 작성 기한(초 단위 시각, 이 시각까지 작성할 수 있다)
     ReturnStatus:
       type: string
       enum: [REQUESTED, APPROVED, REJECTED, WITHDRAWN, REFUNDING, COMPLETED, CANCELED_BY_ADMIN]
@@ -7160,6 +7253,9 @@ components:
         claimed:
           type: boolean
           description: 내가 이미 받았는지(관리자·판매자 목록에서는 항상 false)
+        targetProductName:
+          type: [string, 'null']
+          description: "`targetType=PRODUCT` 일 때 대상 상품 이름. 다른 대상 유형이거나 상품이 삭제됐으면 null"
     CouponResult:
       type: object
       required: [couponId, policyId, name, couponType, discountType, discountValue, status, issuedAt, expiresAt]

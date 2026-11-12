@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS 판매자 — 쿠폰·후기 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+<div class="console">
+  <aside class="console__side">
+    <a class="logo" href="index.html">KAIROS</a>
+    <div class="console__role">판매자 센터</div>
+    <nav class="side-nav" aria-label="판매자 메뉴">
+      <a href="seller-dashboard.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>대시보드</a>
+      <a href="seller-product-list.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>상품 관리</a>
+      <a href="seller-order.html"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg>주문 관리</a>
+      <a href="#" data-go="s-list" data-menu-item="coupon"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>쿠폰 관리</a>
+      <a href="#" data-go="s-reviews" data-menu-item="review"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg>후기 관리<span class="nav-badge" aria-label="미답변 2건">2</span></a>
+      <a href="#"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 7h16v4H4z"/><path d="M6 11v9h12v-9"/><path d="M10 15h4"/></svg>브랜드</a>
+      <a href="#" aria-disabled="true"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>정산<span class="soon">준비 중</span></a>
+    </nav>
+  </aside>
+
+  <div class="console__main">
+    <header class="console__top">
+      <h1>쿠폰 · 후기</h1>
+      <div class="console__user"><span>[판매자 A 주식회사]</span><span class="avatar" aria-hidden="true">A</span></div>
+    </header>
+
+    <main class="console__content">
+      <nav class="board-nav" aria-label="상태별 보기">
+    <div class="board-nav__row"><strong>쿠폰 관리</strong><button type="button" data-go="s-list" aria-pressed="false">① 쿠폰 정책 목록</button><button type="button" data-go="s-form" aria-pressed="false">② 등록 양식 (정액)</button><button type="button" data-go="s-form-err" aria-pressed="false">③ 등록 양식 (정률 · 입력 오류)</button><button type="button" data-go="s-end" aria-pressed="false">④ 종료 확인 창</button></div>
+    <div class="board-nav__row"><strong>후기 관리</strong><button type="button" data-go="s-reviews" aria-pressed="false">⑤ 후기 목록 (미답변 표시)</button><button type="button" data-go="s-reply" aria-pressed="false">⑥ 답글 입력</button><button type="button" data-go="s-reply-edit" aria-pressed="false">⑦ 답글 수정</button></div>
+    
+  </nav>
+      <div class="mt-24">
+      <section id="s-list" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<div class="row-between">
+        <div><h2 style="font-size:18px;font-weight:700">쿠폰 정책</h2><p class="small muted mt-8">내가 발급한 쿠폰 정책입니다. 판매자 쿠폰 할인은 판매자가 부담합니다(정산 금액에서 차감).</p></div>
+        <button type="button" class="btn btn-primary" data-go="s-form">쿠폰 등록</button>
+      </div>
+      <div class="card mt-16">
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th scope="col">이름</th><th scope="col">대상</th><th scope="col">할인</th><th scope="col" class="num">최소 주문 금액</th><th scope="col" class="num">발급 / 총 수량</th><th scope="col">발급 기간</th><th scope="col">상태</th><th scope="col"><span class="sr-only">작업</span></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span style="font-weight:500">[판매자 A] 첫 구매 10% 쿠폰</span></td>
+                <td>내 상품 전체</td>
+                <td>10% (최대 5,000원)</td>
+                <td class="num">20,000원</td>
+                <td class="num mono">128 / 500</td>
+                <td class="mono small muted">2026-11-01 ~ 2026-12-31</td>
+                <td><span class="chip chip-onsale">진행 중</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-end">종료</button></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight:500">이 상품 전용 2,000원 쿠폰</span></td>
+                <td>상품 하나<div class="small muted">오버핏 헤비웨이트 코튼 티셔츠</div></td>
+                <td>2,000원</td>
+                <td class="num">없음</td>
+                <td class="num mono">41 / 제한 없음</td>
+                <td class="mono small muted">2026-11-10 ~ 2026-12-20</td>
+                <td><span class="chip chip-onsale">진행 중</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-end">종료</button></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight:500">가을맞이 10% 쿠폰</span></td>
+                <td>내 상품 전체</td>
+                <td>10% (최대 5,000원)</td>
+                <td class="num">30,000원</td>
+                <td class="num mono">312 / 1,000</td>
+                <td class="mono small muted">2026-09-01 ~ 2026-10-31</td>
+                <td><span class="chip chip-ended">기간 종료</span></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight:500">추석 맞이 3,000원 쿠폰</span></td>
+                <td>상품 하나<div class="small muted">로고 자수 볼캡</div></td>
+                <td>3,000원</td>
+                <td class="num">30,000원</td>
+                <td class="num mono">87 / 100</td>
+                <td class="mono small muted">2026-09-10 ~ 2026-10-05</td>
+                <td><span class="chip chip-ended">종료</span></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-foot"><span class="small muted">4건</span><nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a></nav></div>
+      </div>
+      <p class="hint mt-16"><svg style="display:inline;vertical-align:-3px;margin-right:4px" class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>"기간 종료"는 기간이 지났지만 아직 종료 처리하지 않은 쿠폰입니다. 종료하거나 기간이 끝나도 이미 받은 고객은 쿠폰을 사용할 수 있습니다.</p>
+</section>
+      <section id="s-form" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<a class="back-link" href="#" data-go="s-list"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>쿠폰 정책 목록</a>
+      <h2 style="font-size:18px;font-weight:700" class="mb-16">쿠폰 등록</h2>
+      <div style="max-width:880px"><form class="card" action="#" onsubmit="return false" data-toggle>
+        <div class="card__body">
+          
+          <div class="field" style="max-width:560px">
+            <label for="fa-name--s-form">쿠폰 이름<span class="req" aria-hidden="true">*</span></label>
+            <input id="fa-name--s-form" class="input" type="text" maxlength="50" value="연말 감사 1,000원 쿠폰" placeholder="예: 첫 구매 10% 쿠폰">
+            <span class="counter">15 / 50</span>
+          </div>
+
+          <div class="form-section">
+            <h3>적용 대상</h3>
+            <div class="choice-row" role="radiogroup" aria-label="적용 대상">
+              <label class="choice"><input type="radio" name="fa-target" value="SELLER" checked><span><b>내 상품 전체</b><span>내가 판매하는 모든 상품에 사용할 수 있습니다</span></span></label>
+              <label class="choice"><input type="radio" name="fa-target" value="PRODUCT"><span><b>상품 하나</b><span>내 상품 중 고른 상품에만 사용할 수 있습니다</span></span></label>
+            </div>
+            <div class="field mt-16" data-when="PRODUCT" style="max-width:560px" hidden>
+              <label for="fa-prod--s-form">상품 선택<span class="req" aria-hidden="true">*</span></label>
+              <select id="fa-prod--s-form" class="select"><option>오버핏 헤비웨이트 코튼 티셔츠 (#1024)</option><option>로고 자수 볼캡 (#1031)</option><option>워싱 피그먼트 포켓 티셔츠 (#1047)</option></select>
+              <span class="hint">판매 중인 내 상품에서 고릅니다</span>
+            </div>
+            <p class="hint mt-8">쿠폰 종류는 "상품 쿠폰"으로 고정됩니다. 장바구니 쿠폰은 플랫폼만 발급합니다.</p>
+          </div>
+
+          <div class="form-section">
+            <h3>할인</h3>
+            <div class="choice-row" role="radiogroup" aria-label="할인 유형" style="max-width:560px">
+              <label class="choice"><input type="radio" name="fa-dtype" value="FIXED" checked><span><b>정액 할인</b><span>원 단위로 깎아 줍니다</span></span></label>
+              <label class="choice"><input type="radio" name="fa-dtype" value="RATE"><span><b>정률 할인</b><span>%로 깎아 주고 최대 금액을 정합니다</span></span></label>
+            </div>
+            <div class="form-grid mt-16" style="max-width:560px">
+              <div class="field" data-when="FIXED">
+                <label for="fa-amt--s-form">할인 금액<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fa-amt--s-form" class="input" type="text" inputmode="numeric" value="1,000" placeholder="1,000"><span>원</span></div>
+                <span class="hint">1원 이상</span>
+              </div>
+              <div class="field" data-when="RATE" hidden>
+                <label for="fa-rate--s-form">할인율<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fa-rate--s-form" class="input" type="text" inputmode="numeric" value="" placeholder="10"><span>%</span></div>
+                <span class="hint">1~100의 정수로 입력합니다 (소수 불가)</span>
+              </div>
+              <div class="field" data-when="RATE" hidden>
+                <label for="fa-max--s-form">최대 할인 금액<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fa-max--s-form" class="input" type="text" inputmode="numeric" value="" placeholder="5,000"><span>원</span></div>
+                <span class="hint">정률 할인에서는 꼭 입력합니다</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>사용 조건 · 수량</h3>
+            <div class="form-grid-3">
+              <div class="field"><label for="fa-min--s-form">최소 주문 금액 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fa-min--s-form" class="input" type="text" inputmode="numeric" value="10,000" placeholder="비우면 조건 없음"><span>원</span></div></div>
+              <div class="field"><label for="fa-qty--s-form">총 수량 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fa-qty--s-form" class="input" type="text" inputmode="numeric" value="300" placeholder="비우면 무제한"><span>장</span></div></div>
+              <div class="field"><label for="fa-days--s-form">유효 일수 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fa-days--s-form" class="input" type="text" inputmode="numeric" value="14" placeholder="비우면 종료일까지"><span>일</span></div></div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>발급 기간 <span class="muted" style="font-weight:400">(한국 시간)</span></h3>
+            <div class="form-grid" style="max-width:560px">
+              <div class="field"><label for="fa-s--s-form">시작<span class="req" aria-hidden="true">*</span></label><input id="fa-s--s-form" class="input" type="text" value="2026-12-01 00:00"></div>
+              <div class="field"><label for="fa-e--s-form">종료<span class="req" aria-hidden="true">*</span></label><input id="fa-e--s-form" class="input" type="text" value="2026-12-31 23:59"></div>
+            </div>
+          </div>
+
+          <div class="stack mt-24" style="gap:8px">
+            <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>등록한 쿠폰은 수정할 수 없습니다. 잘못 등록했으면 종료하고 새로 등록해 주세요. 종료해도 이미 받은 고객은 사용할 수 있습니다.</span></div>
+            <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>판매자 쿠폰 할인은 판매자가 부담합니다(정산 금액에서 차감).</span></div>
+          </div>
+        </div>
+        <div class="card__foot" style="justify-content:flex-end;gap:8px;border-top:1px solid var(--border)">
+          <button type="button" class="btn btn-ghost" data-go="s-list">취소</button>
+          <button type="submit" class="btn btn-primary">쿠폰 등록</button>
+        </div>
+      </form></div>
+      <p class="hint mt-16">시안 확인용: "할인 유형"과 "적용 대상"을 눌러 보면 입력 칸이 바뀝니다.</p>
+</section>
+      <section id="s-form-err" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<a class="back-link" href="#" data-go="s-list"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>쿠폰 정책 목록</a>
+      <h2 style="font-size:18px;font-weight:700" class="mb-16">쿠폰 등록 — 정률 할인 · 입력 오류</h2>
+      <div style="max-width:880px"><form class="card" action="#" onsubmit="return false" data-toggle>
+        <div class="card__body">
+          <div class="notice notice-error mb-16" role="alert"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>쿠폰을 등록하지 못했습니다. 입력한 내용을 확인해 주세요.</span></div>
+          <div class="field" style="max-width:560px">
+            <label for="fb-name--s-form-err">쿠폰 이름<span class="req" aria-hidden="true">*</span></label>
+            <input id="fb-name--s-form-err" class="input" type="text" maxlength="50" value="[판매자 A] 겨울 시즌 15% 쿠폰" placeholder="예: 첫 구매 10% 쿠폰">
+            <span class="counter">20 / 50</span>
+          </div>
+
+          <div class="form-section">
+            <h3>적용 대상</h3>
+            <div class="choice-row" role="radiogroup" aria-label="적용 대상">
+              <label class="choice"><input type="radio" name="fb-target" value="SELLER"><span><b>내 상품 전체</b><span>내가 판매하는 모든 상품에 사용할 수 있습니다</span></span></label>
+              <label class="choice"><input type="radio" name="fb-target" value="PRODUCT" checked><span><b>상품 하나</b><span>내 상품 중 고른 상품에만 사용할 수 있습니다</span></span></label>
+            </div>
+            <div class="field mt-16" data-when="PRODUCT" style="max-width:560px">
+              <label for="fb-prod--s-form-err">상품 선택<span class="req" aria-hidden="true">*</span></label>
+              <select id="fb-prod--s-form-err" class="select"><option>오버핏 헤비웨이트 코튼 티셔츠 (#1024)</option><option>로고 자수 볼캡 (#1031)</option><option>워싱 피그먼트 포켓 티셔츠 (#1047)</option></select>
+              <span class="hint">판매 중인 내 상품에서 고릅니다</span>
+            </div>
+            <p class="hint mt-8">쿠폰 종류는 "상품 쿠폰"으로 고정됩니다. 장바구니 쿠폰은 플랫폼만 발급합니다.</p>
+          </div>
+
+          <div class="form-section">
+            <h3>할인</h3>
+            <div class="choice-row" role="radiogroup" aria-label="할인 유형" style="max-width:560px">
+              <label class="choice"><input type="radio" name="fb-dtype" value="FIXED"><span><b>정액 할인</b><span>원 단위로 깎아 줍니다</span></span></label>
+              <label class="choice"><input type="radio" name="fb-dtype" value="RATE" checked><span><b>정률 할인</b><span>%로 깎아 주고 최대 금액을 정합니다</span></span></label>
+            </div>
+            <div class="form-grid mt-16" style="max-width:560px">
+              <div class="field" data-when="FIXED" hidden>
+                <label for="fb-amt--s-form-err">할인 금액<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fb-amt--s-form-err" class="input" type="text" inputmode="numeric" value="" placeholder="1,000"><span>원</span></div>
+                <span class="hint">1원 이상</span>
+              </div>
+              <div class="field" data-when="RATE">
+                <label for="fb-rate--s-form-err">할인율<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fb-rate--s-form-err" class="input" type="text" inputmode="numeric" value="15" placeholder="10"><span>%</span></div>
+                <span class="hint">1~100의 정수로 입력합니다 (소수 불가)</span>
+              </div>
+              <div class="field" data-when="RATE">
+                <label for="fb-max--s-form-err">최대 할인 금액<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-suffix"><input id="fb-max--s-form-err" class="input is-error" type="text" inputmode="numeric" value="" placeholder="5,000" aria-invalid="true"><span>원</span></div>
+                <span class="error-text" role="alert">최대 할인 금액을 입력해 주세요</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>사용 조건 · 수량</h3>
+            <div class="form-grid-3">
+              <div class="field"><label for="fb-min--s-form-err">최소 주문 금액 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fb-min--s-form-err" class="input" type="text" inputmode="numeric" value="30,000" placeholder="비우면 조건 없음"><span>원</span></div></div>
+              <div class="field"><label for="fb-qty--s-form-err">총 수량 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fb-qty--s-form-err" class="input" type="text" inputmode="numeric" value="" placeholder="비우면 무제한"><span>장</span></div></div>
+              <div class="field"><label for="fb-days--s-form-err">유효 일수 <span class="muted" style="font-weight:400">(선택)</span></label><div class="input-suffix"><input id="fb-days--s-form-err" class="input" type="text" inputmode="numeric" value="" placeholder="비우면 종료일까지"><span>일</span></div></div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>발급 기간 <span class="muted" style="font-weight:400">(한국 시간)</span></h3>
+            <div class="form-grid" style="max-width:560px">
+              <div class="field"><label for="fb-s--s-form-err">시작<span class="req" aria-hidden="true">*</span></label><input id="fb-s--s-form-err" class="input" type="text" value="2026-11-20 09:00"></div>
+              <div class="field"><label for="fb-e--s-form-err">종료<span class="req" aria-hidden="true">*</span></label><input id="fb-e--s-form-err" class="input is-error" type="text" value="2026-11-15 18:00" aria-invalid="true"><span class="error-text" role="alert">종료 일시는 시작 일시보다 뒤여야 합니다</span></div>
+            </div>
+          </div>
+
+          <div class="stack mt-24" style="gap:8px">
+            <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>등록한 쿠폰은 수정할 수 없습니다. 잘못 등록했으면 종료하고 새로 등록해 주세요. 종료해도 이미 받은 고객은 사용할 수 있습니다.</span></div>
+            <div class="notice"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>판매자 쿠폰 할인은 판매자가 부담합니다(정산 금액에서 차감).</span></div>
+          </div>
+        </div>
+        <div class="card__foot" style="justify-content:flex-end;gap:8px;border-top:1px solid var(--border)">
+          <button type="button" class="btn btn-ghost" data-go="s-list">취소</button>
+          <button type="submit" class="btn btn-primary">쿠폰 등록</button>
+        </div>
+      </form></div>
+</section>
+      <section id="s-end" class="state-panel" data-group="main" data-menu="coupon" hidden>
+<h2 class="board__label">쿠폰 종료 확인 창 — 목록의 "종료"를 누르면 열립니다</h2>
+      <p class="board__note">종료하면 더 이상 발급되지 않습니다. 이미 받은 고객은 유효기간까지 사용할 수 있습니다.</p>
+      <div class="dialog-stage">
+        <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="end-h--s-end">
+          <div class="dialog__head"><h3 id="end-h--s-end">쿠폰 종료</h3></div>
+          <div class="dialog__body">
+            <div class="dialog__box"><div class="small muted">종료할 쿠폰</div><div style="font-weight:700;margin-top:2px">[판매자 A] 첫 구매 10% 쿠폰</div><div class="small muted mt-8">발급 128 / 500 · 2026-11-01 ~ 2026-12-31</div></div>
+            <p>이 쿠폰을 종료할까요? 종료하면 더 이상 발급되지 않습니다. 종료해도 이미 받은 고객은 사용할 수 있습니다.</p>
+          </div>
+          <div class="dialog__foot"><button type="button" class="btn btn-ghost" data-go="s-list">취소</button><button type="button" class="btn btn-danger">쿠폰 종료</button></div>
+        </div>
+      </div>
+</section>
+      <section id="s-reviews" class="state-panel" data-group="main" data-menu="review" hidden>
+<div class="row-between">
+        <div><h2 style="font-size:18px;font-weight:700">후기 관리</h2><p class="small muted mt-8">최신순입니다. 답글이 없는 후기는 "미답변"으로 표시됩니다.</p></div>
+      </div><div class="card mt-16"><div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">상품</th><th scope="col">별점</th><th scope="col">작성자</th><th scope="col">후기</th><th scope="col">작성일</th><th scope="col">답글</th><th scope="col"><span class="sr-only">작업</span></th></tr></thead>
+            <tbody>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">김*지</td>
+                <td><div class="cell-clamp">두께감이 좋아서 가을부터 겨울 초입까지 입기 딱 좋아요. 핏이 넉넉해서 안에 니트를 입어도 답답하지 않습니다.</div><div class="mini-photos"><div class="ph ">[사진]</div><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-08</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-primary btn-sm" data-go="s-reply">답글 달기</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 4점">★★★★<span class="off">★</span></span></td>
+                <td class="mono">이*훈</td>
+                <td><div class="cell-clamp">색감은 사진과 거의 같아요. 어깨선이 생각보다 많이 내려와서 한 사이즈 작게 입어도 괜찮을 것 같습니다.</div></td>
+                <td class="mono small muted">2026-11-05</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reply-edit">답글 수정</button></td>
+              </tr>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">로고 자수 볼캡</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">박*영</td>
+                <td><div class="cell-clamp">배송도 빨랐고 자수 마감이 깔끔합니다. 챙 각도도 잘 잡혀 있어요.</div><div class="mini-photos"><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-01</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-primary btn-sm" data-go="s-reply">답글 달기</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">워싱 피그먼트 포켓 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 3점">★★★<span class="off">★★</span></span></td>
+                <td class="mono">최*우</td>
+                <td><div class="cell-clamp">제품은 괜찮은데 화이트는 속이 조금 비칩니다. 이너를 신경 써서 입어야 할 것 같아요.</div></td>
+                <td class="mono small muted">2026-10-27</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reply-edit">답글 수정</button></td>
+              </tr>
+            </tbody></table></div>
+        <div class="table-foot"><span class="small muted">128건 중 1–4</span><nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a><a href="#">2</a><a href="#">3</a><a href="#">4</a><a href="#">5</a></nav></div></div>
+</section>
+      <section id="s-reply" class="state-panel" data-group="main" data-menu="review" hidden>
+<div class="row-between">
+        <div><h2 style="font-size:18px;font-weight:700">후기 관리</h2><p class="small muted mt-8">최신순입니다. 답글이 없는 후기는 "미답변"으로 표시됩니다.</p></div>
+      </div><div class="card mt-16"><div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">상품</th><th scope="col">별점</th><th scope="col">작성자</th><th scope="col">후기</th><th scope="col">작성일</th><th scope="col">답글</th><th scope="col"><span class="sr-only">작업</span></th></tr></thead>
+            <tbody>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">김*지</td>
+                <td><div class="cell-clamp">두께감이 좋아서 가을부터 겨울 초입까지 입기 딱 좋아요. 핏이 넉넉해서 안에 니트를 입어도 답답하지 않습니다.</div><div class="mini-photos"><div class="ph ">[사진]</div><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-08</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">접기</button></td>
+              </tr><tr class="reply-row"><td colspan="7">
+                <form class="reply-form" action="#" onsubmit="return false">
+                  
+                  <label for="rp1--s-reply" style="font-weight:700;font-size:13px">답글 작성</label>
+                  <textarea id="rp1--s-reply" class="textarea" maxlength="500" placeholder="고객에게 남길 답글을 적어 주세요.">소중한 후기 감사합니다. 안에 니트를 겹쳐 입으셔도 편하도록 넉넉하게 만든 핏이라 만족하셨다니 기쁩니다.</textarea>
+                  <div class="row-between"><span class="hint">1~500자, 공백만 입력할 수 없습니다.</span><span class="counter">58 / 500</span></div>
+                  <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">취소</button><button type="submit" class="btn btn-primary btn-sm">답글 등록</button></div>
+                </form>
+              </td></tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 4점">★★★★<span class="off">★</span></span></td>
+                <td class="mono">이*훈</td>
+                <td><div class="cell-clamp">색감은 사진과 거의 같아요. 어깨선이 생각보다 많이 내려와서 한 사이즈 작게 입어도 괜찮을 것 같습니다.</div></td>
+                <td class="mono small muted">2026-11-05</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reply-edit">답글 수정</button></td>
+              </tr>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">로고 자수 볼캡</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">박*영</td>
+                <td><div class="cell-clamp">배송도 빨랐고 자수 마감이 깔끔합니다. 챙 각도도 잘 잡혀 있어요.</div><div class="mini-photos"><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-01</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">접기</button></td>
+              </tr><tr class="reply-row"><td colspan="7">
+                <form class="reply-form" action="#" onsubmit="return false">
+                  
+                  <label for="rp3--s-reply" style="font-weight:700;font-size:13px">답글 작성</label>
+                  <textarea id="rp3--s-reply" class="textarea is-error" maxlength="500" placeholder="고객에게 남길 답글을 적어 주세요." aria-invalid="true">   </textarea>
+                  <div class="row-between"><span class="error-text" role="alert">답글 내용을 입력해 주세요. 공백만 입력할 수 없습니다.</span><span class="counter">0 / 500</span></div>
+                  <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">취소</button><button type="submit" class="btn btn-primary btn-sm" disabled>답글 등록</button></div>
+                </form>
+              </td></tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">워싱 피그먼트 포켓 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 3점">★★★<span class="off">★★</span></span></td>
+                <td class="mono">최*우</td>
+                <td><div class="cell-clamp">제품은 괜찮은데 화이트는 속이 조금 비칩니다. 이너를 신경 써서 입어야 할 것 같아요.</div></td>
+                <td class="mono small muted">2026-10-27</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reply-edit">답글 수정</button></td>
+              </tr>
+            </tbody></table></div>
+        <div class="table-foot"><span class="small muted">128건 중 1–4</span><nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a><a href="#">2</a><a href="#">3</a><a href="#">4</a><a href="#">5</a></nav></div></div>
+      <p class="hint mt-16">첫 번째 줄은 입력 중, 세 번째 줄은 공백만 입력해 등록이 막힌 모습입니다.</p>
+</section>
+      <section id="s-reply-edit" class="state-panel" data-group="main" data-menu="review" hidden>
+<div class="row-between">
+        <div><h2 style="font-size:18px;font-weight:700">후기 관리</h2><p class="small muted mt-8">최신순입니다. 답글이 없는 후기는 "미답변"으로 표시됩니다.</p></div>
+      </div><div class="card mt-16"><div class="table-wrap"><table class="table">
+            <thead><tr><th scope="col">상품</th><th scope="col">별점</th><th scope="col">작성자</th><th scope="col">후기</th><th scope="col">작성일</th><th scope="col">답글</th><th scope="col"><span class="sr-only">작업</span></th></tr></thead>
+            <tbody>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">김*지</td>
+                <td><div class="cell-clamp">두께감이 좋아서 가을부터 겨울 초입까지 입기 딱 좋아요. 핏이 넉넉해서 안에 니트를 입어도 답답하지 않습니다.</div><div class="mini-photos"><div class="ph ">[사진]</div><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-08</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-primary btn-sm" data-go="s-reply">답글 달기</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">오버핏 헤비웨이트 코튼 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 4점">★★★★<span class="off">★</span></span></td>
+                <td class="mono">이*훈</td>
+                <td><div class="cell-clamp">색감은 사진과 거의 같아요. 어깨선이 생각보다 많이 내려와서 한 사이즈 작게 입어도 괜찮을 것 같습니다.</div></td>
+                <td class="mono small muted">2026-11-05</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">접기</button></td>
+              </tr><tr class="reply-row"><td colspan="7">
+                <form class="reply-form" action="#" onsubmit="return false">
+                  <div class="small muted">현재 답글 · 2026-11-06</div>
+                  <label for="rp2--s-reply-edit" style="font-weight:700;font-size:13px">답글 수정</label>
+                  <textarea id="rp2--s-reply-edit" class="textarea" maxlength="500" placeholder="고객에게 남길 답글을 적어 주세요.">소중한 후기 감사합니다. 어깨선은 오버핏 디자인이라 한 사이즈 작게 입으셔도 잘 맞습니다.</textarea>
+                  <div class="row-between"><span class="hint">수정하면 기존 답글을 덮어씁니다. 답글은 삭제할 수 없습니다.</span><span class="counter">50 / 500</span></div>
+                  <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn btn-ghost btn-sm" data-go="s-reviews">취소</button><button type="submit" class="btn btn-primary btn-sm">답글 수정</button></div>
+                </form>
+              </td></tr>
+              <tr class="is-unanswered">
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">로고 자수 볼캡</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span></td>
+                <td class="mono">박*영</td>
+                <td><div class="cell-clamp">배송도 빨랐고 자수 마감이 깔끔합니다. 챙 각도도 잘 잡혀 있어요.</div><div class="mini-photos"><div class="ph ">[사진]</div></div></td>
+                <td class="mono small muted">2026-11-01</td>
+                <td><span class="chip chip-pending" style="font-weight:700">미답변</span></td>
+                <td><button type="button" class="btn btn-primary btn-sm" data-go="s-reply">답글 달기</button></td>
+              </tr>
+              <tr>
+                <td><div class="cell-product" style="min-width:200px"><div class="ph ph-sm">[이미지]</div><span class="name">워싱 피그먼트 포켓 티셔츠</span></div></td>
+                <td><span class="stars" role="img" aria-label="별점 3점">★★★<span class="off">★★</span></span></td>
+                <td class="mono">최*우</td>
+                <td><div class="cell-clamp">제품은 괜찮은데 화이트는 속이 조금 비칩니다. 이너를 신경 써서 입어야 할 것 같아요.</div></td>
+                <td class="mono small muted">2026-10-27</td>
+                <td><span class="chip chip-onsale">답변 완료</span></td>
+                <td><button type="button" class="btn btn-ghost btn-sm" data-go="s-reply-edit">답글 수정</button></td>
+              </tr>
+            </tbody></table></div>
+        <div class="table-foot"><span class="small muted">128건 중 1–4</span><nav class="pager" aria-label="페이지"><a href="#" aria-current="page">1</a><a href="#">2</a><a href="#">3</a><a href="#">4</a><a href="#">5</a></nav></div></div>
+</section>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+/* 시안 상태 전환: data-go="패널 id" 를 누르면 같은 data-group 의 패널만 보인다. 주소 뒤 #패널id 로 바로 열 수도 있다. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.state-panel'));
+  var gos = [].slice.call(document.querySelectorAll('[data-go]'));
+  function byId(id) { return document.getElementById(id); }
+  function go(id) {
+    var p = byId(id); if (!p) return;
+    var g = p.getAttribute('data-group');
+    panels.forEach(function (q) { if (q.getAttribute('data-group') === g) q.hidden = (q !== p); });
+    gos.forEach(function (b) {
+      var t = byId(b.getAttribute('data-go'));
+      if (!t || t.getAttribute('data-group') !== g) return;
+      var on = b.getAttribute('data-go') === id;
+      var attr = b.hasAttribute('aria-selected') ? 'aria-selected' : (b.hasAttribute('aria-pressed') ? 'aria-pressed' : null);
+      if (attr) b.setAttribute(attr, on ? 'true' : 'false');
+    });
+    var m = p.getAttribute('data-menu');
+    if (m) [].forEach.call(document.querySelectorAll('[data-menu-item]'), function (a) {
+      if (a.getAttribute('data-menu-item') === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (!b) return;
+    e.preventDefault();
+    go(b.getAttribute('data-go'));
+  });
+  var seen = {};
+  panels.forEach(function (p) { var g = p.getAttribute('data-group'); if (!seen[g]) { seen[g] = 1; go(p.id); } });
+  var h = location.hash.slice(1);
+  if (h && byId(h) && byId(h).classList.contains('state-panel')) go(h);
+})();
+</script>
+<script>
+/* 등록 양식: 할인 유형(정액/정률)·적용 대상(전체/상품 하나)에 따라 입력 칸을 바꾼다. */
+(function () {
+  [].forEach.call(document.querySelectorAll('form[data-toggle]'), function (f) {
+    function sync() {
+      var vals = [];
+      [].forEach.call(f.querySelectorAll('input[type=radio]:checked'), function (r) { vals.push(r.value); });
+      [].forEach.call(f.querySelectorAll('[data-when]'), function (el) { el.hidden = vals.indexOf(el.getAttribute('data-when')) < 0; });
+    }
+    f.addEventListener('change', sync);
+    sync();
+  });
+})();
+</script>
+</body>
+</html>

@@ -357,6 +357,15 @@ class FakeBenefitApplier : BenefitApplier {
         coupons[couponId] = ReservedCoupon(couponId, couponId, "CART", "PLATFORM", "NONE", null, null, discountType, value, max, min)
     }
 
+    /** 견적의 "내 쿠폰" 목록. [coupons] 와 별개로 테스트가 채운다(비어 있으면 목록도 비어 있다). */
+    val usable = mutableListOf<UsableCoupon>()
+
+    fun hold(couponId: Long, name: String = "쿠폰$couponId", expiresAt: LocalDateTime = LocalDateTime.of(2026, 12, 31, 0, 0)) {
+        usable += UsableCoupon(coupons.getValue(couponId), name, expiresAt)
+    }
+
+    override fun listUsable(memberId: Long): List<UsableCoupon> = usable.toList()
+
     private fun lookup(couponIds: Collection<Long>): Map<Long, ReservedCoupon> = couponIds.associateWith {
         coupons[it] ?: throw DomainException(ErrorCode.COUPON_NOT_FOUND)
     }
@@ -414,5 +423,16 @@ class FakePointEarner : PointEarner {
     override fun earnForPurchase(memberId: Long, sellerOrderId: Long, paidAmount: Long): Long {
         calls += Earn(memberId, sellerOrderId, paidAmount)
         return paidAmount / 100
+    }
+}
+
+/** statesOf 호출 횟수와 후보를 기록한다. 응답은 [states] 에 넣은 것만 돌려준다. */
+class FakeReviewStateReader : ReviewStateReader {
+    val states = mutableMapOf<Long, ItemReviewState>()
+    val calls = mutableListOf<List<ReviewCandidate>>()
+
+    override fun statesOf(candidates: List<ReviewCandidate>): Map<Long, ItemReviewState> {
+        calls += candidates
+        return states.filterKeys { id -> candidates.any { it.orderItemId == id } }
     }
 }

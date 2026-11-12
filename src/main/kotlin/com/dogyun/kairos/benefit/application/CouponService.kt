@@ -52,6 +52,17 @@ class CouponService(
         return termsOf(coupons)
     }
 
+    /** 견적의 "내 쿠폰" 목록용 조회(락·UPDATE 없음). 회원의 `AVAILABLE`·만료 전 쿠폰 전부. */
+    @Transactional(readOnly = true)
+    fun listUsableCoupons(memberId: Long): List<UsableCouponResult> {
+        val coupons = couponRepository.findAvailableByMember(memberId, LocalDateTime.now(clock))
+        if (coupons.isEmpty()) return emptyList()
+        val names = policyRepository.findAllByIds(coupons.map { it.policyId }.toSet()).associate { it.id to it.name }
+        return termsOf(coupons).zip(coupons).map { (terms, coupon) ->
+            UsableCouponResult(terms, checkNotNull(names[coupon.policyId]), coupon.expiresAt)
+        }
+    }
+
     /**
      * 쿠폰을 `AVAILABLE → USED` 로 바꾼다(조건부 UPDATE, 쿠폰 ID 오름차순). 영향 행이 0 이면 남의 것·없는 쿠폰은 `COUPON_NOT_FOUND`,
      * 그 밖(사용됨·만료·동시 사용 경합)은 `COUPON_NOT_AVAILABLE`. 주문 생성 트랜잭션 안에서 `member_point` 락 뒤에 불려야 한다(ADR 0004).

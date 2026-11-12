@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
+import { percentToBp, amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, formatPoints, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
 
 describe("money", () => {
+  it("formatPoints는_17700을_17_700P로_만든다", () => {
+    expect(formatPoints(17700)).toBe("17,700P");
+    expect(formatPoints(0)).toBe("0P");
+  });
   it("formatKrw는_27300을_27_300원으로_만든다", () => {
     expect(formatKrw(27300)).toBe("27,300원");
   });
@@ -59,5 +63,33 @@ describe("floorDiv와 mod", () => {
     expect(mod(754, 60)).toBe(34);
     expect(floorDiv(-1, 60)).toBe(-1);
     expect(mod(-1, 60)).toBe(59);
+  });
+});
+
+describe("percentToBp", () => {
+  it("정수_퍼센트를_bp로_바꾼다", () => {
+    expect(percentToBp(10)).toBe(1000);
+    expect(percentToBp(1)).toBe(100);
+    expect(percentToBp(100)).toBe(10000);
+  });
+  it("범위_밖이거나_정수가_아니면_throw", () => {
+    for (const bad of [0, 101, 10.5, Number.NaN]) expect(() => percentToBp(bad)).toThrow();
+  });
+});
+
+describe("ratingFillPercent", () => {
+  it("평균_별점을_채움_비율로_바꾼다", async () => {
+    const { ratingFillPercent } = await import("@/lib/money");
+    expect(ratingFillPercent(4.6)).toBe(92);
+    expect(ratingFillPercent(5)).toBe(100);
+    expect(ratingFillPercent(0)).toBe(0);
+    expect(ratingFillPercent(3.5)).toBe(70);
+    expect(ratingFillPercent(0.1)).toBe(2);
+  });
+  it("범위_밖이거나_숫자가_아니면_0에서_100으로_맞춘다", async () => {
+    const { ratingFillPercent } = await import("@/lib/money");
+    expect(ratingFillPercent(7)).toBe(100);
+    expect(ratingFillPercent(-1)).toBe(0);
+    expect(ratingFillPercent(Number.NaN)).toBe(0);
   });
 });

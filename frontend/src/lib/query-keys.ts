@@ -23,7 +23,9 @@ export const queryKeys = {
   checkout: {
     /** 모든 견적(접두사). 장바구니가 바뀌면 통째로 무효화한다. */
     quotes: ["checkout", "quote"] as const,
-    quote: (items: unknown) => ["checkout", "quote", items] as const,
+    /** benefit 이 없으면 넷째 원소를 넣지 않는다(`quotes`·기존 키의 접두사가 계속 맞는다). */
+    quote: (items: unknown, benefit?: unknown) =>
+      (benefit === undefined ? ["checkout", "quote", items] : ["checkout", "quote", items, benefit]) as readonly unknown[],
   },
   orders: {
     root: ["orders"] as const,
@@ -54,4 +56,38 @@ export const queryKeys = {
     product: (id: number) => ["admin", "product", id] as const,
     sellers: (params?: Params) => ["admin", "sellers", params ?? {}] as const,
   },
+  coupons: {
+    policiesRoot: ["coupons", "policies"] as const,
+    policies: (productId?: number) => ["coupons", "policies", productId ?? null] as const,
+    mineRoot: ["coupons", "mine"] as const,
+    mine: (params?: Params) => ["coupons", "mine", params ?? {}] as const,
+  },
+  points: {
+    root: ["points"] as const,
+    summary: ["points", "summary"] as const,
+    transactions: (params?: Params) => ["points", "transactions", params ?? {}] as const,
+  },
+  reviews: {
+    productRoot: (productId: number) => ["reviews", "product", productId] as const,
+    product: (productId: number, page: number) => ["reviews", "product", productId, page] as const,
+    mineRoot: ["reviews", "mine"] as const,
+    mine: (params?: Params) => ["reviews", "mine", params ?? {}] as const,
+  },
+  likes: {
+    root: ["likes"] as const,
+    list: (params?: Params) => ["likes", "list", params ?? {}] as const,
+  },
+  sellerCoupons: {
+    lists: ["sellerCoupons", "list"] as const,
+    list: (params?: Params) => ["sellerCoupons", "list", params ?? {}] as const,
+  },
+  sellerReviews: {
+    lists: ["sellerReviews", "list"] as const,
+    list: (params?: Params) => ["sellerReviews", "list", params ?? {}] as const,
+  },
+  adminCoupons: {
+    lists: ["adminCoupons", "list"] as const,
+    list: (params?: Params) => ["adminCoupons", "list", params ?? {}] as const,
+  },
+  adminMemberPoints: (memberId: number, params?: Params) => ["adminMemberPoints", memberId, params ?? {}] as const,
 } as const;

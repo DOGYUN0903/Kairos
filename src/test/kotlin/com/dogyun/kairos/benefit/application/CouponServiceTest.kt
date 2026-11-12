@@ -122,4 +122,28 @@ class CouponServiceTest {
         policyService.endBySeller(1L, policyId)
         assertEquals("ENDED", policyRepository.findById(policyId)!!.status.name)
     }
+
+    @Test
+    fun 정책_목록_한_페이지의_상품_이름은_한_번에_조회한다() {
+        productReader.put(10L, 7L); productReader.put(11L, 7L)
+        productReader.putName(10L, "티셔츠"); productReader.putName(11L, "청바지")
+        policyService.createBySeller(7L, command(targetType = "PRODUCT", targetProductId = 10L))
+        policyService.createBySeller(7L, command(targetType = "PRODUCT", targetProductId = 11L))
+        policyService.createBySeller(7L, command(targetType = "SELLER"))
+
+        val result = policyService.listForSeller(7L, 0, 20).content
+
+        assertEquals(1, productReader.findProductNamesCalls)
+        assertEquals(setOf("티셔츠", "청바지", null), result.map { it.targetProductName }.toSet())
+    }
+
+    @Test
+    fun 삭제된_상품은_null이다() {
+        productReader.put(10L, 7L)
+        productReader.putName(10L, "티셔츠")
+        policyService.createBySeller(7L, command(targetType = "PRODUCT", targetProductId = 10L))
+        productReader.names.remove(10L)
+
+        assertEquals(null, policyService.listForSeller(7L, 0, 20).content.single().targetProductName)
+    }
 }

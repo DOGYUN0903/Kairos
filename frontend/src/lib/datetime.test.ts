@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString } from "@/lib/datetime";
+import { fromDateTimeInput, formatDateTimeMinute, formatMonthDay, hasPassedKst, formatCountdown, formatDate, formatDateTime, secondsUntilKst, toLocalDateTimeString } from "@/lib/datetime";
 
 describe("datetime", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -50,5 +50,22 @@ describe("formatCountdown", () => {
   it("MM:SS로_만든다", () => {
     expect(formatCountdown(754)).toBe("12:34");
     expect(formatCountdown(0)).toBe("00:00");
+  });
+});
+
+describe("datetime F3", () => {
+  const t = Date.parse("2026-11-12T10:00:00+09:00");
+  it("hasPassedKst는_KST_기준으로_지났는지_본다", () => {
+    expect(hasPassedKst("2026-11-12T10:00:00", t)).toBe(true);
+    expect(hasPassedKst("2026-11-12T10:00:00", t - 1000)).toBe(false);
+  });
+  it("fromDateTimeInput은_초를_붙이고_형식이_아니면_null", () => {
+    expect(fromDateTimeInput("2026-11-12T10:00")).toBe("2026-11-12T10:00:00");
+    expect(fromDateTimeInput("2026-11-12")).toBeNull();
+    expect(fromDateTimeInput("")).toBeNull();
+  });
+  it("formatDateTimeMinute·formatMonthDay", () => {
+    expect(formatDateTimeMinute("2026-11-12T10:05:30")).toBe("11월 12일 10:05");
+    expect(formatMonthDay("2026-01-05T00:00:00")).toBe("1월 5일");
   });
 });

@@ -30,3 +30,21 @@ describe("resolveError", () => {
     expect(resolveError(new ApiError(422, "ORDER_INVALID", "x", null)).kind).toBe("form");
   });
 });
+
+describe("resolveError F3", () => {
+  it("후기·쿠폰_정책_양식_오류는_form", () => {
+    expect(resolveError(new ApiError(400, "REVIEW_INVALID", "x", null)).kind).toBe("form");
+    expect(resolveError(new ApiError(400, "COUPON_POLICY_INVALID", "x", null)).kind).toBe("form");
+  });
+  it("REVIEW_NOT_FOUND는_toast_서버_메시지", () => {
+    expect(resolveError(new ApiError(404, "REVIEW_NOT_FOUND", "후기 없음", null))).toEqual({
+      kind: "toast",
+      message: "후기 없음",
+      traceId: null,
+    });
+  });
+  it("쿠폰_소진·종료_메시지", () => {
+    expect(resolveError(new ApiError(409, "COUPON_SOLD_OUT", "x", null)).message).toBe("쿠폰이 모두 소진되었습니다.");
+    expect(resolveError(new ApiError(409, "COUPON_POLICY_ENDED", "x", null)).message).toBe("종료된 쿠폰입니다.");
+  });
+});

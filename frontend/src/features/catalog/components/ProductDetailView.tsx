@@ -3,7 +3,7 @@
 import { ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { ApiError } from "@/api/client";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCategories, useProduct, type ProductDetail } from "@/features/catalog/api";
 import { findCategoryPath } from "@/features/catalog/category-path";
 import { AddToCartButtons } from "@/features/cart/components/AddToCartButtons";
+import { ProductCouponSection } from "@/features/coupons/components/ProductCouponSection";
+import { ProductReviewSection } from "@/features/reviews/components/ProductReviewSection";
 import { LikeButton } from "@/features/catalog/components/LikeButton";
 import { OptionSelector } from "@/features/catalog/components/OptionSelector";
 import { ProductGallery } from "@/features/catalog/components/ProductGallery";
@@ -99,6 +101,8 @@ function PurchasePanel({ product }: { product: ProductDetail }) {
         </div>
       </div>
 
+      <ProductCouponSection productId={product.productId} />
+
       {product.soldOut && (
         <p role="status" className="notice notice-warn mt-4">
           품절된 상품입니다.
@@ -182,6 +186,9 @@ export function ProductDetailView({ productId }: { productId: number }) {
           )}
         </div>
       </section>
+      <Suspense fallback={<Skeleton aria-busy="true" aria-label="후기를 불러오는 중" className="mx-auto mb-16 h-40 max-w-[960px]" />}>
+        <ProductReviewSection productId={product.productId} reviewCount={product.reviewCount} averageRating={product.averageRating} />
+      </Suspense>
     </div>
   );
 }

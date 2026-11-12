@@ -1,4 +1,4 @@
-type Kind = "seller" | "brand" | "product" | "changeRequest" | "order" | "sellerOrder" | "orderItem" | "payment";
+type Kind = "seller" | "brand" | "product" | "changeRequest" | "order" | "sellerOrder" | "orderItem" | "payment" | "coupon" | "couponPolicy" | "reply";
 type Tone = "pending" | "onsale" | "rejected" | "paused" | "ended" | "info";
 
 // 스펙 §9-4 표 그대로.
@@ -58,6 +58,19 @@ const table: Record<Kind, Record<string, [string, Tone]>> = {
     PARTIAL_CANCELED: ["부분 환불", "paused"],
     CANCELED: ["전액 환불", "ended"],
     FAILED: ["실패", "rejected"],
+  },
+  coupon: {
+    AVAILABLE: ["사용 가능", "onsale"],
+    USED: ["사용 완료", "ended"],
+    EXPIRED: ["기간 만료", "paused"],
+  },
+  couponPolicy: {
+    ACTIVE: ["진행 중", "onsale"],
+    ENDED: ["종료", "ended"],
+    PERIOD_OVER: ["기간 종료", "paused"],
+  },
+  reply: {
+    UNANSWERED: ["미답변", "pending"],
   },
 };
 

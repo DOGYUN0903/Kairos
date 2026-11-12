@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 주문서 (쿠폰·포인트)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="user-cart.html"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 3개">3</span>장바구니</a>
+      <a href="user-order-list.html"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <div class="board-nav__row"><strong>상태별 보기</strong><button type="button" data-go="co-none" aria-pressed="false">① 쿠폰 미선택</button><button type="button" data-go="co-applied" aria-pressed="false">② 쿠폰·포인트 적용</button><button type="button" data-go="co-dialog" aria-pressed="false">③ 쿠폰 선택 창</button><button type="button" data-go="co-error" aria-pressed="false">④ 포인트 입력 오류</button><button type="button" data-go="co-zero" aria-pressed="false">⑤ 0원 결제</button></div>
+    
+  </nav>
+
+  <div class="page-head">
+    <h1 id="co-h">주문서</h1>
+    <ol class="steps" aria-label="구매 단계">
+      <li>장바구니</li><li aria-current="step">주문서</li><li>주문 완료</li>
+    </ol>
+  </div>
+
+  <section id="co-none" class="state-panel" data-group="main" hidden>
+<h2 class="board__label" style="margin-bottom:16px">① 쿠폰 미선택 — 처음 들어온 상태. 쿠폰은 자동 적용하지 않고, 쓸 수 있는 장수를 보여 줍니다</h2><div class="buy-layout">
+      <div class="stack" style="gap:24px">
+        <section class="card" aria-labelledby="addr-h--co-none">
+          <div class="card__head">
+            <h2 id="addr-h--co-none">배송지</h2>
+            <button type="button" class="btn btn-ghost btn-sm">최근 배송지 불러오기</button>
+          </div>
+          <div class="card__body">
+            <form class="form-grid" action="#" onsubmit="return false">
+              <div class="field">
+                <label for="receiver--co-none">수령인<span class="req" aria-hidden="true">*</span></label>
+                <input id="receiver--co-none" class="input" type="text" maxlength="50" value="김민지" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="phone--co-none">연락처<span class="req" aria-hidden="true">*</span></label>
+                <input id="phone--co-none" class="input" type="tel" maxlength="20" value="010-1234-5678" placeholder="010-0000-0000" autocomplete="tel">
+              </div>
+              <div class="field span-2">
+                <label for="zip--co-none">우편번호<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-group" style="max-width:320px">
+                  <input id="zip--co-none" class="input" type="text" maxlength="10" value="04524" autocomplete="postal-code">
+                  <button type="button" class="btn">주소 검색</button>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label for="addr1--co-none">주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr1--co-none" class="input" type="text" maxlength="200" value="서울특별시 중구 세종대로 110" autocomplete="address-line1">
+              </div>
+              <div class="field span-2">
+                <label for="addr2--co-none">상세 주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr2--co-none" class="input" type="text" maxlength="200" value="302호" autocomplete="address-line2">
+                <span class="hint">주소 검색을 쓸 수 없을 때는 우편번호와 주소를 직접 입력할 수 있습니다.</span>
+              </div>
+              <div class="field span-2">
+                <label for="memo--co-none">배송 메모 <span class="muted" style="font-weight:400">(선택)</span></label>
+                <input id="memo--co-none" class="input" type="text" maxlength="200" value="부재 시 문 앞에 놓아 주세요">
+                <span class="counter">17 / 200</span>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section aria-label="주문 상품">
+          <div class="row-between">
+            <h2 class="section-title">주문 상품 <span class="muted" style="font-weight:500">2</span></h2>
+            <span class="small muted">판매자별로 따로 배송됩니다</span>
+          </div>
+          <div class="notice mt-16" role="status"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg><span><strong>쓸 수 있는 쿠폰이 있습니다.</strong> 쿠폰을 쓸 수 있는 상품이 2개, 장바구니 쿠폰이 1장 있습니다. 쿠폰은 자동으로 적용되지 않으니 직접 선택해 주세요.</span></div>
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 B]</div>
+                <span class="line-item__name">와이드 데님 팬츠</span>
+                <div class="line-item__opt">인디고 / 32 · 30,000원</div>
+              </div>
+              <div class="line-item__qty">수량 1개</div>
+              <div class="line-item__amount">30,000원</div>
+            </div>
+            <div class="coupon-line"><span class="muted">상품 쿠폰</span><button type="button" class="btn btn-sm coupon-pick" data-go="co-dialog">쿠폰 선택<span class="coupon-count">1장 사용 가능</span></button></div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>30,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 C 스튜디오]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 C]</div>
+                <span class="line-item__name">로고 자수 볼캡</span>
+                <div class="line-item__opt">블랙 / FREE · 20,000원</div>
+              </div>
+              <div class="line-item__qty">수량 2개</div>
+              <div class="line-item__amount">40,000원</div>
+            </div>
+            <div class="coupon-line"><span class="muted">상품 쿠폰</span><button type="button" class="btn btn-sm coupon-pick" data-go="co-dialog">쿠폰 선택<span class="coupon-count">2장 사용 가능</span></button></div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>40,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+        </section><section class="card" aria-labelledby="ben-h--co-none">
+          <div class="card__head"><h2 id="ben-h--co-none">할인·포인트</h2><span class="small muted">선택할 때마다 결제 금액이 다시 계산됩니다</span></div>
+          <div class="benefit-row"><div class="benefit-row__label">장바구니 쿠폰<small>주문에 한 장</small></div><div class="benefit-row__body"><div class="benefit-row__line"><span class="muted">선택한 쿠폰이 없습니다</span><button type="button" class="btn btn-sm coupon-pick" data-go="co-dialog">쿠폰 선택<span class="coupon-count">1장 사용 가능</span></button></div></div></div>
+          <div class="benefit-row"><div class="benefit-row__label">포인트<small>보유 20,000P</small></div><div class="benefit-row__body"><div class="point-field"><label class="sr-only" for="pt--co-none">사용할 포인트</label><input id="pt--co-none" class="input" type="text" inputmode="numeric" placeholder="0" value=""><span class="unit">P</span><button type="button" class="btn">최대 사용</button></div>
+          <span class="hint">최대 20,000P까지 사용할 수 있습니다 · 1,000P 이상 보유 시 10P 단위로, 상품 금액의 30%까지 사용</span></div></div>
+        </section>
+      </div>
+      <aside class="buy-layout__side" aria-label="결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>70,000원</dd>
+            
+            <dt>배송비</dt><dd>0원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>무료배송</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>70,000원</strong></div>
+          
+          <button type="button" class="btn btn-primary btn-lg btn-block">70,000원 결제하기</button>
+          <span class="hint">결제하기를 누르면 주문이 만들어지고 결제창이 열립니다</span>
+        </div>
+      </aside>
+    </div>
+</section>
+  <section id="co-applied" class="state-panel" data-group="main" hidden>
+<h2 class="board__label" style="margin-bottom:16px">② 상품 쿠폰 · 장바구니 쿠폰 · 포인트 적용 — 화면의 모든 숫자는 견적 응답 값</h2><div class="buy-layout">
+      <div class="stack" style="gap:24px">
+        <section class="card" aria-labelledby="addr-h--co-applied">
+          <div class="card__head">
+            <h2 id="addr-h--co-applied">배송지</h2>
+            <button type="button" class="btn btn-ghost btn-sm">최근 배송지 불러오기</button>
+          </div>
+          <div class="card__body">
+            <form class="form-grid" action="#" onsubmit="return false">
+              <div class="field">
+                <label for="receiver--co-applied">수령인<span class="req" aria-hidden="true">*</span></label>
+                <input id="receiver--co-applied" class="input" type="text" maxlength="50" value="김민지" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="phone--co-applied">연락처<span class="req" aria-hidden="true">*</span></label>
+                <input id="phone--co-applied" class="input" type="tel" maxlength="20" value="010-1234-5678" placeholder="010-0000-0000" autocomplete="tel">
+              </div>
+              <div class="field span-2">
+                <label for="zip--co-applied">우편번호<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-group" style="max-width:320px">
+                  <input id="zip--co-applied" class="input" type="text" maxlength="10" value="04524" autocomplete="postal-code">
+                  <button type="button" class="btn">주소 검색</button>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label for="addr1--co-applied">주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr1--co-applied" class="input" type="text" maxlength="200" value="서울특별시 중구 세종대로 110" autocomplete="address-line1">
+              </div>
+              <div class="field span-2">
+                <label for="addr2--co-applied">상세 주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr2--co-applied" class="input" type="text" maxlength="200" value="302호" autocomplete="address-line2">
+                <span class="hint">주소 검색을 쓸 수 없을 때는 우편번호와 주소를 직접 입력할 수 있습니다.</span>
+              </div>
+              <div class="field span-2">
+                <label for="memo--co-applied">배송 메모 <span class="muted" style="font-weight:400">(선택)</span></label>
+                <input id="memo--co-applied" class="input" type="text" maxlength="200" value="부재 시 문 앞에 놓아 주세요">
+                <span class="counter">17 / 200</span>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section aria-label="주문 상품">
+          <div class="row-between">
+            <h2 class="section-title">주문 상품 <span class="muted" style="font-weight:500">2</span></h2>
+            <span class="small muted">판매자별로 따로 배송됩니다</span>
+          </div>
+          
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 B]</div>
+                <span class="line-item__name">와이드 데님 팬츠</span>
+                <div class="line-item__opt">인디고 / 32 · 30,000원</div>
+              </div>
+              <div class="line-item__qty">수량 1개</div>
+              <div class="line-item__amount">30,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>신규 회원 2,000원 쿠폰</b><span class="small">30,000원 이상 구매 시</span></span>
+              <span class="row"><span class="minus">−2,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>30,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−2,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 C 스튜디오]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 C]</div>
+                <span class="line-item__name">로고 자수 볼캡</span>
+                <div class="line-item__opt">블랙 / FREE · 20,000원</div>
+              </div>
+              <div class="line-item__qty">수량 2개</div>
+              <div class="line-item__amount">40,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>[판매자 C] 첫 구매 10% 쿠폰</b><span class="small">10% · 최대 5,000원</span></span>
+              <span class="row"><span class="minus">−4,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>40,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−4,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+        </section><section class="card" aria-labelledby="ben-h--co-applied">
+          <div class="card__head"><h2 id="ben-h--co-applied">할인·포인트</h2><span class="small muted">선택할 때마다 결제 금액이 다시 계산됩니다</span></div>
+          <div class="benefit-row"><div class="benefit-row__label">장바구니 쿠폰<small>주문에 한 장</small></div><div class="benefit-row__body"><div class="benefit-row__line"><span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span><b style="font-weight:500">주말 특가 5,000원 장바구니 쿠폰</b><span class="small muted">50,000원 이상 구매 시</span></span><span class="row"><span class="amt-minus">−5,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span></div></div></div>
+          <div class="benefit-row"><div class="benefit-row__label">포인트<small>보유 20,000P</small></div><div class="benefit-row__body"><div class="point-field"><label class="sr-only" for="pt--co-applied">사용할 포인트</label><input id="pt--co-applied" class="input" type="text" inputmode="numeric" value="10,000"><span class="unit">P</span><button type="button" class="btn">최대 사용</button></div>
+          <span class="hint">최대 17,700P까지 사용할 수 있습니다 · 쿠폰을 바꾸면 한도도 달라집니다</span></div></div>
+        </section>
+      </div>
+      <aside class="buy-layout__side" aria-label="결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>70,000원</dd>
+            <dt>상품 쿠폰 할인</dt><dd class="minus">−6,000원</dd>
+            <dt>장바구니 쿠폰 할인</dt><dd class="minus">−5,000원</dd>
+            <dt>포인트 사용</dt><dd class="minus">−10,000P</dd>
+            <dt>배송비</dt><dd>0원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>무료배송</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>49,000원</strong></div>
+          <div class="save-line"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg><span>쿠폰·포인트로 <b>21,000원</b> 할인받았어요</span></div>
+          <button type="button" class="btn btn-primary btn-lg btn-block">49,000원 결제하기</button>
+          <span class="hint">결제하기를 누르면 주문이 만들어지고 결제창이 열립니다</span>
+        </div>
+      </aside>
+    </div>
+</section>
+  <section id="co-dialog" class="state-panel" data-group="main" hidden>
+<h2 class="board__label">③ 쿠폰 선택 창 — "쿠폰 선택"·"변경"을 누르면 열립니다. 왼쪽은 상품 쿠폰(볼캡 줄), 오른쪽은 장바구니 쿠폰</h2>
+    <p class="board__note">②의 상태(상품 쿠폰 신규 회원 2,000원이 상단 팬츠 줄에 적용됨)에서 볼캡 줄의 창을 연 모습입니다. 쓸 수 없는 쿠폰은 흐리게 두고 이유를 보여 주며, 다른 상품에 이미 고른 쿠폰은 "다른 상품에 적용됨"으로 표시합니다. 한 항목에 한 장, 마지막 줄은 "적용 안 함"입니다.</p>
+    <div class="dialog-stage"><div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="cd1-h--co-dialog">
+        <div class="dialog__head"><h3 id="cd1-h--co-dialog">상품 쿠폰 선택</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          <div class="dialog__item">
+            <div class="ph ph-sm">[이미지]</div>
+            <div><div class="line-item__brand">[브랜드 C]</div><div style="font-weight:500">로고 자수 볼캡</div><div class="small muted">블랙 / FREE · 20,000원 × 2 = 40,000원</div></div>
+          </div>
+          <div class="dialog__scroll">
+            <div class="coupon-group-title">사용할 수 있는 쿠폰<span>2</span></div>
+            <div class="coupon coupon--sm is-selected">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 C] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">최소 주문 금액 없음 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><span class="coupon__expect">−4,000원</span><input type="radio" name="S1" checked  aria-label="S1" style="width:18px;height:18px;accent-color:var(--navy)"></div>
+</div>
+            <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><span class="badge badge-moved">다른 상품에 적용됨</span></div>
+    <div class="coupon__name">신규 회원 2,000원 쿠폰</div>
+    <div class="coupon__meta">30,000원 이상 구매 시 · <span class="soon">2026-11-18까지</span></div>
+    
+  </div>
+  <div class="coupon__act"><span class="coupon__expect">−2,000원</span><input type="radio" name="P1"   aria-label="P1" style="width:18px;height:18px;accent-color:var(--navy)"></div>
+</div>
+            <div class="hint" style="margin-top:-4px">"다른 상품에 적용됨" 쿠폰을 고르면 이 상품으로 옮겨지고, 이전 상품에서는 해제됩니다.</div>
+            <div class="coupon-group-title" style="margin-top:8px">사용할 수 없는 쿠폰<span>1</span></div>
+            <div class="coupon coupon--sm is-disabled">
+  <div class="coupon__value"><strong>20%</strong><small>최대 10,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">주말 20% 특가 쿠폰</div>
+    <div class="coupon__meta">2026-11-30까지</div>
+    <div class="coupon__reason">50,000원 이상 구매 시 사용 가능</div>
+  </div>
+  <div class="coupon__act"><input type="radio" name="P2"  disabled aria-label="P2" style="width:18px;height:18px;accent-color:var(--navy)"></div>
+</div>
+            <label class="coupon-none"><input type="radio" name="none1"> 적용 안 함</label>
+          </div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">적용하기</button></div>
+      </div><div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="cd2-h--co-dialog">
+        <div class="dialog__head"><h3 id="cd2-h--co-dialog">장바구니 쿠폰 선택</h3><button type="button" class="dialog__x" aria-label="닫기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="dialog__body">
+          <p class="dialog__sub">주문에 한 장만 사용할 수 있습니다.</p>
+          <div class="dialog__scroll">
+            <div class="coupon-group-title">사용할 수 있는 쿠폰<span>1</span></div>
+            <div class="coupon coupon--sm is-selected">
+  <div class="coupon__value"><strong>5,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">주말 특가 5,000원 장바구니 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-12-15까지</div>
+    
+  </div>
+  <div class="coupon__act"><span class="coupon__expect">−5,000원</span><input type="radio" name="C1" checked  aria-label="C1" style="width:18px;height:18px;accent-color:var(--navy)"></div>
+</div>
+            <div class="coupon-group-title" style="margin-top:8px">사용할 수 없는 쿠폰<span>1</span></div>
+            <div class="coupon coupon--sm is-disabled">
+  <div class="coupon__value"><strong>10%</strong><small>최대 8,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">VIP 10% 장바구니 쿠폰</div>
+    <div class="coupon__meta">2026-11-30까지</div>
+    <div class="coupon__reason">80,000원 이상 구매 시 사용 가능</div>
+  </div>
+  <div class="coupon__act"><input type="radio" name="C2"  disabled aria-label="C2" style="width:18px;height:18px;accent-color:var(--navy)"></div>
+</div>
+            <label class="coupon-none"><input type="radio" name="none2"> 적용 안 함</label>
+          </div>
+        </div>
+        <div class="dialog__foot"><button type="button" class="btn btn-ghost">취소</button><button type="button" class="btn btn-primary">적용하기</button></div>
+      </div></div>
+</section>
+  <section id="co-error" class="state-panel" data-group="main" hidden>
+<h2 class="board__label" style="margin-bottom:16px">④ 포인트 입력 오류 — 견적을 부르기 전에 칸 아래에 안내하고, 금액·결제 버튼은 직전 견적 그대로 막아 둡니다</h2><div class="buy-layout">
+      <div class="stack" style="gap:24px">
+        <section class="card" aria-labelledby="addr-h--co-error">
+          <div class="card__head">
+            <h2 id="addr-h--co-error">배송지</h2>
+            <button type="button" class="btn btn-ghost btn-sm">최근 배송지 불러오기</button>
+          </div>
+          <div class="card__body">
+            <form class="form-grid" action="#" onsubmit="return false">
+              <div class="field">
+                <label for="receiver--co-error">수령인<span class="req" aria-hidden="true">*</span></label>
+                <input id="receiver--co-error" class="input" type="text" maxlength="50" value="김민지" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="phone--co-error">연락처<span class="req" aria-hidden="true">*</span></label>
+                <input id="phone--co-error" class="input" type="tel" maxlength="20" value="010-1234-5678" placeholder="010-0000-0000" autocomplete="tel">
+              </div>
+              <div class="field span-2">
+                <label for="zip--co-error">우편번호<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-group" style="max-width:320px">
+                  <input id="zip--co-error" class="input" type="text" maxlength="10" value="04524" autocomplete="postal-code">
+                  <button type="button" class="btn">주소 검색</button>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label for="addr1--co-error">주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr1--co-error" class="input" type="text" maxlength="200" value="서울특별시 중구 세종대로 110" autocomplete="address-line1">
+              </div>
+              <div class="field span-2">
+                <label for="addr2--co-error">상세 주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr2--co-error" class="input" type="text" maxlength="200" value="302호" autocomplete="address-line2">
+                <span class="hint">주소 검색을 쓸 수 없을 때는 우편번호와 주소를 직접 입력할 수 있습니다.</span>
+              </div>
+              <div class="field span-2">
+                <label for="memo--co-error">배송 메모 <span class="muted" style="font-weight:400">(선택)</span></label>
+                <input id="memo--co-error" class="input" type="text" maxlength="200" value="부재 시 문 앞에 놓아 주세요">
+                <span class="counter">17 / 200</span>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section aria-label="주문 상품">
+          <div class="row-between">
+            <h2 class="section-title">주문 상품 <span class="muted" style="font-weight:500">2</span></h2>
+            <span class="small muted">판매자별로 따로 배송됩니다</span>
+          </div>
+          
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 B]</div>
+                <span class="line-item__name">와이드 데님 팬츠</span>
+                <div class="line-item__opt">인디고 / 32 · 30,000원</div>
+              </div>
+              <div class="line-item__qty">수량 1개</div>
+              <div class="line-item__amount">30,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>신규 회원 2,000원 쿠폰</b><span class="small">30,000원 이상 구매 시</span></span>
+              <span class="row"><span class="minus">−2,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>30,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−2,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 C 스튜디오]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 C]</div>
+                <span class="line-item__name">로고 자수 볼캡</span>
+                <div class="line-item__opt">블랙 / FREE · 20,000원</div>
+              </div>
+              <div class="line-item__qty">수량 2개</div>
+              <div class="line-item__amount">40,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>[판매자 C] 첫 구매 10% 쿠폰</b><span class="small">10% · 최대 5,000원</span></span>
+              <span class="row"><span class="minus">−4,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>40,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−4,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+        </section><section class="card" aria-labelledby="ben-h--co-error">
+          <div class="card__head"><h2 id="ben-h--co-error">할인·포인트</h2><span class="small muted">선택할 때마다 결제 금액이 다시 계산됩니다</span></div>
+          <div class="benefit-row"><div class="benefit-row__label">장바구니 쿠폰<small>주문에 한 장</small></div><div class="benefit-row__body"><div class="benefit-row__line"><span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span><b style="font-weight:500">주말 특가 5,000원 장바구니 쿠폰</b><span class="small muted">50,000원 이상 구매 시</span></span><span class="row"><span class="amt-minus">−5,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span></div></div></div>
+          <div class="benefit-row"><div class="benefit-row__label">포인트<small>보유 20,000P</small></div><div class="benefit-row__body"><div class="point-field"><label class="sr-only" for="pt--co-error">사용할 포인트</label><input id="pt--co-error" class="input is-error" type="text" inputmode="numeric" value="17,850" aria-invalid="true" aria-describedby="pt-err--co-error"><span class="unit">P</span><button type="button" class="btn">최대 사용</button></div>
+          <span id="pt-err--co-error" class="error-text" role="alert">최대 17,700P까지 사용할 수 있습니다</span>
+          <span class="hint">입력이 올바르지 않아 금액은 바뀌지 않았습니다 · 1,000P 이상 보유 시 10P 단위로, 상품 금액의 30%까지 사용</span></div></div>
+        </section><section class="card" aria-label="다른 입력 오류 예시">
+          <div class="card__head"><h2>다른 입력 오류 예시</h2><span class="badge badge-outline">안내 문구 모음</span></div>
+          <div class="benefit-row">
+            <div class="benefit-row__label">10P 단위가 아닐 때</div>
+            <div class="benefit-row__body"><div class="point-field"><input class="input is-error" type="text" value="12,345" aria-label="10P 단위 오류 예시" readonly><span class="unit">P</span></div><span class="error-text">10P 단위로 입력해 주세요</span></div>
+          </div>
+          <div class="benefit-row">
+            <div class="benefit-row__label">보유 1,000P 미만<small>보유 800P</small></div>
+            <div class="benefit-row__body"><div class="point-field"><input class="input" type="text" value="0" disabled aria-label="보유 부족 예시"><span class="unit">P</span><button type="button" class="btn" disabled>최대 사용</button></div><span class="hint">1,000P 이상 보유 시 사용할 수 있습니다</span></div>
+          </div>
+        </section>
+      </div>
+      <aside class="buy-layout__side" aria-label="결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>70,000원</dd>
+            <dt>상품 쿠폰 할인</dt><dd class="minus">−6,000원</dd>
+            <dt>장바구니 쿠폰 할인</dt><dd class="minus">−5,000원</dd>
+            <dt>배송비</dt><dd>0원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>무료배송</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>59,000원</strong></div>
+          
+          <button type="button" class="btn btn-primary btn-lg btn-block" disabled>59,000원 결제하기</button>
+          <span class="hint">포인트 입력을 확인해 주세요</span>
+        </div>
+      </aside>
+    </div>
+</section>
+  <section id="co-zero" class="state-panel" data-group="main" hidden>
+<h2 class="board__label" style="margin-bottom:16px">⑤ 0원 결제 — 쿠폰이 상품 금액 전부를 덮고 배송비가 0원일 때만. 버튼은 "주문하기", 포인트 입력은 막힘</h2><div class="buy-layout">
+      <div class="stack" style="gap:24px">
+        <section class="card" aria-labelledby="addr-h--co-zero">
+          <div class="card__head">
+            <h2 id="addr-h--co-zero">배송지</h2>
+            <button type="button" class="btn btn-ghost btn-sm">최근 배송지 불러오기</button>
+          </div>
+          <div class="card__body">
+            <form class="form-grid" action="#" onsubmit="return false">
+              <div class="field">
+                <label for="receiver--co-zero">수령인<span class="req" aria-hidden="true">*</span></label>
+                <input id="receiver--co-zero" class="input" type="text" maxlength="50" value="김민지" autocomplete="name">
+              </div>
+              <div class="field">
+                <label for="phone--co-zero">연락처<span class="req" aria-hidden="true">*</span></label>
+                <input id="phone--co-zero" class="input" type="tel" maxlength="20" value="010-1234-5678" placeholder="010-0000-0000" autocomplete="tel">
+              </div>
+              <div class="field span-2">
+                <label for="zip--co-zero">우편번호<span class="req" aria-hidden="true">*</span></label>
+                <div class="input-group" style="max-width:320px">
+                  <input id="zip--co-zero" class="input" type="text" maxlength="10" value="04524" autocomplete="postal-code">
+                  <button type="button" class="btn">주소 검색</button>
+                </div>
+              </div>
+              <div class="field span-2">
+                <label for="addr1--co-zero">주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr1--co-zero" class="input" type="text" maxlength="200" value="서울특별시 중구 세종대로 110" autocomplete="address-line1">
+              </div>
+              <div class="field span-2">
+                <label for="addr2--co-zero">상세 주소<span class="req" aria-hidden="true">*</span></label>
+                <input id="addr2--co-zero" class="input" type="text" maxlength="200" value="302호" autocomplete="address-line2">
+                <span class="hint">주소 검색을 쓸 수 없을 때는 우편번호와 주소를 직접 입력할 수 있습니다.</span>
+              </div>
+              <div class="field span-2">
+                <label for="memo--co-zero">배송 메모 <span class="muted" style="font-weight:400">(선택)</span></label>
+                <input id="memo--co-zero" class="input" type="text" maxlength="200" value="부재 시 문 앞에 놓아 주세요">
+                <span class="counter">17 / 200</span>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section aria-label="주문 상품">
+          <div class="row-between">
+            <h2 class="section-title">주문 상품 <span class="muted" style="font-weight:500">2</span></h2>
+            <span class="small muted">판매자별로 따로 배송됩니다</span>
+          </div>
+          
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 B 상사]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 B]</div>
+                <span class="line-item__name">와이드 데님 팬츠</span>
+                <div class="line-item__opt">인디고 / 32 · 30,000원</div>
+              </div>
+              <div class="line-item__qty">수량 1개</div>
+              <div class="line-item__amount">30,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>[이벤트] 100% 체험 쿠폰</b><span class="small">100% · 최대 30,000원</span></span>
+              <span class="row"><span class="minus">−30,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>30,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−30,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+          <div class="seller-group">
+            <div class="seller-group__head"><span class="seller-group__name"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M4 9h16"/><path d="M10 20v-6h4v6"/></svg>[판매자 C 스튜디오]</span></div>
+            <div class="line-item line-item--plain">
+              <div class="ph ph-72">[이미지]</div>
+              <div class="line-item__info">
+                <div class="line-item__brand">[브랜드 C]</div>
+                <span class="line-item__name">로고 자수 볼캡</span>
+                <div class="line-item__opt">블랙 / FREE · 20,000원</div>
+              </div>
+              <div class="line-item__qty">수량 2개</div>
+              <div class="line-item__amount">40,000원</div>
+            </div>
+            <div class="coupon-line">
+              <span class="coupon-line__name"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span><b>[이벤트] 100% 체험 쿠폰</b><span class="small">100% · 최대 40,000원</span></span>
+              <span class="row"><span class="minus">−40,000원</span><button type="button" class="link-btn" data-go="co-dialog">변경</button></span>
+            </div>
+            <div class="seller-group__foot">
+              <span>상품 금액<b>40,000원</b></span><span class="sep" aria-hidden="true"></span><span>상품 쿠폰 할인<b class="amt-minus">−40,000원</b></span><span class="sep" aria-hidden="true"></span><span>배송비<b>무료</b></span>
+            </div>
+          </div>
+        </section><section class="card" aria-labelledby="ben-h--co-zero">
+          <div class="card__head"><h2 id="ben-h--co-zero">할인·포인트</h2><span class="small muted">선택할 때마다 결제 금액이 다시 계산됩니다</span></div>
+          <div class="benefit-row"><div class="benefit-row__label">장바구니 쿠폰<small>주문에 한 장</small></div><div class="benefit-row__body"><div class="benefit-row__line"><span class="muted">사용 가능한 쿠폰이 없습니다</span></div></div></div>
+          <div class="benefit-row"><div class="benefit-row__label">포인트<small>보유 20,000P</small></div><div class="benefit-row__body"><div class="point-field"><label class="sr-only" for="pt--co-zero">사용할 포인트</label><input id="pt--co-zero" class="input" type="text" value="0" disabled aria-describedby="pt-why--co-zero"><span class="unit">P</span><button type="button" class="btn" disabled>최대 사용</button></div>
+          <span id="pt-why--co-zero" class="hint">결제 금액이 0원이라 포인트를 사용할 수 없습니다</span></div></div>
+        </section>
+      </div>
+      <aside class="buy-layout__side" aria-label="결제 금액">
+        <div class="summary-panel">
+          <h2>결제 금액</h2>
+          <dl class="sum-rows">
+            <dt>상품 금액</dt><dd>70,000원</dd>
+            <dt>상품 쿠폰 할인</dt><dd class="minus">−70,000원</dd>
+            <dt>배송비</dt><dd>0원</dd>
+            <div class="sub"><span>판매자 2곳</span><span>무료배송</span></div>
+          </dl>
+          <div class="sum-total"><span>결제 금액</span><strong>0원</strong></div>
+          
+          <button type="button" class="btn btn-primary btn-lg btn-block">주문하기</button>
+          <span class="hint">결제 금액이 0원이라 결제창 없이 바로 주문이 완료됩니다</span>
+        </div>
+      </aside>
+    </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+<script>
+/* 시안 상태 전환: data-go="패널 id" 를 누르면 같은 data-group 의 패널만 보인다. 주소 뒤 #패널id 로 바로 열 수도 있다. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.state-panel'));
+  var gos = [].slice.call(document.querySelectorAll('[data-go]'));
+  function byId(id) { return document.getElementById(id); }
+  function go(id) {
+    var p = byId(id); if (!p) return;
+    var g = p.getAttribute('data-group');
+    panels.forEach(function (q) { if (q.getAttribute('data-group') === g) q.hidden = (q !== p); });
+    gos.forEach(function (b) {
+      var t = byId(b.getAttribute('data-go'));
+      if (!t || t.getAttribute('data-group') !== g) return;
+      var on = b.getAttribute('data-go') === id;
+      b.setAttribute(b.hasAttribute('aria-selected') ? 'aria-selected' : 'aria-pressed', on ? 'true' : 'false');
+    });
+    var m = p.getAttribute('data-menu');
+    if (m) [].forEach.call(document.querySelectorAll('[data-menu-item]'), function (a) {
+      if (a.getAttribute('data-menu-item') === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (!b) return;
+    e.preventDefault();
+    go(b.getAttribute('data-go'));
+  });
+  var seen = {};
+  panels.forEach(function (p) { var g = p.getAttribute('data-group'); if (!seen[g]) { seen[g] = 1; go(p.id); } });
+  var h = location.hash.slice(1);
+  if (h && byId(h) && byId(h).classList.contains('state-panel')) go(h);
+})();
+</script>
+</body>
+</html>

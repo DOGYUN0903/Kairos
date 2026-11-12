@@ -7,6 +7,7 @@ import com.dogyun.kairos.benefit.application.PointService
 import com.dogyun.kairos.order.application.BenefitApplier
 import com.dogyun.kairos.order.application.BenefitReservation
 import com.dogyun.kairos.order.application.ReservedCoupon
+import com.dogyun.kairos.order.application.UsableCoupon
 import com.dogyun.kairos.order.domain.PointUsePolicy
 import org.springframework.stereotype.Component
 
@@ -20,6 +21,9 @@ class BenefitApplierImpl(
 
     override fun quote(memberId: Long, couponIds: Collection<Long>): BenefitReservation =
         reservation(couponService.quoteCoupons(memberId, couponIds), pointService.balanceOf(memberId))
+
+    override fun listUsable(memberId: Long): List<UsableCoupon> =
+        couponService.listUsableCoupons(memberId).map { UsableCoupon(it.terms.toReserved(), it.name, it.expiresAt) }
 
     /** 락 순서: `member_point`(lockBalance) → `coupon`(조건부 UPDATE). */
     override fun reserve(memberId: Long, couponIds: Collection<Long>): BenefitReservation {

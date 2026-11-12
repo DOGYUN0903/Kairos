@@ -8,6 +8,7 @@ function order(over: Partial<{ status: OrderDetail["status"]; expiresAt: string;
   const payment = over.payment === undefined ? "READY" : over.payment;
   return {
     status: over.status ?? "PENDING_PAYMENT",
+    totalAmount: 48000,
     expiresAt: over.expiresAt ?? "2026-11-12T14:36:00",
     payment: payment ? { amount: 48000, refundedAmount: 0, status: payment } : null,
     sellerOrders: [
@@ -21,6 +22,10 @@ describe("canPay", () => {
   it("결제_대기이고_만료_전이며_결제가_진행_중이_아니면_결제할_수_있다", () => {
     expect(canPay(order(), NOW)).toBe(true);
     expect(canPay(order({ payment: null }), NOW)).toBe(true);
+  });
+
+  it("결제_금액이_0원이면_결제창을_열지_않는다", () => {
+    expect(canPay({ ...order(), totalAmount: 0 } as OrderDetail, NOW)).toBe(false);
   });
 
   it("결제_대기가_아니면_결제할_수_없다", () => {

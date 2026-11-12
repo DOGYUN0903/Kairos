@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { Heart, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/auth/useAuth";
 import { useCartCount } from "@/features/cart/api";
 
@@ -67,6 +68,10 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
               )}
               {status === "authenticated" && (
                 <>
+                  <Link className={cn(utilLink, "flex-col gap-0.5 text-[11px]")} href="/my/likes">
+                    <Heart className="h-5 w-5" aria-hidden />
+                    좋아요
+                  </Link>
                   <Link className={`${utilLink} relative`} href="/cart" aria-label={cartCount ? `장바구니 ${cartCount}개` : "장바구니"}>
                     장바구니
                     {cartCount !== null && cartCount > 0 && (
@@ -79,7 +84,7 @@ export function StoreHeader({ minimal = false }: { minimal?: boolean }) {
                     )}
                   </Link>
                   <Link className={utilLink} href="/my/orders">
-                    마이
+                    마이페이지
                   </Link>
                   <Link className={utilLink} href="/seller">
                     판매자 센터

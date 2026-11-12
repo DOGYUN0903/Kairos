@@ -62,8 +62,10 @@ class CouponPolicyService(
     fun listForSeller(sellerId: Long, page: Int, size: Int): PageResult<CouponPolicyResult> =
         toResults(policyRepository.findPageByIssuer(IssuerType.SELLER, sellerId, checkedPage(page), checkedSize(size)))
 
-    private fun toResults(result: PageResult<CouponPolicy>) =
-        PageResult(result.content.map { it.toResult(false) }, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
+    private fun toResults(result: PageResult<CouponPolicy>): PageResult<CouponPolicyResult> {
+        val names = productReader.policyProductNames(result.content)
+        return PageResult(result.content.map { it.toResult(false, it.targetProductId?.let(names::get)) }, result.page, result.size, result.totalElements, result.totalPages, result.hasNext)
+    }
 
     private fun requireProduct(productId: Long): ProductRef =
         productReader.findProduct(productId) ?: throw DomainException(ErrorCode.COUPON_POLICY_INVALID)

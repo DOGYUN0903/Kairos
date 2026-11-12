@@ -16,6 +16,13 @@ export function formatKrw(n: number): string {
   return `${krw.format(v)}원`;
 }
 
+/** 포인트 표기: 17700 → "17,700P". */
+export function formatPoints(n: number): string {
+  const v = assertSafeInt(n, "포인트");
+  if (Number.isNaN(v)) return "포인트 오류";
+  return `${krw.format(v)}P`;
+}
+
 export function discountRate(originalPrice: number, salePrice: number): number {
   const orig = assertSafeInt(originalPrice, "정가");
   const sale = assertSafeInt(salePrice, "판매가");
@@ -70,4 +77,22 @@ export function mod(n: number, d: number): number {
   const nn = assertSafeInt(n, "피제수");
   const dd = positiveDivisor(d);
   return ((nn % dd) + dd) % dd;
+}
+
+/** 정률 쿠폰 입력 %(1~100 정수)를 bp 로. 곱셈만 쓴다. */
+export function percentToBp(percent: number): number {
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) {
+    throw new Error(`퍼센트는 1~100의 정수여야 합니다: ${percent}`);
+  }
+  return percent * 100;
+}
+
+/**
+ * 평균 별점(0~5, 서버 값 소수 한 자리)을 별 채움 너비 %(0~100 정수)로. 4.6 → 92.
+ * 소수 한 자리로 반올림해 10배 한 값(tenths, 0~50)을 `floorDiv(tenths * 100, 50)`(= tenths × 2)으로 퍼센트로 바꾼다. 4.6 → 46 → 92.
+ */
+export function ratingFillPercent(rating: number): number {
+  if (!Number.isFinite(rating)) return 0;
+  const tenths = Math.round(Math.min(Math.max(rating, 0), 5) * 10);
+  return floorDiv(tenths * 100, 50);
 }

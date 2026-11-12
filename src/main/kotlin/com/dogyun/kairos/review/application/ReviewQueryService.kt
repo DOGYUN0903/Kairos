@@ -50,6 +50,7 @@ class ReviewQueryService(
         val urls = imageFileReader.findImages(reviews.flatMap { r -> r.images.map { it.fileId } }.toSet()).mapValues { it.value.url }
         val names = if (reviews.isEmpty()) emptyMap() else nameReader.findMaskedNames(reviews.map { it.memberId }.toSet())
         return page.map { r ->
+            val images = r.images.sortedBy { it.displayOrder }.mapNotNull { img -> urls[img.fileId]?.let { ReviewImageResult(img.fileId, it) } }
             ReviewResult(
                 reviewId = requireNotNull(r.id),
                 orderItemId = r.orderItemId,
@@ -57,7 +58,8 @@ class ReviewQueryService(
                 productName = r.productName,
                 rating = r.rating,
                 content = r.content,
-                imageUrls = r.images.sortedBy { it.displayOrder }.mapNotNull { urls[it.fileId] },
+                imageUrls = images.map { it.url },
+                images = images,
                 writerName = names[r.memberId] ?: UNKNOWN_WRITER,
                 replyContent = r.replyContent,
                 repliedAt = r.repliedAt,

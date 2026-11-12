@@ -14,6 +14,7 @@ import { ConfirmPurchaseButton } from "@/features/orders/components/ConfirmPurch
 import { OrderStatusHeader } from "@/features/orders/components/OrderStatusHeader";
 import { PaymentSummaryCard } from "@/features/orders/components/PaymentSummaryCard";
 import { SellerOrderCard } from "@/features/orders/components/SellerOrderCard";
+import { OrderItemReviewAction, OrderItemReviewNote } from "@/features/reviews/components/OrderItemReviewAction";
 import { ShippingAddressCard } from "@/features/orders/components/ShippingAddressCard";
 import { expiredRecheckInterval, isPastExpiry, shouldRefetchAtExpiry } from "@/features/orders/expiry";
 import { secondsUntilKst } from "@/lib/datetime";
@@ -52,7 +53,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
   if (q.isError && q.error instanceof ApiError && (q.error.code === "ORDER_NOT_FOUND" || q.error.status === 404)) notFound();
 
   return (
-    <div className="container max-w-[1120px] pb-16 pt-9">
+    <div>
       <nav aria-label="현재 위치" className="mb-3 flex gap-2 text-[13px] text-text-2">
         <Link href="/my/orders" className="hover:underline">
           주문 내역
@@ -66,7 +67,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
       ) : !data ? (
         <PageSkeleton />
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-8">
+        <div className="grid gap-6">
           <div>
             <OrderStatusHeader
               order={data}
@@ -85,8 +86,11 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTarget(item)}>
                         취소
                       </button>
-                    ) : null
+                    ) : (
+                      <OrderItemReviewAction orderId={orderId} item={item} />
+                    )
                   }
+                  renderItemNote={(item) => <OrderItemReviewNote item={item} />}
                 />
               ))}
             </div>
@@ -94,11 +98,11 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
               항목 취소는 판매자가 발송하기 전(배송 준비 중)에만 할 수 있습니다. 구매 확정은 배송 완료 후에 할 수 있으며, 확정하면 되돌릴 수 없습니다.
             </p>
           </div>
-          <aside className="flex flex-col gap-4">
+          <aside className="grid grid-cols-2 items-start gap-4">
             <PaymentSummaryCard order={data} />
             <ShippingAddressCard address={data.shippingAddress} />
           </aside>
-          <CancelItemDialog orderId={orderId} item={target} onClose={() => setTarget(null)} />
+          <CancelItemDialog orderId={orderId} item={target} hasCartCoupon={data.cartCouponId != null} onClose={() => setTarget(null)} />
         </div>
       )}
     </div>

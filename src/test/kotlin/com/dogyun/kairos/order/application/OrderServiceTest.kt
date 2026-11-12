@@ -317,4 +317,167 @@ class OrderServiceTest {
         assertEquals(emptyList(), benefitApplier.committed)
         assertEquals(emptyList(), stockManager.calls)
     }
+
+    // ---- F3: 견적의 "적용 가능한 내 쿠폰" ----
+
+    private val twoItems = listOf(OrderItemCommand(31L, 1), OrderItemCommand(32L, 2))
+
+    private fun quoteOf(productCoupons: List<ProductCouponCommand> = emptyList(), cartCouponId: Long? = null) =
+        service.quote(7L, QuoteOrderCommand(twoItems, productCoupons, cartCouponId, 0))
+
+    private fun OrderQuote.lineCoupons(skuId: Long) = items.single { it.skuId == skuId }.availableCoupons
+
+    @Test
+    fun 견적은_항목마다_대상이_맞는_상품_쿠폰과_예상_할인을_준다() {
+        spec6Fixture()
+        benefitApplier.hold(501L)
+        benefitApplier.hold(502L)
+
+        val quote = quoteOf()
+
+        assertEquals(listOf(501L to 2_000L), quote.lineCoupons(31L).map { it.couponId to it.expectedDiscount })
+        assertEquals(listOf(502L to 4_000L, 501L to 2_000L), quote.lineCoupons(32L).map { it.couponId to it.expectedDiscount })
+        assertEquals(true, (quote.lineCoupons(31L) + quote.lineCoupons(32L)).all { it.usable && it.unusableReason == null })
+        val seller = quote.lineCoupons(32L).first()
+        assertEquals(listOf("SELLER", "RATE", 1_000L, 5_000L, null), listOf(seller.issuerType, seller.discountType, seller.discountValue, seller.maxDiscount, seller.minOrderAmount))
+        assertEquals(emptyList(), quote.cartCoupons)
+    }
+
+    @Test
+    fun 장바구니_쿠폰은_상품_쿠폰_적용_뒤_금액으로_판정한다() {
+        spec6Fixture()
+        benefitApplier.hold(503L)
+        benefitApplier.hold(501L)
+        benefitApplier.hold(502L)
+
+        val none = quoteOf().cartCoupons.single()
+        assertEquals(true to 5_000L, none.usable to none.expectedDiscount)
+
+        val withProduct = quoteOf(listOf(ProductCouponCommand(31L, 501L), ProductCouponCommand(32L, 502L)))
+        assertEquals(64_000L, withProduct.itemsAmount - withProduct.productCouponDiscount)
+        val cart = withProduct.cartCoupons.single()
+        assertEquals(true to 5_000L, cart.usable to cart.expectedDiscount)
+    }
+
+    @Test
+    fun 상품_쿠폰으로_합계가_최소_금액_아래로_내려가면_장바구니_쿠폰은_사용_불가다() {
+        spec6Fixture()
+        benefitApplier.cart(504L, min = 69_000)
+        benefitApplier.cart(505L, min = 68_000)
+        benefitApplier.hold(504L)
+        benefitApplier.hold(505L)
+
+        assertEquals(listOf(true, true), quoteOf().cartCoupons.map { it.usable })
+
+        val quote = quoteOf(listOf(ProductCouponCommand(31L, 501L)))
+        val byId = quote.cartCoupons.associateBy { it.couponId }
+        assertEquals(false, byId.getValue(504L).usable)
+        assertEquals("MIN_AMOUNT_NOT_MET", byId.getValue(504L).unusableReason)
+        assertEquals(null, byId.getValue(504L).expectedDiscount)
+        assertEquals(true, byId.getValue(505L).usable)
+    }
+
+    @Test
+    fun 최소_금액_미달_상품_쿠폰은_사용_불가로_목록에_남는다() {
+        spec6Fixture()
+        benefitApplier.product(506L, min = 35_000)
+        benefitApplier.hold(506L)
+
+        val quote = quoteOf()
+
+        val small = quote.lineCoupons(31L).single()
+        assertEquals(false, small.usable)
+        assertEquals("MIN_AMOUNT_NOT_MET", small.unusableReason)
+        assertEquals(null, small.expectedDiscount)
+        assertEquals(true, quote.lineCoupons(32L).single().usable)
+    }
+
+    @Test
+    fun 상품_쿠폰이_전액을_덮으면_장바구니_쿠폰은_할인할_금액이_없다() {
+        spec6Fixture()
+        benefitApplier.product(507L, value = 30_000)
+        benefitApplier.product(508L, value = 40_000)
+        benefitApplier.cart(509L, min = null)
+        benefitApplier.hold(503L)
+        benefitApplier.hold(509L)
+
+        val quote = quoteOf(listOf(ProductCouponCommand(31L, 507L), ProductCouponCommand(32L, 508L)))
+
+        assertEquals(listOf(false, false), quote.cartCoupons.map { it.usable })
+        assertEquals(listOf("NOTHING_TO_DISCOUNT", "NOTHING_TO_DISCOUNT"), quote.cartCoupons.map { it.unusableReason })
+    }
+
+    @Test
+    fun 대상이_다른_쿠폰과_종류가_다른_쿠폰은_목록에_없다() {
+        spec6Fixture()
+        benefitApplier.product(510L, issuer = "SELLER", target = "SELLER", sellerId = 9L)
+        benefitApplier.product(511L, target = "PRODUCT", productId = 999L)
+        benefitApplier.hold(510L)
+        benefitApplier.hold(511L)
+        benefitApplier.hold(503L)
+        benefitApplier.hold(501L)
+
+        val quote = quoteOf()
+
+        assertEquals(listOf(501L), quote.lineCoupons(31L).map { it.couponId })
+        assertEquals(listOf(501L), quote.lineCoupons(32L).map { it.couponId })
+        assertEquals(listOf(503L), quote.cartCoupons.map { it.couponId })
+    }
+
+    @Test
+    fun 정렬은_사용_가능_먼저_예상_할인_큰_순_만료_빠른_순이다() {
+        spec6Fixture()
+        benefitApplier.product(512L, value = 1_000)
+        benefitApplier.product(513L, value = 1_000)
+        benefitApplier.product(514L, value = 9_000, min = 99_000)
+        benefitApplier.hold(512L, expiresAt = LocalDateTime.of(2026, 12, 20, 0, 0))
+        benefitApplier.hold(513L, expiresAt = LocalDateTime.of(2026, 12, 10, 0, 0))
+        benefitApplier.hold(514L)
+        benefitApplier.hold(501L)
+
+        assertEquals(listOf(501L, 513L, 512L, 514L), quoteOf().lineCoupons(31L).map { it.couponId })
+    }
+
+    @Test
+    fun usable인_쿠폰은_고르면_성공하고_아닌_쿠폰은_거절된다() {
+        spec6Fixture()
+        benefitApplier.product(506L, min = 35_000)
+        benefitApplier.product(507L, value = 30_000)
+        benefitApplier.product(508L, value = 40_000)
+        benefitApplier.cart(504L, min = 69_000)
+        benefitApplier.cart(509L, min = null)
+        listOf(501L, 502L, 503L, 504L, 506L, 507L, 508L, 509L).forEach(benefitApplier::hold)
+
+        // (가) 상품 쿠폰: 그 쿠폰 하나만 담아 견적한다.
+        val base = quoteOf()
+        for (line in base.items) for (coupon in line.availableCoupons) {
+            val cmd = listOf(ProductCouponCommand(line.skuId, coupon.couponId))
+            if (coupon.usable) {
+                val result = quoteOf(cmd).items.single { it.skuId == line.skuId }
+                assertEquals(coupon.expectedDiscount, result.productCouponDiscount)
+            } else {
+                assertError(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET) { quoteOf(cmd) }
+            }
+        }
+        // (나) 장바구니 쿠폰: 같은 상품 쿠폰 선택에 cartCouponId 만 더한다.
+        val selections = listOf(
+            emptyList(),
+            listOf(ProductCouponCommand(31L, 501L)),
+            listOf(ProductCouponCommand(31L, 507L), ProductCouponCommand(32L, 508L)),
+        )
+        var checked = 0
+        for (p in selections) {
+            for (coupon in quoteOf(p).cartCoupons) {
+                checked++
+                if (coupon.usable) {
+                    assertEquals(coupon.expectedDiscount, quoteOf(p, coupon.couponId).cartCouponDiscount)
+                } else when (coupon.unusableReason) {
+                    "MIN_AMOUNT_NOT_MET" -> assertError(ErrorCode.COUPON_MIN_AMOUNT_NOT_MET) { quoteOf(p, coupon.couponId) }
+                    "NOTHING_TO_DISCOUNT" -> assertError(ErrorCode.COUPON_NOT_APPLICABLE) { quoteOf(p, coupon.couponId) }
+                    else -> error("알 수 없는 이유: ${coupon.unusableReason}")
+                }
+            }
+        }
+        assertEquals(true, checked > 0)
+    }
 }

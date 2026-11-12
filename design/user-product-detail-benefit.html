@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAIROS — 상품 상세 (쿠폰·후기)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/kairos.css">
+<style>
+  .crumb { display: flex; gap: 8px; font-size: 12px; color: var(--text-2); margin: 20px 0; flex-wrap: wrap; }
+  .crumb a:hover { color: var(--navy); }
+  .detail { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 56px; }
+  .gallery .main { aspect-ratio: 1 / 1; }
+  .thumbs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px; }
+  .thumbs button { padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: none; overflow: hidden; }
+  .thumbs button[aria-current="true"] { border-color: var(--navy); border-width: 2px; }
+  .thumbs .ph { font-size: 10px; border-radius: 0; }
+
+  .buy { position: sticky; top: 96px; align-self: start; }
+  .buy .brand { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 14px; }
+  .buy h1 { font-size: 22px; font-weight: 500; line-height: 1.4; margin-top: 8px; }
+  .buy .pricing { margin-top: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .buy .pricing .strike { font-size: 14px; }
+  .buy .pricing .row { gap: 8px; margin-top: 2px; }
+  .buy .pricing .discount { font-size: 22px; }
+  .buy .pricing .price { font-size: 24px; }
+
+  .opt { padding: 20px 0; border-bottom: 1px solid var(--border); }
+  .opt h2 { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .opt h2 .sel { color: var(--text-2); font-weight: 400; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches button { min-width: 56px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; font-weight: 500; position: relative; }
+  .swatches button:hover { border-color: var(--navy); }
+  .swatches button[aria-pressed="true"] { border-color: var(--navy); background: var(--navy); color: #fff; }
+  .swatches button:disabled { color: var(--text-3); background: var(--surface); border-style: dashed; cursor: not-allowed; }
+  .swatches button:disabled::after { content: "품절"; position: absolute; right: -4px; top: -8px; font-size: 10px; font-weight: 700; background: #fff; padding: 0 3px; color: var(--text-3); }
+  .swatches .extra { display: block; font-size: 11px; font-weight: 400; opacity: .85; }
+
+  .selected { margin-top: 16px; background: var(--surface); border-radius: var(--radius); padding: 14px; }
+  .selected .row-between { align-items: flex-start; }
+  .qty { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+  .qty button { width: 36px; height: 36px; border: 0; background: none; display: grid; place-items: center; }
+  .qty input { width: 40px; border: 0; text-align: center; -moz-appearance: textfield; }
+  .qty input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .selected .remove { border: 0; background: none; color: var(--text-3); width: 32px; height: 32px; display: grid; place-items: center; }
+  .total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; }
+  .total strong { font-size: 22px; }
+  .actions { display: grid; grid-template-columns: 52px 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .like-btn { height: 52px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; color: var(--text-2); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .like-btn[aria-pressed="true"] { color: var(--hot); border-color: var(--hot); }
+  .like-btn[aria-pressed="true"] .icon { fill: currentColor; }
+  .like-btn .icon { width: 20px; height: 20px; }
+  .info-list { margin-top: 20px; font-size: 12px; color: var(--text-2); display: grid; grid-template-columns: 72px 1fr; row-gap: 6px; }
+  .info-list dt { font-weight: 500; } .info-list dd { margin: 0; }
+
+  .desc { margin-top: 72px; border-top: 1px solid var(--border); }
+  .desc .tabs { justify-content: center; }
+  .desc-body { max-width: 760px; margin: 40px auto 0; }
+  .desc-body .ph { aspect-ratio: 4 / 3; margin-top: 24px; }
+  .desc-body p { line-height: 1.8; color: var(--text-2); margin-top: 16px; }
+  .desc-body h3 { font-size: 16px; font-weight: 700; margin-top: 32px; }
+  .spec { margin-top: 16px; }
+  .spec th { width: 140px; }
+
+  @media (max-width: 960px) {
+    .detail { grid-template-columns: 1fr; gap: 28px; }
+    .buy { position: static; }
+    .site-header__row { height: auto; flex-wrap: wrap; padding: 12px 0; gap: 12px; }
+    .search { order: 3; flex-basis: 100%; max-width: none; }
+    .buy h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container site-header__row">
+    <a class="logo" href="user-product-list.html" aria-label="KAIROS 홈">KAIROS</a>
+    <form class="search" role="search" action="#" onsubmit="return false">
+      <label for="q" class="sr-only">상품명 또는 브랜드 검색</label>
+      <input id="q" type="search" name="keyword" placeholder="상품명, 브랜드를 검색하세요">
+      <button type="submit" aria-label="검색"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </form>
+    <nav class="util-nav" aria-label="사용자 메뉴">
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>좋아요</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8h12l-1 11H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="cart-count" aria-label="장바구니 2개">2</span>장바구니</a>
+      <a href="#"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>마이</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="cat-nav" aria-label="카테고리">
+  <div class="container">
+    <ul>
+      <li><a class="hot" href="#">핫딜</a></li>
+      <li><a href="user-product-list.html">전체</a></li>
+      <li><a href="#" aria-current="page">상의</a></li>
+      <li><a href="#">아우터</a></li>
+      <li><a href="#">바지</a></li>
+      <li><a href="#">신발</a></li>
+      <li><a href="#">가방</a></li>
+      <li><a href="#">액세서리</a></li>
+      <li><a href="#">브랜드</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container">
+  <nav class="board-nav" aria-label="상태별 보기">
+    <div class="board-nav__row"><strong>쿠폰 영역</strong><button type="button" data-go="cz-login" aria-pressed="false">① 로그인 · 받을 수 있음</button><button type="button" data-go="cz-guest" aria-pressed="false">② 비로그인</button><button type="button" data-go="cz-claimed" aria-pressed="false">③ 받은 직후 (토스트)</button><button type="button" data-go="cz-fail" aria-pressed="false">③-2 받기 실패 안내 (토스트 3종)</button><button type="button" data-go="cz-none" aria-pressed="false">④ 쿠폰 없음 (영역 숨김)</button></div>
+    <div class="board-nav__row"><strong>후기 영역</strong><button type="button" data-go="rz-list" aria-pressed="false">⑤ 후기 있음 (요약·목록·사진·답글·페이지)</button><button type="button" data-go="rz-empty" aria-pressed="false">⑥ 후기 없음</button></div>
+    <div class="board-nav__row"><strong>창</strong><button type="button" data-go="dlg-all" aria-pressed="false">⑦ 쿠폰 모두 보기 (5장)</button><button type="button" data-go="dlg-photo" aria-pressed="false">⑧ 후기 사진 크게 보기</button><button type="button" data-go="dlg-none" aria-pressed="false">창 닫기</button></div>
+    <div class="small muted" style="width:100%">쿠폰은 3장까지 영역에 모두 보이고, 4장부터는 2장 + "쿠폰 모두 보기"로 보입니다. 아래로 내려가면 후기 영역이 있습니다.</div>
+  </nav>
+
+  <nav class="crumb" aria-label="현재 위치">
+    <a href="user-product-list.html">홈</a><span aria-hidden="true">/</span>
+    <a href="#">상의</a><span aria-hidden="true">/</span>
+    <a href="user-product-list.html">티셔츠</a>
+  </nav>
+
+  <div class="detail">
+    <section class="gallery" aria-label="상품 이미지">
+      <div class="ph main">[상품 이미지 1/5]</div>
+      <div class="thumbs" role="group" aria-label="이미지 선택">
+        <button type="button" aria-current="true" aria-label="이미지 1"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 2"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 3"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 4"><div class="ph">[이미지]</div></button>
+        <button type="button" aria-label="이미지 5"><div class="ph">[이미지]</div></button>
+      </div>
+    </section>
+
+    <section class="buy" aria-labelledby="pname">
+      <a class="brand" href="#">[브랜드 A]<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+      <h1 id="pname">오버핏 헤비웨이트 코튼 티셔츠</h1>
+
+      <div class="pricing">
+        <div class="strike">정가 39,000원</div>
+        <div class="row">
+          <span class="discount">30%</span>
+          <span class="price">27,300원</span>
+        </div>
+      </div>
+
+      <div class="coupon-zone" aria-label="쿠폰">
+        <div id="cz-login" class="state-panel" data-group="cz" hidden><div class="coupon-zone__head"><h2><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>받을 수 있는 쿠폰 <span class="muted" style="font-weight:500">5</span></h2></div><div class="coupon-list"><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 A] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">20,000원 이상 구매 시 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">이 상품 전용 2,000원 쿠폰</div>
+    <div class="coupon__meta">대상 상품 · 오버핏 헤비웨이트 코튼 티셔츠<br>조건 없음 · 2026-12-20까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div></div><button type="button" class="btn btn-ghost btn-block mt-8" data-go="dlg-all" style="min-height:40px">쿠폰 모두 보기 (5장)<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div>
+        <div id="cz-guest" class="state-panel" data-group="cz" hidden><div class="coupon-zone__head"><h2><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>받을 수 있는 쿠폰</h2></div><div class="login-line"><span>로그인하면 이 상품에 쓸 수 있는 쿠폰을 받을 수 있습니다</span><a href="login.html?next=user-product-detail-benefit.html">로그인하고 쿠폰 받기</a></div></div>
+        <div id="cz-claimed" class="state-panel" data-group="cz" hidden><div class="coupon-zone__head"><h2><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>받을 수 있는 쿠폰 <span class="muted" style="font-weight:500">5</span></h2></div><div class="coupon-list"><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 A] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">20,000원 이상 구매 시 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">이 상품 전용 2,000원 쿠폰</div>
+    <div class="coupon__meta">대상 상품 · 오버핏 헤비웨이트 코튼 티셔츠<br>조건 없음 · 2026-12-20까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div></div><button type="button" class="btn btn-ghost btn-block mt-8" data-go="dlg-all" style="min-height:40px">쿠폰 모두 보기 (5장)<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+          <div class="toast-stack toast-fixed"><div class="toast" role="status"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg><span>쿠폰을 받았습니다. 12월 12일까지 사용할 수 있습니다</span></div></div></div>
+        <div id="cz-fail" class="state-panel" data-group="cz" hidden><div class="coupon-zone__head"><h2><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4v0a2 2 0 0 0 0-4V6H3v2Z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg>받을 수 있는 쿠폰 <span class="muted" style="font-weight:500">5</span></h2></div><div class="coupon-list"><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 A] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">20,000원 이상 구매 시 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div><div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">이 상품 전용 2,000원 쿠폰</div>
+    <div class="coupon__meta">대상 상품 · 오버핏 헤비웨이트 코튼 티셔츠<br>조건 없음 · 2026-12-20까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div></div><button type="button" class="btn btn-ghost btn-block mt-8" data-go="dlg-all" style="min-height:40px">쿠폰 모두 보기 (5장)<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+          <div class="toast-stack toast-fixed"><div class="toast" role="status">이미 받은 쿠폰입니다</div><div class="toast" role="status">쿠폰이 모두 소진되었습니다</div><div class="toast" role="status">종료된 쿠폰입니다</div></div></div>
+        <div id="cz-none" class="state-panel" data-group="cz" hidden><div class="hidden-note">이 상품에 받을 수 있는 쿠폰이 없으면 이 영역은 화면에서 숨겨집니다</div></div>
+      </div>
+      
+
+      <div class="opt">
+        <h2 id="color-h">색상 <span class="sel">선택: 블랙</span></h2>
+        <div class="swatches" role="group" aria-labelledby="color-h">
+          <button type="button" aria-pressed="true">블랙</button>
+          <button type="button" aria-pressed="false">화이트</button>
+          <button type="button" aria-pressed="false">네이비</button>
+          <button type="button" aria-pressed="false" disabled aria-label="올리브 품절">올리브</button>
+        </div>
+      </div>
+
+      <div class="opt">
+        <h2 id="size-h">사이즈 <span class="sel">선택: L</span></h2>
+        <div class="swatches" role="group" aria-labelledby="size-h">
+          <button type="button" aria-pressed="false">S</button>
+          <button type="button" aria-pressed="false">M</button>
+          <button type="button" aria-pressed="true">L</button>
+          <button type="button" aria-pressed="false">XL <span class="extra">+2,000원</span></button>
+          <button type="button" aria-pressed="false" disabled aria-label="2XL 품절">2XL <span class="extra">+2,000원</span></button>
+        </div>
+      </div>
+
+      <div class="selected" aria-live="polite">
+        <div class="row-between">
+          <div>
+            <div style="font-weight:500">블랙 / L</div>
+            <div class="small muted">27,300원</div>
+          </div>
+          <div class="row">
+            <div class="qty" role="group" aria-label="수량">
+              <button type="button" aria-label="수량 줄이기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+              <label class="sr-only" for="qty1">수량</label>
+              <input id="qty1" type="number" value="1" min="1">
+              <button type="button" aria-label="수량 늘리기"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+            <button type="button" class="remove" aria-label="선택 삭제"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="total">
+        <span class="muted">총 상품 금액 <span class="small">(1개)</span></span>
+        <strong class="price">27,300원</strong>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="like-btn" aria-pressed="false" aria-label="좋아요 1,204">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10Z"/></svg>
+          <span aria-hidden="true">1,204</span>
+        </button>
+        <button type="button" class="btn btn-lg">장바구니</button>
+        <button type="button" class="btn btn-lg btn-primary" title="구매는 C2 단계에서 연결됩니다">구매하기</button>
+      </div>
+
+      <dl class="info-list">
+        <dt>배송</dt><dd>일반 택배 · 결제 후 2~3일 내 출고</dd>
+        <dt>판매자</dt><dd>[판매자 A 주식회사]</dd>
+        <dt>상품 번호</dt><dd>1024</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="desc" aria-label="상품 정보">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true">상품 설명</button>
+      <button type="button" role="tab" aria-selected="false">사이즈 정보</button>
+      <button type="button" role="tab" aria-selected="false">배송/교환/환불</button>
+      <button type="button" role="tab" aria-selected="false" onclick="document.getElementById('reviews').scrollIntoView({behavior:'smooth'})">후기<span class="count">128</span></button>
+    </div>
+    <div class="desc-body">
+      <h3>상품 설명</h3>
+      <p>두께감 있는 헤비웨이트 코튼 원단으로 제작한 오버핏 티셔츠입니다. 어깨선을 자연스럽게 떨어뜨린 드롭 숄더와 넉넉한 몸통으로 편안한 착용감을 줍니다. 넥 라인은 늘어남을 줄이기 위해 2중 립으로 마감했습니다.</p>
+      <div class="ph">[상세 이미지]</div>
+      <p>세탁 시 찬물 단독 세탁을 권장하며, 건조기 사용은 피해 주세요. 모니터 환경에 따라 실제 색상과 차이가 있을 수 있습니다.</p>
+      <h3>기본 정보</h3>
+      <table class="table spec">
+        <tbody>
+          <tr><th scope="row">브랜드</th><td>[브랜드 A]</td></tr>
+          <tr><th scope="row">카테고리</th><td>상의 &gt; 티셔츠</td></tr>
+          <tr><th scope="row">소재</th><td>면 100%</td></tr>
+          <tr><th scope="row">옵션</th><td>색상(블랙, 화이트, 네이비, 올리브) × 사이즈(S, M, L, XL, 2XL)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="reviews" class="desc" aria-labelledby="rev-h">
+    <div style="max-width:960px;margin:40px auto 0">
+      <h2 id="rev-h" class="section-title" style="font-size:20px">상품 후기 <span class="muted" style="font-weight:500">128</span></h2>
+      <div id="rz-list" class="state-panel" data-group="rz" hidden>
+      <div class="rating-summary">
+        <div class="rating-summary__score">4.6</div>
+        <div class="rating-summary__side">
+          <span class="stars-avg" role="img" aria-label="평균 별점 5점 만점에 4.6점">★★★★★<span style="width:92%">★★★★★</span></span>
+          <span class="muted">후기 128개</span>
+        </div>
+      </div>
+      <article class="review">
+        <div class="review__head"><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span><span style="font-weight:500">김*지</span><span class="review__meta">2026-11-08</span></div>
+        <p class="review__body">두께감이 좋아서 가을부터 겨울 초입까지 입기 딱 좋아요. 핏이 넉넉해서 안에 니트를 입어도 답답하지 않습니다.</p>
+        <div class="review__photos"><button type="button" data-go="dlg-photo" aria-label="사진 1 크게 보기"><div class="ph ">[사진 1]</div></button><button type="button" data-go="dlg-photo" aria-label="사진 2 크게 보기"><div class="ph ">[사진 2]</div></button></div>
+        <div class="review__reply"><div class="review__reply-head"><span class="badge badge-seller">판매자 답글</span><span class="review__meta">2026-11-09</span></div><p>소중한 후기 감사합니다. 오래 편하게 입으실 수 있도록 세탁 방법은 상품 설명을 참고해 주세요.</p></div>
+      </article>
+      <article class="review">
+        <div class="review__head"><span class="stars" role="img" aria-label="별점 4점">★★★★<span class="off">★</span></span><span style="font-weight:500">이*훈</span><span class="review__meta">2026-11-05</span></div>
+        <p class="review__body">색감은 사진과 거의 같아요. 어깨선이 생각보다 많이 내려와서 한 사이즈 작게 입어도 괜찮을 것 같습니다.</p>
+        
+        
+      </article>
+      <article class="review">
+        <div class="review__head"><span class="stars" role="img" aria-label="별점 5점">★★★★★<span class="off"></span></span><span style="font-weight:500">박*영</span><span class="review__meta">2026-11-01</span></div>
+        <p class="review__body">배송도 빨랐고 원단이 탄탄합니다. 세탁 후에도 목 늘어남이 없어요.</p>
+        <div class="review__photos"><button type="button" data-go="dlg-photo" aria-label="사진 1 크게 보기"><div class="ph ">[사진 1]</div></button></div>
+        
+      </article>
+      <article class="review">
+        <div class="review__head"><span class="stars" role="img" aria-label="별점 3점">★★★<span class="off">★★</span></span><span style="font-weight:500">최*우</span><span class="review__meta">2026-10-27</span></div>
+        <p class="review__body">제품은 괜찮은데 화이트는 속이 조금 비칩니다. 이너를 신경 써서 입어야 할 것 같아요.</p>
+        
+        <div class="review__reply"><div class="review__reply-head"><span class="badge badge-seller">판매자 답글</span><span class="review__meta">2026-10-28</span></div><p>불편을 드려 죄송합니다. 화이트는 얇은 이너와 함께 입으시면 비침이 줄어듭니다.</p></div>
+      </article>
+      <nav class="pager" aria-label="후기 페이지"><a href="#reviews" aria-label="이전" style="pointer-events:none;opacity:.4">‹</a><a href="#reviews" aria-current="page">1</a><a href="#reviews">2</a><a href="#reviews">3</a><a href="#reviews">4</a><a href="#reviews">5</a><a href="#reviews" aria-label="다음">›</a></nav>
+    </div>
+      <div id="rz-empty" class="state-panel" data-group="rz" hidden>
+      <div class="rating-summary"><div class="rating-summary__side"><strong style="font-size:18px">아직 후기가 없습니다</strong><span class="muted">구매를 확정한 뒤 첫 후기를 남겨 보세요</span></div></div>
+      <div class="empty" style="border-top:0;padding:64px 24px"><div class="empty__icon"><svg class="icon " viewBox="0 0 24 24"><path d="m12 4 2.5 5.2 5.5.8-4 4 1 5.6L12 17l-5 2.6 1-5.6-4-4 5.5-.8L12 4Z"/></svg></div><h2>등록된 후기가 없습니다</h2><p>후기를 쓰면 포인트를 받을 수 있습니다</p></div>
+    </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="logo">KAIROS</div>
+    <p>KAIROS 마켓플레이스 · 디자인 목업 (정적 HTML)</p>
+  </div>
+</footer>
+
+<div id="dlg-none" class="state-panel" data-group="dlg"></div>
+<div id="dlg-all" class="state-panel overlay" data-group="dlg" hidden>
+  <div class="overlay__backdrop" data-go="dlg-none"></div>
+  <div class="dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="all-h">
+    <div class="dialog__head"><h3 id="all-h">받을 수 있는 쿠폰 <span class="muted" style="font-weight:500">5</span></h3><button type="button" class="dialog__x" aria-label="닫기" data-go="dlg-none"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="dialog__body">
+      <div class="dialog__scroll">
+        <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>10%</strong><small>최대 5,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">[판매자 A] 첫 구매 10% 쿠폰</div>
+    <div class="coupon__meta">20,000원 이상 구매 시 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+        <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>2,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-seller">판매자 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">이 상품 전용 2,000원 쿠폰</div>
+    <div class="coupon__meta">대상 상품 · 오버핏 헤비웨이트 코튼 티셔츠<br>조건 없음 · 2026-12-20까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+        <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>3,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">상품 쿠폰</span></div>
+    <div class="coupon__name">겨울 맞이 3,000원 쿠폰</div>
+    <div class="coupon__meta">40,000원 이상 구매 시 · 2026-12-31까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+        <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>5,000원</strong></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">주말 특가 5,000원 장바구니 쿠폰</div>
+    <div class="coupon__meta">50,000원 이상 구매 시 · 2026-12-15까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-sm" disabled>받음</button></div>
+</div>
+        <div class="coupon coupon--sm">
+  <div class="coupon__value"><strong>7%</strong><small>최대 6,000원</small></div>
+  <div class="coupon__body">
+    <div class="coupon__tags"><span class="badge badge-navy">플랫폼 쿠폰</span><span class="badge badge-outline">장바구니 쿠폰</span></div>
+    <div class="coupon__name">11월 한정 7% 장바구니 쿠폰</div>
+    <div class="coupon__meta">60,000원 이상 구매 시 · 2026-11-30까지</div>
+    
+  </div>
+  <div class="coupon__act"><button type="button" class="btn btn-primary btn-sm">쿠폰 받기</button></div>
+</div>
+      </div>
+    </div>
+    <div class="dialog__foot dialog__foot--single"><button type="button" class="btn btn-ghost" data-go="dlg-none">닫기</button></div>
+  </div>
+</div>
+<div id="dlg-photo" class="state-panel overlay" data-group="dlg" hidden>
+  <div class="overlay__backdrop" data-go="dlg-none"></div>
+  <div class="lightbox" role="dialog" aria-modal="true" aria-label="후기 사진 크게 보기">
+    <div class="ph">[후기 사진 크게 보기 · 1 / 2]</div>
+    <button type="button" class="dialog__x" aria-label="닫기" data-go="dlg-none"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </div>
+</div>
+<script>
+/* 시안 상태 전환: data-go="패널 id" 를 누르면 같은 data-group 의 패널만 보인다. 주소 뒤 #패널id 로 바로 열 수도 있다. */
+(function () {
+  var panels = [].slice.call(document.querySelectorAll('.state-panel'));
+  var gos = [].slice.call(document.querySelectorAll('[data-go]'));
+  function byId(id) { return document.getElementById(id); }
+  function go(id) {
+    var p = byId(id); if (!p) return;
+    var g = p.getAttribute('data-group');
+    panels.forEach(function (q) { if (q.getAttribute('data-group') === g) q.hidden = (q !== p); });
+    gos.forEach(function (b) {
+      var t = byId(b.getAttribute('data-go'));
+      if (!t || t.getAttribute('data-group') !== g) return;
+      var on = b.getAttribute('data-go') === id;
+      var attr = b.hasAttribute('aria-selected') ? 'aria-selected' : (b.hasAttribute('aria-pressed') ? 'aria-pressed' : null);
+      if (attr) b.setAttribute(attr, on ? 'true' : 'false');
+    });
+    var m = p.getAttribute('data-menu');
+    if (m) [].forEach.call(document.querySelectorAll('[data-menu-item]'), function (a) {
+      if (a.getAttribute('data-menu-item') === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (!b) return;
+    e.preventDefault();
+    go(b.getAttribute('data-go'));
+  });
+  var seen = {};
+  panels.forEach(function (p) { var g = p.getAttribute('data-group'); if (!seen[g]) { seen[g] = 1; go(p.id); } });
+  var h = location.hash.slice(1);
+  if (h && byId(h) && byId(h).classList.contains('state-panel')) go(h);
+})();
+</script>
+</body>
+</html>
