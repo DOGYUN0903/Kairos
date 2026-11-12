@@ -17,6 +17,9 @@ import {
   writeReview,
 } from "./fixtures/api";
 
+/** 견적 디바운스(500ms)보다 조금 길게 한 번만 기다려, 잘못된 입력에 요청이 나가지 않음을 확인한다. */
+const NO_QUOTE_WAIT_MS = 700;
+
 test.skip(() => requireAdmin() !== null, requireAdmin() ?? "");
 
 test("포인트로 결제하고 취소하면 사용·환급이 내역에 남는다", async ({ page, request }) => {
@@ -36,6 +39,7 @@ test("포인트로 결제하고 취소하면 사용·환급이 내역에 남는�
   expect(await getPointBalance(request, buyer.accessToken)).toBe(1100);
 
   let quoteRequests = 0;
+  let quoteRequestsBeforeMax = 0;
   await page.route("**/api/v1/orders/quote", async (route) => {
     quoteRequests += 1;
     await route.continue();
@@ -51,6 +55,7 @@ test("포인트로 결제하고 취소하면 사용·환급이 내역에 남는�
   const input = page.getByLabel("사용할 포인트");
   await test.step("최대 사용: 1,100P 가 들어가고 결제 금액이 서버 견적과 맞는다", async () => {
     await expect(section.getByText("보유 1,100P", { exact: true })).toBeVisible();
+    quoteRequestsBeforeMax = quoteRequests;
     await section.getByRole("button", { name: "최대 사용" }).click();
     await expect(input).toHaveValue("1100");
     await expect(valueOf(page, "포인트 사용")).toHaveText("−1,100P");
@@ -59,11 +64,12 @@ test("포인트로 결제하고 취소하면 사용·환급이 내역에 남는�
   });
 
   await test.step("10P 단위가 아니면 안내만 뜨고 견적 요청 없이 결제가 막힌다", async () => {
-    await page.waitForTimeout(1000);
+    // 양성 대조: 위 "최대 사용"은 견적을 다시 불렀다. 이 계측이 요청을 실제로 센다는 증거다.
+    expect(quoteRequests).toBeGreaterThan(quoteRequestsBeforeMax);
     const before = quoteRequests;
     await input.fill("15");
     await expect(page.getByRole("alert").filter({ hasText: "10P 단위로 입력해 주세요" })).toBeVisible();
-    await page.waitForTimeout(1500); // 디바운스(500ms)보다 길게 기다려도 요청이 없어야 한다.
+    await page.waitForTimeout(NO_QUOTE_WAIT_MS);
     expect(quoteRequests).toBe(before);
     await expect(page.getByRole("button", { name: /결제하기$/ })).toBeDisabled();
 

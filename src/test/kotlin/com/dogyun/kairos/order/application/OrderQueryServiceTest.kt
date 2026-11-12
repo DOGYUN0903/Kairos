@@ -273,12 +273,26 @@ class OrderQueryServiceTest {
             memberId, PlaceOrderCommand(listOf(OrderItemCommand(10L, 1), OrderItemCommand(11L, 1), OrderItemCommand(20L, 1)), 33_000, address),
         )
         deliverAndConfirm(order, 1L, 2L)
+        val itemIds = listOf(itemIdOf(order, 10L), itemIdOf(order, 11L), itemIdOf(order, 20L))
+        itemIds.forEach { reviewStateReader.states[it] = ItemReviewState("WRITABLE", null, now.plusDays(90)) }
 
         val detail = service.getMine(memberId, order.orderId)
 
         assertEquals(1, reviewStateReader.calls.size)
-        assertEquals(3, reviewStateReader.calls.single().size)
-        assertEquals(listOf("NOT_ELIGIBLE", "NOT_ELIGIBLE", "NOT_ELIGIBLE"), detail.sellerOrders.flatMap { it.items }.map { it.review?.status })
+        assertEquals(itemIds.toSet(), reviewStateReader.calls.single().map { it.orderItemId }.toSet())
+        assertEquals(listOf("WRITABLE", "WRITABLE", "WRITABLE"), detail.sellerOrders.flatMap { it.items }.map { it.review?.status })
+        assertEquals(itemIds.toSet(), detail.sellerOrders.flatMap { it.items }.map { it.orderItemId }.toSet())
+    }
+
+    @Test
+    fun 구매_확정_전_주문의_후기_상태는_NOT_ELIGIBLE이고_reader를_부르지_않는다() {
+        val order = place(10L)
+        pay(order)
+
+        val detail = service.getMine(memberId, order.orderId)
+
+        assertEquals("NOT_ELIGIBLE", detail.sellerOrders.single().items.single().review?.status)
+        assertEquals(0, reviewStateReader.calls.size)
     }
 
     @Test

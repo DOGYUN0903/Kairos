@@ -161,7 +161,7 @@ test("쿠폰 받기부터 상품·장바구니 쿠폰 결제, 사용 완료 목�
       await dialog.getByRole("button", { name: "취소하기" }).click();
       await expect(dialog).toBeHidden();
 
-      await page.goto("/my/coupons?tab=mine");
+      await page.goto("/my/coupons?tab=mine&status=AVAILABLE");
       await expect(page.getByText(nSeller, { exact: true })).toHaveCount(1);
       await expect(page.getByText(n2000, { exact: true })).toHaveCount(0);
     });

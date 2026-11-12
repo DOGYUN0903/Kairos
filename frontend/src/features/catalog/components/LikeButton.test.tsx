@@ -18,12 +18,12 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 
-function setup(liked: boolean | null, likeCount: number | null = 1204) {
+function setup(liked: boolean | null, likeCount: number | null = 1204, extra: { tone?: "default" | "navy"; label?: string } = {}) {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: 0 } } });
   const spy = vi.spyOn(qc, "invalidateQueries");
   render(
     <QueryClientProvider client={qc}>
-      <LikeButton productId={7} liked={liked} {...(likeCount !== null ? { likeCount } : {})} />
+      <LikeButton productId={7} liked={liked} {...(likeCount !== null ? { likeCount } : {})} {...extra} />
     </QueryClientProvider>,
   );
   return spy;
@@ -42,6 +42,19 @@ describe("LikeButton", () => {
     const btn = screen.getByRole("button", { name: "좋아요" });
     expect(btn).toHaveAccessibleDescription("좋아요 1,204개");
     expect(btn).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("눌린_상태는_기본이면_hot이고_navy_톤이면_navy다", () => {
+    setup(true, null);
+    expect(screen.getByRole("button", { name: "좋아요" })).toHaveClass("border-hot", "text-hot");
+  });
+
+  it("navy_톤은_hot_색을_쓰지_않고_접근성_이름을_바꿀_수_있다", () => {
+    setup(true, null, { tone: "navy", label: "샘플 상품 좋아요 취소" });
+    const btn = screen.getByRole("button", { name: "샘플 상품 좋아요 취소" });
+    expect(btn).toHaveClass("border-navy", "text-navy");
+    expect(btn).not.toHaveClass("border-hot");
+    expect(btn).not.toHaveClass("text-hot");
   });
 
   it("likeCount가_없으면_숫자를_그리지_않는다", () => {

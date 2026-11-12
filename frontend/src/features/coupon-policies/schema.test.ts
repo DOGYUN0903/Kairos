@@ -123,3 +123,20 @@ describe("정책 양식 스키마 - 관리자", () => {
     expect(run("admin", { couponType: "PRODUCT", targetType: "NONE" }).ok).toBe(false);
   });
 });
+
+describe("정책 양식 스키마 - 입력 경계", () => {
+  it.each(["1e3", "10.5", "-1", "9007199254740992"])("할인 금액 %s는 거절한다", (discountValue) => {
+    expect(run("seller", { discountValue })).toEqual({ ok: false, fields: ["discountValue"] });
+  });
+  it("앞뒤 공백은 잘라서 5로 받아들인다", () => {
+    const r = run("seller", { discountValue: " 5 " });
+    expect(r.ok && r.body.discountValue).toBe(5);
+  });
+  it("발행 수량이 정수 최대값을 넘으면 거절한다", () => {
+    expect(run("seller", { totalQuantity: "2147483648" })).toEqual({ ok: false, fields: ["totalQuantity"] });
+  });
+  it("발행 수량이 정수 최대값이면 받아들인다", () => {
+    const r = run("seller", { totalQuantity: "2147483647" });
+    expect(r.ok && r.body.totalQuantity).toBe(2147483647);
+  });
+});
