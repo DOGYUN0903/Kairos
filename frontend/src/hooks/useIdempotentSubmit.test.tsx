@@ -6,10 +6,10 @@ import { useIdempotentSubmit } from "@/hooks/useIdempotentSubmit";
 
 type V = { name: string };
 
-function setup(submit: (v: V, key: string) => Promise<void>, onError?: (e: unknown) => void) {
+function setup(submit: (v: V, key: string) => Promise<void>, onError?: (e: unknown) => void, fingerprint?: () => string) {
   return renderHook(() => {
     const form = useForm<V>({ defaultValues: { name: "a" } });
-    return { form, ...useIdempotentSubmit(form, submit, onError ? { onError } : undefined) };
+    return { form, ...useIdempotentSubmit(form, submit, onError || fingerprint ? { onError, fingerprint } : undefined) };
   });
 }
 
@@ -169,5 +169,31 @@ describe("useIdempotentSubmit", () => {
       await p1;
     });
     expect(result.current.submitting).toBe(false);
+  });
+
+  it("응답을_못_받은_뒤_폼_밖_내용이_바뀌면_새_키를_쓰고_같으면_같은_키를_쓴다", async () => {
+    const submit = vi.fn(async () => {
+      throw new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null);
+    });
+    let fp = "A";
+    const { result } = setup(submit, () => {}, () => fp);
+    await act(() => result.current.onSubmit());
+    await act(() => result.current.onSubmit());
+    fp = "B";
+    await act(() => result.current.onSubmit());
+    expect(keysOf(submit)[0]).toBe(keysOf(submit)[1]);
+    expect(keysOf(submit)[2]).not.toBe(keysOf(submit)[0]);
+  });
+
+  it("지문이_비어_있으면_직전_지문으로_보아_키를_유지한다", async () => {
+    const submit = vi.fn(async () => {
+      throw new ApiError(0, "INTERNAL_ERROR", "네트워크 오류", null);
+    });
+    let fp = "A";
+    const { result } = setup(submit, () => {}, () => fp);
+    await act(() => result.current.onSubmit());
+    fp = "";
+    await act(() => result.current.onSubmit());
+    expect(keysOf(submit)[0]).toBe(keysOf(submit)[1]);
   });
 });

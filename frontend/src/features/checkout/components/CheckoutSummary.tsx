@@ -1,6 +1,7 @@
 import { Money } from "@/components/common/Money";
-import { formatKrw } from "@/lib/money";
+import { formatPoints } from "@/lib/money";
 import type { OrderQuote } from "@/features/checkout/api";
+import { payButtonLabel } from "@/features/checkout/checkout-guard";
 
 type Props = { quote: OrderQuote; payable: boolean; submitting: boolean };
 
@@ -14,6 +15,28 @@ export function CheckoutSummary({ quote, payable, submitting }: Props) {
         <dd className="text-right font-medium tabular-nums">
           <Money value={quote.itemsAmount} />
         </dd>
+        {quote.productCouponDiscount !== 0 && (
+          <>
+            <dt className="text-text-2">상품 쿠폰 할인</dt>
+            <dd className="text-right font-medium tabular-nums text-danger">
+              −<Money value={quote.productCouponDiscount} />
+            </dd>
+          </>
+        )}
+        {quote.cartCouponDiscount !== 0 && (
+          <>
+            <dt className="text-text-2">장바구니 쿠폰 할인</dt>
+            <dd className="text-right font-medium tabular-nums text-danger">
+              −<Money value={quote.cartCouponDiscount} />
+            </dd>
+          </>
+        )}
+        {quote.pointsUsed !== 0 && (
+          <>
+            <dt className="text-text-2">포인트 사용</dt>
+            <dd className="text-right font-medium tabular-nums text-danger">−{formatPoints(quote.pointsUsed)}</dd>
+          </>
+        )}
         <dt className="text-text-2">배송비</dt>
         <dd className="text-right font-medium tabular-nums">
           <Money value={quote.buyerShippingFee} />
@@ -32,9 +55,9 @@ export function CheckoutSummary({ quote, payable, submitting }: Props) {
         </strong>
       </div>
       <button type="submit" className="btn btn-primary btn-lg btn-block mt-5" disabled={!payable || submitting}>
-        {submitting ? "주문 접수 중…" : `${formatKrw(quote.totalAmount)} 결제하기`}
+        {submitting ? "주문 접수 중…" : payButtonLabel(quote.totalAmount)}
       </button>
-      <span className="mt-2.5 block text-center text-xs text-text-2">결제하기를 누르면 주문이 만들어지고 결제창이 열립니다</span>
+      <span className="mt-2.5 block text-center text-xs text-text-2">{quote.totalAmount === 0 ? "결제 금액이 0원이라 결제창 없이 바로 주문이 완료됩니다" : "결제하기를 누르면 주문이 만들어지고 결제창이 열립니다"}</span>
     </div>
   );
 }

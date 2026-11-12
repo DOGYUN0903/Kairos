@@ -98,7 +98,7 @@ export function OrderDetailPage({ orderId }: { orderId: number }) {
             <PaymentSummaryCard order={data} />
             <ShippingAddressCard address={data.shippingAddress} />
           </aside>
-          <CancelItemDialog orderId={orderId} item={target} onClose={() => setTarget(null)} />
+          <CancelItemDialog orderId={orderId} item={target} hasCartCoupon={data.cartCouponId != null} onClose={() => setTarget(null)} />
         </div>
       )}
     </div>

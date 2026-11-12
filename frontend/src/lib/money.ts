@@ -16,6 +16,13 @@ export function formatKrw(n: number): string {
   return `${krw.format(v)}원`;
 }
 
+/** 포인트 표기: 17700 → "17,700P". */
+export function formatPoints(n: number): string {
+  const v = assertSafeInt(n, "포인트");
+  if (Number.isNaN(v)) return "포인트 오류";
+  return `${krw.format(v)}P`;
+}
+
 export function discountRate(originalPrice: number, salePrice: number): number {
   const orig = assertSafeInt(originalPrice, "정가");
   const sale = assertSafeInt(salePrice, "판매가");

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { percentToBp, amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
+import { percentToBp, amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, formatPoints, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
 
 describe("money", () => {
+  it("formatPoints는_17700을_17_700P로_만든다", () => {
+    expect(formatPoints(17700)).toBe("17,700P");
+    expect(formatPoints(0)).toBe("0P");
+  });
   it("formatKrw는_27300을_27_300원으로_만든다", () => {
     expect(formatKrw(27300)).toBe("27,300원");
   });

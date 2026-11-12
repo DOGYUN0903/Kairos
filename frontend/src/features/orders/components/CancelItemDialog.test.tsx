@@ -19,12 +19,12 @@ vi.mock("@/hooks/use-toast", () => ({ toast: h.toast }));
 const item = { orderItemId: 7, productName: "램스울 크루넥 니트", brandName: "브랜드", optionDisplayName: "오트밀 / M", quantity: 1, thumbnailUrl: null } as OrderItemResult;
 const preview = { orderItemId: 7, paidAmount: 30000, shippingFeeRefund: 0, shippingFeeDeducted: 3000, shippingFeeReturned: 0, refundAmount: 27000, pointsRefund: 0 };
 
-function mount(onClose = vi.fn()) {
+function mount(onClose = vi.fn(), opts: { item?: OrderItemResult; hasCartCoupon?: boolean } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidate = vi.spyOn(qc, "invalidateQueries");
   render(
     <QueryClientProvider client={qc}>
-      <CancelItemDialog orderId={42} item={item} onClose={onClose} />
+      <CancelItemDialog orderId={42} item={opts.item ?? item} hasCartCoupon={opts.hasCartCoupon} onClose={onClose} />
     </QueryClientProvider>,
   );
   return { onClose, invalidate };
@@ -39,6 +39,9 @@ async function fillAndSubmit() {
 function expectOrdersInvalidated(invalidate: ReturnType<typeof mount>["invalidate"]) {
   expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.orders.detail(42) });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.orders.list() });
+  // 취소하면 쿠폰이 돌아오고 포인트가 환불될 수 있다.
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.coupons.mineRoot });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.points.root });
 }
 
 describe("CancelItemDialog", () => {
@@ -55,6 +58,19 @@ describe("CancelItemDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "취소하기" }));
     expect(await screen.findByText("취소 사유를 입력해 주세요.")).toBeInTheDocument();
     expect(h.POST).not.toHaveBeenCalled();
+  });
+
+  it("항목에_포인트와_상품_쿠폰이_있고_주문에_장바구니_쿠폰이_있으면_안내_문구를_보인다", async () => {
+    mount(vi.fn(), { item: { ...item, pointsAllocated: 5625, productCouponId: 3 } as OrderItemResult, hasCartCoupon: true });
+    expect(await screen.findByText("사용한 포인트 5,625P가 함께 돌아옵니다")).toBeInTheDocument();
+    expect(screen.getByText("사용한 상품 쿠폰은 유효기간이 남아 있으면 돌아옵니다")).toBeInTheDocument();
+    expect(screen.getByText("장바구니 쿠폰은 주문 전체를 취소해야 돌아옵니다")).toBeInTheDocument();
+  });
+
+  it("혜택이_없는_항목에는_안내_문구가_없다", async () => {
+    mount();
+    await screen.findByText("27,000원");
+    expect(screen.queryByLabelText("쿠폰·포인트 안내")).toBeNull();
   });
 
   it("미리보기를_확인하기_전에는_취소하기를_막는다", async () => {

@@ -2,24 +2,37 @@
 
 import { resolveError } from "@/api/errors";
 import { Money } from "@/components/common/Money";
+import { benefitNotices } from "@/features/orders/benefit-notices";
 import { refundLines } from "@/features/orders/actions";
 import { useCancelItem, useCancelPreview, type OrderItemResult } from "@/features/orders/api";
 import { ItemCancelDialog } from "@/features/orders/components/ItemCancelDialog";
 
 /** 구매자 항목 취소 창. item 이 있을 때만 열린다(닫으면 내용이 언마운트되어 사유·미리보기가 새로 시작한다). */
-export function CancelItemDialog({ orderId, item, onClose }: { orderId: number; item: OrderItemResult | null; onClose: () => void }) {
+export function CancelItemDialog({ orderId, item, hasCartCoupon = false, onClose }: { orderId: number; item: OrderItemResult | null; hasCartCoupon?: boolean; onClose: () => void }) {
   if (!item) return null;
-  return <CancelBody key={item.orderItemId} orderId={orderId} item={item} onClose={onClose} />;
+  return <CancelBody key={item.orderItemId} orderId={orderId} item={item} hasCartCoupon={hasCartCoupon} onClose={onClose} />;
 }
 
-function CancelBody({ orderId, item, onClose }: { orderId: number; item: OrderItemResult; onClose: () => void }) {
+function CancelBody({ orderId, item, hasCartCoupon, onClose }: { orderId: number; item: OrderItemResult; hasCartCoupon: boolean; onClose: () => void }) {
   const preview = useCancelPreview(orderId, item.orderItemId, true);
   const cancel = useCancelItem(orderId);
+  const notices = benefitNotices({ pointsAllocated: item.pointsAllocated, hasProductCoupon: item.productCouponId != null, hasCartCoupon });
   return (
     <ItemCancelDialog
       item={item}
       cancel={(reason, key) => cancel(item.orderItemId, reason, key)}
-      notice={<RefundPreview preview={preview} />}
+      notice={
+        <>
+          <RefundPreview preview={preview} />
+          {notices.length > 0 && (
+            <ul className="notice flex-col gap-1" aria-label="쿠폰·포인트 안내">
+              {notices.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      }
       // 환불 예정 금액을 확인한 뒤에만 취소할 수 있다(미리보기가 409 면 취소할 수 없는 항목이다).
       canSubmit={preview.isSuccess}
       onClose={onClose}
