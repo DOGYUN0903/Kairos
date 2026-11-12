@@ -51,7 +51,7 @@ export function ApplyForm({ mode, seller }: { mode: "create" | "update"; seller?
     async (values, key) => {
       if (mode === "create") await apply.mutateAsync({ values, key });
       else await update.mutateAsync({ values });
-      // 같은 값으로 다시 신청하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
+      // 신청이 끝난 입력을 남기지 않게 성공 뒤 폼을 비운다. Idempotency-Key 와는 무관하다(키는 성공하면 훅이 버린다).
       if (mode === "create") form.reset();
       toast({ title: mode === "create" ? "입점을 신청했습니다." : "신청 내용을 수정해 다시 접수했습니다." });
       router.replace("/seller");

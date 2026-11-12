@@ -122,7 +122,7 @@ export function ProductForm({ mode, initial, leavingRef }: ProductFormProps) {
         return;
       }
       const { productId: createdId } = await register_.mutateAsync({ body: toRegisterRequest(values), key });
-      // 같은 값으로 다시 등록하면 새 Idempotency-Key 가 필요하므로 성공 뒤 폼을 비운다.
+      // 등록이 끝난 입력을 비워 dirty 상태(이탈 경고)를 없앤다. Idempotency-Key 와는 무관하다(키는 성공하면 훅이 버린다).
       form.reset(EMPTY);
       toast({ title: "검수 대기 상태로 등록됐습니다" });
       router.push(`/seller/products/${createdId}`);

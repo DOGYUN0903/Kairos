@@ -29,7 +29,11 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 3. `cd frontend && cp .env.example .env.local && pnpm install && pnpm dev`
 4. http://localhost:3000 (Grafana도 기본 3000이라 겹치면 `pnpm dev --port 3001` 처럼 다른 포트를 쓴다)
 
-결제 방식: 기본은 모의 결제(`frontend/.env.local`의 `NEXT_PUBLIC_PG_PROVIDER=mock`, 백엔드 `.env`의 `KAIROS_PG_PROVIDER=mock`)다. 토스페이먼츠 테스트 모드로 바꾸려면 양쪽을 같은 값으로 맞춘다(다르면 결제 승인이 실패한다).
+결제 방식: 기본은 모의 결제(`frontend/.env.local`의 `NEXT_PUBLIC_PG_PROVIDER=mock`, 백엔드 `.env`의 `KAIROS_PG_PROVIDER=mock`)다. 토스페이먼츠 테스트 모드로 바꾸려면 양쪽을 반드시 같은 값으로 맞춘다. 값이 다르면 방향에 따라 결과가 다르다.
+- 프론트 `mock` + 백엔드 `toss`: 승인이 거절되고 주문이 취소된다.
+- 프론트 `toss` + 백엔드 `mock`: Mock PG가 접두사 없는 키를 전부 승인하므로 토스에서 실제 승인 없이 주문이 결제 완료가 된다(로컬에서만 가능한 조합이다).
+
+토스로 바꿀 때의 설정:
 - 백엔드 `.env`: `KAIROS_PG_PROVIDER=toss`, `TOSS_SECRET_KEY=test_sk_…`(시크릿 키는 여기에만 둔다)
 - 프론트 `frontend/.env.local`: `NEXT_PUBLIC_PG_PROVIDER=toss`, `NEXT_PUBLIC_TOSS_CLIENT_KEY=test_ck_…`(토스 "API 개별 연동" 테스트 클라이언트 키, 공개용)
 - 모의 결제창의 실패 선택지(카드사 거절·응답 없음 2종)는 데모 빌드(`NEXT_PUBLIC_DEMO_MODE=true`)에서만 보인다. 운영 빌드 번들에는 없다(`pnpm check:bundle`이 확인한다).
@@ -54,7 +58,7 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은
 - [x] C3. 혜택과 후기
 - [x] C4. 반품과 정산
 - [x] F1. 프론트엔드 기반과 C1 화면
-- [ ] F2. 구매 화면
+- [x] F2. 구매 화면
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
