@@ -4,7 +4,7 @@ import { ADMIN_EMAIL, DEMO_PASSWORD, adminToken, asUser, createSellerWithProduct
 test.skip(() => requireAdmin() !== null, requireAdmin() ?? "");
 
 test("상품 불량 반품: 환불 예정 33,000원, 구매 확정 차단, 철회·재요청, 판매자 거절, 관리자 재승인과 대신 수거 확인", async ({ page, request }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(120_000);
   const run = uniq();
   const admin = await adminToken(request);
   const productName = `E2E 상품T ${run}`;
@@ -77,6 +77,7 @@ test("상품 불량 반품: 환불 예정 33,000원, 구매 확정 차단, 철�
     const row = itemRow(page, productName);
     await expect(row.getByText("반품 거절", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "반품 요청" })).toHaveCount(0);
+    await expect(row.getByText("반품이 거절된 상품입니다", { exact: true })).toBeVisible();
     await row.getByRole("link", { name: "반품 상세" }).click();
     await page.waitForURL(/\/my\/returns\/\d+$/);
     const rejected = page.getByRole("alert").filter({ hasText: "거절 사유" });
@@ -97,6 +98,7 @@ test("상품 불량 반품: 환불 예정 33,000원, 구매 확정 차단, 철�
       const receive = ap.getByRole("dialog", { name: /수거 확인/ });
       await receive.getByRole("button", { name: "수거 확인 · 환불 실행" }).click();
       await expect(ap.getByText("환불을 완료했습니다. 환불 금액 33,000원").first()).toBeVisible();
+      await expect(refundValue(ap, "환불 금액")).toHaveText("33,000원");
     });
   });
 

@@ -23,7 +23,7 @@ test.skip(() => requireAdmin() !== null, requireAdmin() ?? "");
 const ESTIMATE_NOTE = "실제 환불 금액은 판매자가 상품을 받은 뒤 확정됩니다. 같은 주문의 다른 상품을 취소·반품하면 달라질 수 있습니다";
 
 test("단순 변심 반품: 환불 예정 금액 미리보기부터 판매자 승인·수거 확인, 남은 항목 반품, 전체 반품 주문까지 이어진다", async ({ page, request }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(120_000);
   const run = uniq();
   const admin = await adminToken(request);
   const sellerName = `E2E 판매자S ${run}`;
@@ -58,9 +58,15 @@ test("단순 변심 반품: 환불 예정 금액 미리보기부터 판매자 �
     await expect(dialog.locator("dt em").filter({ hasText: "예상" })).toBeVisible();
     await expect(dialog.getByText(ESTIMATE_NOTE, { exact: true })).toBeVisible();
 
-    // 연타해도 한 건만 만들어진다.
-    await dialog.getByRole("button", { name: "반품 요청", exact: true }).dblclick();
+    // 연타해도 요청이 한 번만 나간다(최종 상태는 서버가 중복을 막아도 1건이라, 실제로 나간 POST 를 센다).
+    const returnPosts: string[] = [];
+    page.on("request", (req) => {
+      if (req.method() === "POST" && /^\/api\/v1\/orders\/\d+\/items\/\d+\/returns$/.test(new URL(req.url()).pathname)) returnPosts.push(req.url());
+    });
+    await dialog.getByRole("button", { name: "반품 요청", exact: true }).click({ clickCount: 2, delay: 0 });
     await expect(dialog).toBeHidden();
+    await page.waitForLoadState("networkidle");
+    expect(returnPosts).toHaveLength(1);
   });
 
   await test.step("반품 내역에 1건", async () => {
@@ -87,6 +93,8 @@ test("단순 변심 반품: 환불 예정 금액 미리보기부터 판매자 �
       await expect(dialog.getByText("단순 변심 반품이라 환불이 완료되면 재고가 자동으로 복구됩니다.")).toBeVisible();
       await dialog.getByRole("button", { name: "수거 확인 · 환불 실행" }).click();
       await expect(sp.getByText("환불을 완료했습니다. 환불 금액 14,000원").first()).toBeVisible();
+      // 알림만이 아니라 판매자 상세의 환불 금액 줄도 같은 금액이다.
+      await expect(refundValue(sp, "환불 금액")).toHaveText("14,000원");
     });
   });
 

@@ -14,6 +14,7 @@ import { defineConfig, devices } from "@playwright/test";
  * 시작일을 지난주 월요일로 덮어써야 한다(Spring 느슨한 바인딩 환경 변수). 시연 주문(§5-3)도 demo 시더가 같은 주에 만든다.
  *   export KAIROS_SETTLEMENT_STARTDATE=$(TZ=Asia/Seoul date -v-"$(( $(TZ=Asia/Seoul date +%u) - 1 + 7 ))"d +%F)   # macOS(BSD date)
  *   다른 시스템에서는 지난주 월요일(KST) 날짜를 YYYY-MM-DD 로 직접 넣는다.
+ * 정산 spec 은 새 스키마에서만 한 번 돈다(같은 스키마에서 다시 돌리면 그 기간은 "이미 생성된 기간"으로 나온다). 한국 시간 월요일 00:00 을 넘겨 돌리지 않는다.
  * 새 빈 스키마에서 전체 스위트를 한 번에 돌린다(spec 은 이름순이고, c4 spec 은 앞선 spec 의 데이터에 기대지 않는다).
  */
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3100";

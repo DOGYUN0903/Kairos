@@ -417,23 +417,6 @@ export async function addProductToSeller(
   return { productId, skuId };
 }
 
-/** 주문에서 상품 ID 로 주문 항목 ID 를 찾는다. */
-export async function orderItemIdOf(request: APIRequestContext, buyerToken: string, orderId: number, productId: number): Promise<number> {
-  for (const so of (await orderDetail(request, buyerToken, orderId)).sellerOrders) {
-    const item = so.items.find((i) => i.productId === productId);
-    if (item) return item.orderItemId;
-  }
-  throw new Error(`주문 ${orderId} 에 상품 ${productId} 항목이 없습니다`);
-}
-
-export type ReturnReasonCode = "CHANGE_OF_MIND" | "DEFECTIVE" | "WRONG_DELIVERY";
-
-/** 구매자 반품 요청(API). returnId 를 돌려준다. */
-export async function requestReturnApi(request: APIRequestContext, buyerToken: string, orderId: number, orderItemId: number, reason: ReturnReasonCode, detail?: string): Promise<number> {
-  const r = await api.post<{ returnId: number }>(request, `/api/v1/orders/${orderId}/items/${orderItemId}/returns`, buyerToken, { reason, ...(detail ? { detail } : {}) });
-  return r.returnId;
-}
-
 /** 반품 승인(API). 판매자 토큰이면 판매자 경로, 관리자면 관리자 경로. */
 export async function approveReturnApi(request: APIRequestContext, token: string, returnId: number, as: "seller" | "admin" = "seller") {
   await api.patch(request, `/api/v1/${as}/returns/${returnId}/approve`, token);
@@ -474,5 +457,5 @@ export function refundValue(scope: Page | Locator, label: string): Locator {
 
 /** 주문 상세에서 상품 이름으로 항목 줄(OrderItemRow)을 찾는다. */
 export function itemRow(page: Page, productName: string): Locator {
-  return page.getByRole("link", { name: productName, exact: true }).locator("xpath=ancestor::div[contains(@class,'72px')][1]");
+  return page.getByTestId("order-item-row").filter({ has: page.getByRole("link", { name: productName, exact: true }) });
 }
