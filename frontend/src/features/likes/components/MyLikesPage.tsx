@@ -19,6 +19,7 @@ function LikedCard({ product }: { product: LikedProduct }) {
   const ended = !isOnSale(product.productStatus);
   return (
     <li className="relative">
+      <div className="relative">
       <Link href={href} className="block" aria-label={`${product.brandName} ${product.name}${ended ? " (판매 종료)" : ""}`}>
         <div className="relative aspect-square overflow-hidden rounded bg-surface-2">
           {product.thumbnailUrl ? (
@@ -30,6 +31,10 @@ function LikedCard({ product }: { product: LikedProduct }) {
           {ended && <div className="absolute inset-0 grid place-items-center rounded bg-navy/55 text-[15px] font-bold text-white">판매 종료</div>}
         </div>
       </Link>
+      <div className="absolute bottom-2 right-2">
+        <LikeButton productId={product.productId} liked tone="navy" variant="overlay" label={`${product.name} 좋아요 취소`} />
+      </div>
+      </div>
       <div className={cn("pt-2.5", ended && "opacity-45")}>
         <p className="text-xs font-bold">{product.brandName}</p>
         <p className="mt-0.5 line-clamp-2 text-sm text-text-2">
@@ -38,9 +43,6 @@ function LikedCard({ product }: { product: LikedProduct }) {
           </Link>
         </p>
         <Money value={product.salePrice} className="mt-1.5 block text-[15px] font-bold" />
-      </div>
-      <div className="absolute right-2 top-2">
-        <LikeButton productId={product.productId} liked tone="navy" label={`${product.name} 좋아요 취소`} />
       </div>
     </li>
   );

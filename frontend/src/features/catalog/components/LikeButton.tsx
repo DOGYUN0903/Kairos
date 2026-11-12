@@ -14,6 +14,7 @@ export function LikeButton({
   likeCount,
   tone = "default",
   label = "좋아요",
+  variant = "default",
 }: {
   productId: number;
   liked: boolean | null | undefined;
@@ -22,6 +23,8 @@ export function LikeButton({
   tone?: "default" | "navy";
   /** 접근성 이름. 목록에서는 상품 이름을 넣는다. */
   label?: string;
+  /** overlay: 썸네일 위에 얹는 36px 원형 버튼(내 좋아요 카드). 숫자는 그리지 않는다. */
+  variant?: "default" | "overlay";
 }) {
   const { toggle, isPending } = useToggleLike(productId);
   const descId = useId();
@@ -35,12 +38,14 @@ export function LikeButton({
       disabled={isPending}
       onClick={() => toggle(pressed)}
       className={cn(
-        "flex h-[52px] flex-col items-center justify-center rounded border border-border bg-bg text-[11px] text-text-2 disabled:opacity-60",
-        pressed && (tone === "navy" ? "border-navy text-navy" : "border-hot text-hot"),
+        variant === "overlay"
+          ? "grid h-9 w-9 place-items-center rounded-full border border-border bg-white text-navy shadow-sm disabled:opacity-60"
+          : "flex h-[52px] flex-col items-center justify-center rounded border border-border bg-bg text-[11px] text-text-2 disabled:opacity-60",
+        variant === "default" && pressed && (tone === "navy" ? "border-navy text-navy" : "border-hot text-hot"),
       )}
     >
-      <Heart className={cn("h-5 w-5", pressed && "fill-current")} aria-hidden />
-      {likeCount !== undefined && (
+      <Heart className={cn(variant === "overlay" ? "h-4 w-4" : "h-5 w-5", pressed && "fill-current")} aria-hidden />
+      {likeCount !== undefined && variant === "default" && (
         <>
           <span aria-hidden>{count.format(likeCount)}</span>
           <span id={descId} className="sr-only">
