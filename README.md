@@ -29,6 +29,11 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 3. `cd frontend && cp .env.example .env.local && pnpm install && pnpm dev`
 4. http://localhost:3000 (Grafana도 기본 3000이라 겹치면 `pnpm dev --port 3001` 처럼 다른 포트를 쓴다)
 
+결제 방식: 기본은 모의 결제(`frontend/.env.local`의 `NEXT_PUBLIC_PG_PROVIDER=mock`, 백엔드 `.env`의 `KAIROS_PG_PROVIDER=mock`)다. 토스페이먼츠 테스트 모드로 바꾸려면 양쪽을 같은 값으로 맞춘다(다르면 결제 승인이 실패한다).
+- 백엔드 `.env`: `KAIROS_PG_PROVIDER=toss`, `TOSS_SECRET_KEY=test_sk_…`(시크릿 키는 여기에만 둔다)
+- 프론트 `frontend/.env.local`: `NEXT_PUBLIC_PG_PROVIDER=toss`, `NEXT_PUBLIC_TOSS_CLIENT_KEY=test_ck_…`(토스 "API 개별 연동" 테스트 클라이언트 키, 공개용)
+- 모의 결제창의 실패 선택지(카드사 거절·응답 없음 2종)는 데모 빌드(`NEXT_PUBLIC_DEMO_MODE=true`)에서만 보인다. 운영 빌드 번들에는 없다(`pnpm check:bundle`이 확인한다).
+
 명령(`frontend/`에서):
 - `pnpm dev` / `pnpm build` / `pnpm start`
 - `pnpm lint`, `pnpm typecheck`, `pnpm test`(Vitest)
@@ -36,7 +41,7 @@ Kotlin 2.3, Spring Boot 4.1, JDK 21, Gradle Kotlin DSL, MySQL 8.4, Redis 7.4, Fl
 - `pnpm check:bundle`(운영 빌드에 데모 코드·관리자 계정 문자열이 없는지 확인)
 - `pnpm e2e`(Playwright, 아래 전제 필요)
 
-E2E 전제: `local,demo` 프로필 백엔드가 떠 있고 `KAIROS_DEMO_PASSWORD`를 같은 값으로 넘긴다(데모 관리자 `admin@kairos.demo`로 승인 단계를 진행한다). 처음 한 번 `pnpm exec playwright install chromium`. 주소는 환경변수로 바꾼다: `E2E_BASE_URL`(기본 http://localhost:3100, Grafana의 3000과 겹치지 않게), `BACKEND_URL`(기본 http://localhost:8080). 그 주소에 서버가 없으면 `scripts/e2e-server.sh`가 `.next-e2e`에 운영 빌드한 뒤 `next start`로 띄운다(추적 파일을 건드리지 않는다). 이미 떠 있는 서버가 있으면 그대로 재사용하므로(`reuseExistingServer`), 시작 전에 그 주소가 KAIROS 화면인지 확인하고 아니면 바로 실패한다. 재사용한 서버는 `BACKEND_URL`과 같은 백엔드를 보고 있어야 한다. 예: `KAIROS_DEMO_PASSWORD=… pnpm e2e`. 데이터는 실행마다 고유한 이름으로 만들므로 재시드 상태에 기대지 않는다. CI(`.github/workflows/frontend.yml`)는 백엔드가 필요한 E2E를 빼고 check:api·lint·typecheck·test·build·check:bundle을 돌린다.
+E2E 전제: `local,demo` 프로필 백엔드가 떠 있고(구매 흐름 spec은 결제에 모의 결제를 쓰므로 백엔드가 `KAIROS_PG_PROVIDER=mock`이어야 하고, E2E 서버는 `NEXT_PUBLIC_PG_PROVIDER=mock`·데모 아닌 빌드로 뜬다) `KAIROS_DEMO_PASSWORD`를 같은 값으로 넘긴다(데모 관리자 `admin@kairos.demo`로 승인 단계를 진행한다). 처음 한 번 `pnpm exec playwright install chromium`. 주소는 환경변수로 바꾼다: `E2E_BASE_URL`(기본 http://localhost:3100, Grafana의 3000과 겹치지 않게), `BACKEND_URL`(기본 http://localhost:8080). 그 주소에 서버가 없으면 `scripts/e2e-server.sh`가 `.next-e2e`에 운영 빌드한 뒤 `next start`로 띄운다(추적 파일을 건드리지 않는다). 이미 떠 있는 서버가 있으면 그대로 재사용하므로(`reuseExistingServer`), 시작 전에 그 주소가 KAIROS 화면인지 확인하고 아니면 바로 실패한다. 재사용한 서버는 `BACKEND_URL`과 같은 백엔드를 보고 있어야 한다. 예: `KAIROS_DEMO_PASSWORD=… pnpm e2e`. 데이터는 실행마다 고유한 이름으로 만들므로 재시드 상태에 기대지 않는다. CI(`.github/workflows/frontend.yml`)는 백엔드가 필요한 E2E를 빼고 check:api·lint·typecheck·test·build·check:bundle을 돌린다.
 
 > 경고: `NEXT_PUBLIC_DEMO_*`는 운영 빌드에 두지 않는다. 빌드 시점에 번들에 들어가 데모 계정이 노출된다.
 
@@ -49,6 +54,7 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고 `KAIROS_DEMO_PASSWORD
 - [x] C3. 혜택과 후기
 - [x] C4. 반품과 정산
 - [x] F1. 프론트엔드 기반과 C1 화면
+- [ ] F2. 구매 화면
 - [ ] C5. 운영 데이터
 - [ ] C6. 핫딜 추가
 - [ ] Phase 3. 모놀리식 최적화
@@ -68,6 +74,8 @@ E2E 전제: `local,demo` 프로필 백엔드가 떠 있고 `KAIROS_DEMO_PASSWORD
 - C4 구현 계획: `docs/superpowers/plans/2026-11-10-c4-returns-settlement.md`
 - F1 스펙: `docs/superpowers/specs/2026-11-11-frontend-f1-foundation-design.md`
 - F1 구현 계획: `docs/superpowers/plans/2026-11-11-frontend-f1-foundation.md`
+- F2 스펙: `docs/superpowers/specs/2026-11-12-frontend-f2-purchase-design.md`
+- F2 구현 계획: `docs/superpowers/plans/2026-11-12-frontend-f2-purchase.md`
 - ADR 0005(C4 반품 환불과 정산 불변성): `docs/adr/0005-c4-return-refund-and-settlement-immutability.md`
 - ADR 0004(C3 혜택 트랜잭션과 락 순서): `docs/adr/0004-c3-benefit-transaction-and-lock-order.md`
 - ADR 0003(C2 주문 트랜잭션과 외부 호출 경계): `docs/adr/0003-c2-order-transaction-and-external-calls.md`
