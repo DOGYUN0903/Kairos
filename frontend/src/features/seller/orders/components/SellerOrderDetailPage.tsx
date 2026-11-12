@@ -18,12 +18,13 @@ import { OrderThumb } from "@/features/orders/components/OrderThumb";
 import { ShippingAddressCard } from "@/features/orders/components/ShippingAddressCard";
 import { useSellerBanner } from "@/features/seller/gate/banner";
 import { useSellerCapabilities } from "@/features/seller/gate/useSellerCapabilities";
-import { canDeliver, canSellerCancelItem, canShip } from "@/features/seller/orders/actions";
+import { canDeliver, canSellerCancelItem, canShip, shipBlockReason } from "@/features/seller/orders/actions";
 import { useDeliver, useSellerOrder, type SellerOrderDetail } from "@/features/seller/orders/api";
 import { SellerCancelDialog } from "@/features/seller/orders/components/SellerCancelDialog";
 import { SellerStatusChip } from "@/features/seller/orders/components/SellerStatusChip";
 import { ShipDialog } from "@/features/seller/orders/components/ShipDialog";
 import { toast } from "@/hooks/use-toast";
+import { unitPrice } from "@/lib/money";
 import { formatDateTime } from "@/lib/datetime";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
@@ -90,8 +91,7 @@ function Detail({ so }: { so: SellerOrderDetail }) {
     }
   };
 
-  const shipBlocked = so.items.some((i) => i.status === "CANCEL_REQUESTED");
-  const shipTitle = !canProcessOrders ? SUSPENDED_TITLE : shipBlocked ? "취소를 확인 중인 항목이 있어 발송할 수 없습니다" : undefined;
+  const shipTitle = !canProcessOrders ? SUSPENDED_TITLE : (shipBlockReason(so) ?? undefined);
 
   return (
     <>
@@ -142,6 +142,7 @@ function Detail({ so }: { so: SellerOrderDetail }) {
               <thead>
                 <tr>
                   <th scope="col" className={TH}>상품</th>
+                  <th scope="col" className={`${TH} text-right`}>단가</th>
                   <th scope="col" className={`${TH} text-right`}>수량</th>
                   <th scope="col" className={`${TH} text-right`}>금액</th>
                   <th scope="col" className={TH}>상태</th>
@@ -163,6 +164,9 @@ function Detail({ so }: { so: SellerOrderDetail }) {
                             </span>
                           </div>
                         </div>
+                      </td>
+                      <td className={`${TD} text-right ${canceled ? "opacity-55" : ""}`}>
+                        <Money value={unitPrice(item.salePrice, item.extraPrice)} />
                       </td>
                       <td className={`${TD} text-right tabular-nums ${canceled ? "opacity-55" : ""}`}>{item.quantity}</td>
                       <td className={`${TD} text-right font-bold ${canceled ? "opacity-55" : ""}`}>

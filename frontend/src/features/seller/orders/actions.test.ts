@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OrderItemResult } from "@/features/orders/api";
 import type { SellerOrderDetail } from "@/features/seller/orders/api";
-import { canDeliver, canSellerCancelItem, canShip } from "./actions";
+import { canDeliver, canSellerCancelItem, canShip, shipBlockReason } from "./actions";
 
 const item = (status: OrderItemResult["status"]): OrderItemResult => ({ orderItemId: 1, status }) as OrderItemResult;
 const so = (status: SellerOrderDetail["status"], items: OrderItemResult["status"][]): SellerOrderDetail =>
@@ -35,5 +35,14 @@ describe("canSellerCancelItem", () => {
     expect(canSellerCancelItem(so("PAID", ["ORDERED"]), item("CANCEL_REQUESTED"))).toBe(false);
     expect(canSellerCancelItem(so("PAID", ["ORDERED"]), item("CANCELED"))).toBe(false);
     expect(canSellerCancelItem(so("SHIPPING", ["ORDERED"]), item("ORDERED"))).toBe(false);
+  });
+});
+
+describe("shipBlockReason", () => {
+  it("발송_불가_이유를_고른다", () => {
+    expect(shipBlockReason(so("PAID", ["ORDERED"]))).toBeNull();
+    expect(shipBlockReason(so("PAID", ["CANCELED", "CANCELED"]))).toBe("발송할 상품이 없습니다");
+    expect(shipBlockReason(so("PAID", ["ORDERED", "CANCEL_REQUESTED"]))).toBe("취소 확인 중인 상품이 있습니다");
+    expect(shipBlockReason(so("SHIPPING", ["ORDERED"]))).toBeNull();
   });
 });

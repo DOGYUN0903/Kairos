@@ -17,9 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 /** 발송 처리 창. open 일 때만 내용을 그려 닫으면 입력이 새로 시작한다. */
 export function ShipDialog({ sellerOrderId, orderNo, itemCount, open, onClose }: { sellerOrderId: number; orderNo: string; itemCount: number; open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      {open && <ShipBody sellerOrderId={sellerOrderId} orderNo={orderNo} itemCount={itemCount} onClose={onClose} />}
-    </Dialog>
+    open ? <ShipBody sellerOrderId={sellerOrderId} orderNo={orderNo} itemCount={itemCount} onClose={onClose} /> : null
   );
 }
 
@@ -56,7 +54,8 @@ function ShipBody({ sellerOrderId, orderNo, itemCount, onClose }: { sellerOrderI
   const carrierError = formState.errors.carrierCode?.message;
 
   return (
-    <DialogContent className="max-w-[460px]" onInteractOutside={(e) => submitting && e.preventDefault()}>
+    <Dialog open onOpenChange={(next) => !next && !submitting && onClose()}>
+    <DialogContent className="max-w-[460px]">
       <DialogHeader>
         <DialogTitle>발송 처리</DialogTitle>
         <DialogDescription>
@@ -112,5 +111,6 @@ function ShipBody({ sellerOrderId, orderNo, itemCount, onClose }: { sellerOrderI
         </div>
       </form>
     </DialogContent>
+    </Dialog>
   );
 }

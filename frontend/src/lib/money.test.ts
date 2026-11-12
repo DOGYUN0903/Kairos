@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, lineTotal, mod, parseWon } from "@/lib/money";
+import { amountUntil, assertSafeInt, discountRate, floorDiv, formatBp, formatKrw, lineTotal, mod, unitPrice, parseWon } from "@/lib/money";
 
 describe("money", () => {
   it("formatKrw는_27300을_27_300원으로_만든다", () => {
@@ -16,6 +16,10 @@ describe("money", () => {
   });
   it("lineTotal(27300, 2000, 3)은_87900", () => {
     expect(lineTotal(27300, 2000, 3)).toBe(87900);
+  });
+  it("unitPrice는_판매가와_추가금의_합이다",()=>{
+    expect(unitPrice(27300, 2000)).toBe(29300);
+    expect(unitPrice(27300, 0)).toBe(27300);
   });
   it("parseWon은_소수와_음수를_null로", () => {
     expect(parseWon("1.5")).toBeNull();

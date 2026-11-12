@@ -23,6 +23,11 @@ export function discountRate(originalPrice: number, salePrice: number): number {
   return Math.floor(((orig - sale) * 100) / orig);
 }
 
+/** 단가 = 판매가 + 옵션 추가금(서버 값 두 개의 덧셈). */
+export function unitPrice(salePrice: number, extraPrice: number): number {
+  return assertSafeInt(assertSafeInt(salePrice, "판매가") + assertSafeInt(extraPrice, "추가금"), "단가");
+}
+
 export function lineTotal(salePrice: number, extraPrice: number, quantity: number): number {
   const total =
     (assertSafeInt(salePrice, "판매가") + assertSafeInt(extraPrice, "추가금")) * assertSafeInt(quantity, "수량");
