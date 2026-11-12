@@ -54,8 +54,17 @@ describe("refundRows", () => {
   });
   it("불량은_3줄", () => {
     const rows = refundRows({ ...z, paidAmount: 30000, shippingFeeRefund: 3000, refundAmount: 33000 });
-    expect(rows.map((r) => r.label)).toEqual(["결제 금액", "배송비 환급", "환불 금액"]);
+    expect(rows.map((r) => r.label)).toEqual(["결제 금액", "배송비 환불", "환불 금액"]);
     expect(rows[1]!.sign).toBe("plus");
+  });
+  it("미리보기는_환불_예정_금액_라벨을_쓴다", () => {
+    const rows = refundRows({ ...z, paidAmount: 20000, refundAmount: 17000, pointsRefund: 3000 }, "환불 예정 금액");
+    expect(rows.map((r) => r.label)).toEqual(["결제 금액", "환불 예정 금액", "포인트 반환"]);
+    expect(refundRows(z, "환불 금액")[1]!.label).toBe("환불 금액");
+  });
+  it("전체_라벨_집합", () => {
+    const rows = refundRows({ paidAmount: 1, returnFee: 1, outboundFeeRecovered: 1, shippingFeeRefund: 1, refundAmount: 1, pointsRefund: 1 });
+    expect(rows.map((r) => r.label)).toEqual(["결제 금액", "반품비", "발송 배송비 회수", "배송비 환불", "환불 금액", "포인트 반환"]);
   });
   it("포인트_반환이_있으면_줄이_늘어난다", () => {
     const rows = refundRows({ ...z, paidAmount: 20000, refundAmount: 17000, pointsRefund: 3000 });

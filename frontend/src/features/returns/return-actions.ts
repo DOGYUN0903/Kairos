@@ -24,19 +24,22 @@ export function canWithdraw(returnStatus: string | null | undefined): boolean {
 export type RefundRow = { key: string; label: string; amount: number; sign: "plus" | "minus" | "none"; unit: "won" | "point" };
 
 /** 환불 내역 줄. 0 이 아닌 줄만 순서대로(결제 금액·환불 금액은 항상). 금액은 서버 값 그대로이고 부호만 정한다. */
-export function refundRows(r: {
-  paidAmount: number;
-  returnFee: number;
-  outboundFeeRecovered: number;
-  shippingFeeRefund: number;
-  refundAmount: number;
-  pointsRefund: number;
-}): RefundRow[] {
+export function refundRows(
+  r: {
+    paidAmount: number;
+    returnFee: number;
+    outboundFeeRecovered: number;
+    shippingFeeRefund: number;
+    refundAmount: number;
+    pointsRefund: number;
+  },
+  refundLabel: "환불 예정 금액" | "환불 금액" = "환불 금액",
+): RefundRow[] {
   const rows: RefundRow[] = [{ key: "paid", label: "결제 금액", amount: r.paidAmount, sign: "none", unit: "won" }];
   if (r.returnFee !== 0) rows.push({ key: "returnFee", label: "반품비", amount: r.returnFee, sign: "minus", unit: "won" });
   if (r.outboundFeeRecovered !== 0) rows.push({ key: "outbound", label: "발송 배송비 회수", amount: r.outboundFeeRecovered, sign: "minus", unit: "won" });
-  if (r.shippingFeeRefund !== 0) rows.push({ key: "shippingRefund", label: "배송비 환급", amount: r.shippingFeeRefund, sign: "plus", unit: "won" });
-  rows.push({ key: "refund", label: "환불 금액", amount: r.refundAmount, sign: "none", unit: "won" });
+  if (r.shippingFeeRefund !== 0) rows.push({ key: "shippingRefund", label: "배송비 환불", amount: r.shippingFeeRefund, sign: "plus", unit: "won" });
+  rows.push({ key: "refund", label: refundLabel, amount: r.refundAmount, sign: "none", unit: "won" });
   if (r.pointsRefund !== 0) rows.push({ key: "points", label: "포인트 반환", amount: r.pointsRefund, sign: "none", unit: "point" });
   return rows;
 }
